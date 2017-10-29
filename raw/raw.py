@@ -5,7 +5,7 @@ from __future__ import (
     absolute_import,
     print_function,
     division,
-    )
+)
 
 import io
 import os
@@ -22,67 +22,73 @@ from fractions import Fraction
 
 '''
 Takes pictures in raw bayer format with different shutter times
-Version: 1
+Version: 2
 Attila Horvat
 25.10.2017
 '''
 
-
-global Path
-Path = '/home/pi/python_scripts/raw/raw_pictures'
-
+global Path_to_raw
+Path_to_raw = './raw_pictures'
 
 def takepictures(mypath):
     try:
-        global Path
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')        
-        Path = mypath + "/" + timestamp
-        os.makedirs(Path)
-        setOwnerAndPermission(Path)
-      
+        global Path_to_raw
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        Path_to_raw = mypath + "/" + timestamp
+        os.makedirs(Path_to_raw)
+        setOwnerAndPermission(Path_to_raw)
+
+        log = open(Path_to_raw + '/'+timestamp+'_log.txt', 'w')
+
         stream = io.BytesIO()
         with picamera.PiCamera() as camera:
             # Let the camera warm up for a couple of seconds
             camera.resolution = (2592, 1944)
-            #1/2 per second
-            #camera.framerate = Fraction(1, 2)
-            #shutter speed is limited by framerate!
+            # 1/2 per second
+            # camera.framerate = Fraction(1, 2)
+            # shutter speed is limited by framerate!
             camera.framerate = 1
             camera.exposure_mode = 'off'
             camera.awb_mode = 'auto'
             camera.iso = 0
             shutter_speed = 100
             for i0 in range(10):
-                #set shutter speed
-                camera.shutter_speed = (i0+1)*shutter_speed
-                #time.sleep(2)        
-                fileName = 'raw_img%s.jpg'%str(i0)
+                # set shutter speed
+                camera.shutter_speed = (i0 + 1) * shutter_speed
+                # time.sleep(2)
+                fileName = 'raw_img%s.jpg' % str(i0)
                 # Capture the image, without the Bayer data to file
-                camera.capture(Path + "/" + fileName, format='jpeg', bayer=False)
+                camera.capture(Path_to_raw + "/" + fileName, format='jpeg', bayer=False)
+
                 # Capture the image, including the Bayer data to stream
                 camera.capture(stream, format='jpeg', bayer=True)
-                
-                #camera settings
+
+                # camera settings
                 exp = camera.exposure_speed
                 ag = camera.analog_gain
                 dg = camera.digital_gain
                 awb = camera.awb_gains
                 br = camera.brightness
                 ct = camera.contrast
-                print('exposure time %d, ag %f, dg %f, awb %s, br %d, ct = %d' %(exp,ag,dg,str(awb),br,ct))
-                
+
+                logdata = '{} Run: camera shutter speed:[{}] '.format(str(i0),camera.shutter_speed)
+                logdata = logdata +'| camera settings: [exposure time'
+                logdata = logdata +' %d, ag %f, dg %f, awb %s, br %d, ct = %d]' % (exp, ag, dg, str(awb), br, ct)
+                print(logdata)
+                log.write(logdata+ "\n")
+
                 # Extract the raw Bayer data from the end of the stream (is in jpeg-meta data), check the
-                # header and strip if off before converting the data into a numpy array
+                # header and strip it off before converting the data into a numpy array
 
                 data = stream.getvalue()[-10270208:]
-                print('%s' %data[:4])
-                #assert data[:4] == 'BRCM'
-                data = data[32768:4128*2480+32768]
+                print('%s' % data[:4])
+                # assert data[:4] == 'BRCM'
+                data = data[32768:4128 * 2480 + 32768]
                 data = np.fromstring(data, dtype=np.uint8)
 
                 # The data consists of 2480 rows of 4128 bytes of data. The last rows
                 # of data are unused (they only exist because the actual resolution of
-                # is rounded up to the nearest 16). Likewise, the last 
+                # is rounded up to the nearest 16). Likewise, the last
                 # bytes of each row are unused (why?). Here we reshape the data and
                 # strip off the unused bytes
 
@@ -103,19 +109,19 @@ def takepictures(mypath):
                 data = data.astype(np.uint16) << 2
                 for byte in range(4):
                     data[:, byte::5] |= ((data[:, 4::5] >> ((4 - byte) * 2)) & 0b11)
-                
+
                 data = np.delete(data, np.s_[4::5], 1)
 
-                # Finally save raw (16bit data) having a size 3296 x 2464 
-                fileName = 'data%d_%s.data'%(i0,str(''))
-                print('%s' %fileName)
-                with open(Path + "/" + fileName, 'wb') as g:
+                # Finally save raw (16bit data) having a size 3296 x 2464
+                fileName = 'data%d_%s.data' % (i0, str(''))
+                print('%s' % fileName)
+                with open(Path_to_raw + "/" + fileName, 'wb') as g:
                     data.tofile(g)
 
-                setOwnerAndPermission(Path)
-    
+                setOwnerAndPermission(Path_to_raw)
+
     except Exception as e:
-        #camera.close()
+        # camera.close()
         print('Error in takepicture: ' + str(e))
 
 def setOwnerAndPermission(pathToFile):
@@ -126,29 +132,27 @@ def setOwnerAndPermission(pathToFile):
         os.chmod(pathToFile, 0o777)
     except IOError as e:
         print('PERM : Could not set permissions for file: ' + str(e))
-        
 
 def createNewFolder(mypath):
     try:
         if not os.path.exists(mypath):
-            os.makedirs(Path)
+            os.makedirs(Path_to_raw)
             setOwnerAndPermission(mypath)
     except IOError as e:
         print('DIR : Could not create new folder: ' + str(e))
 
-
-def compressFolder(mypath,zipfilename):
+def compressFolder(mypath, zipfilename):
     try:
         print("Compressed file in : {} ".format(mypath))
-        dirtozip    = os.path.join(mypath,zipfilename)
-        zipfilepath = os.path.join(mypath,zipfilename+".zip")
-        
+        dirtozip = os.path.join(mypath, zipfilename)
+        zipfilepath = os.path.join(mypath, zipfilename + ".zip")
+
         zf = zipfile.ZipFile(zipfilepath, "w", zipfile.ZIP_DEFLATED)
         for dirname, subdirs, files in os.walk(dirtozip):
             print('writing dirname: {}'.format(dirname))
-            zf.write(dirname)        
+            zf.write(dirname)
             for filename in files:
-                filepath = os.path.join(dirname, filename)             
+                filepath = os.path.join(dirname, filename)
                 zf.write(filepath)
                 print('adding file {} to zip'.format(filename))
         zf.close()
@@ -156,13 +160,12 @@ def compressFolder(mypath,zipfilename):
     except IOError as e:
         print('ZIP : Could not create *.zip file: ' + str(e))
 
-
 def main():
     try:
-        global Path
-        createNewFolder(Path)
-        takepictures(Path)
-        #compressFolder(Path)
+        global Path_to_raw
+        createNewFolder(Path_to_raw)
+        takepictures(Path_to_raw)
+        # compressFolder(Path)
 
     except Exception as e:
         print('Error in Main: ' + str(e))
@@ -170,4 +173,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-        
+
