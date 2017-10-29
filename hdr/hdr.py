@@ -1,129 +1,153 @@
 #!/usr/bin/env python
-#Quelle: http://www.learnopencv.com/high-dynamic-range-hdr-imaging-using-opencv-cpp-python/
 
 import cv2
 import numpy as np
-from os import listdir, makedirs, walk,path
+import os
+import exifread
+#import pwd
+#import grp
+from os import listdir
 from os.path import isfile, join
+from fractions import Fraction
+import shutil
 
-def readImagesAndTimes(picturepath):
-  
-  #times = np.array([ 1/30.0, 0.25, 2.5, 15.0 ], dtype=np.float32)
-  #filenames = ["img_0.033.jpg", "img_0.25.jpg", "img_2.5.jpg", "img_15.jpg"]
+print('Version opencv: ' + cv2.__version__)
 
+'''
+hdr.py 
+Version 2
+29.10.2017
+Attila Horvath
+'''
 
-  filenames = []
-  shuttertimes = []
-
-  onlyfiles = [f for f in listdir(picturepath) if isfile(join(picturepath, f))]
-
-  for file in onlyfiles:
-    print(file)
-    filenames.append(picturepath+file)
-    shuttertimes.append(np.float32(file.split("ss")[1].replace('.jpg',''))/1000000)
+global Path_to_raw
+Path_to_raw ='./jpg/2'
 
 
+def getEXIF_TAG(file_path, field):
+    try:
+        foundvalue = '0'
+        with open(file_path, 'rb') as f:
+            exif = exifread.process_file(f)
 
-  #filenames = [picturepath +"iso100ss200.jpg",picturepath +"iso100ss600.jpg",picturepath +"iso100ss4000.jpg"]
-  #s1 = np.float32(filenames[0].split("ss")[1].replace('.jpg',''))/1000000
-  #s2 = np.float32(filenames[1].split("ss")[1].replace('.jpg',''))/1000000
-  #s3 = np.float32(filenames[2].split("ss")[1].replace('.jpg',''))/1000000
-  #print("Shutter time s1 : "+str(s1))
-  #print("Shutter time s2 : "+str(s2))
-  #print("Shutter time s3 : "+str(s3))
+        for k in sorted(exif.keys()):
+            if k not in ['JPEGThumbnail', 'TIFFThumbnail', 'Filename', 'EXIF MakerNote']:
+                if k == field:
+                    #print('%s = %s' % (k, exif[k]))
+                    foundvalue = np.float32(Fraction(str(exif[k])))
+                    break
 
-  times = np.array(shuttertimes, dtype=np.float32)   #times = np.array([ 0.0001, 0.0006, 0.002 ], dtype=np.float32)
+        return  foundvalue
 
-  images = []
-  for filename in filenames:
-    im = cv2.imread(filename)
-    images.append(im)
-  
-  return images, times
+    except Exception as e:
+        print('EXIF: Could not read exif data ' + str(e))
 
 
-def makeHDR (picturepath,outputfolder):
+def readImagesAndExpos(mypath,piclist):
+    try:
+        onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
+        image_stack = np.empty(len(piclist), dtype=object)    # Achtung len = onlyfiles für alle bilder
+        expos_stack = np.empty(len(piclist), dtype=np.float32)# Achtung len = onlyfiles für alle bilder
+        for n in range(0, len(onlyfiles)):
+            picnumber = ''.join(filter(str.isdigit, onlyfiles[n]))
+            pos = 0
+            for pic in piclist:
+                if picnumber == pic:
+                    expos_stack[pos] = getEXIF_TAG(join(mypath, onlyfiles[n]), "EXIF ExposureTime")
+                    image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
+                pos = pos + 1
 
-  try:
-    images, times = readImagesAndTimes(picturepath)
+        return image_stack, expos_stack
 
-    # Align input images
-    print("Aligning images ... ")
-    alignMTB = cv2.createAlignMTB()
-    alignMTB.process(images, images)
+    except Exception as e:
+        print('readImagesAndExpos: Could not read images ' + str(e))
 
-    # Obtain Camera Response Function (CRF)
-    print("Calculating Camera Response Function (CRF) ... ")
-    calibrateDebevec = cv2.createCalibrateDebevec()
-    responseDebevec = calibrateDebevec.process(images, times)
 
-    # Merge images into an HDR linear image
-    print("Merging images into one HDR image ... ")
-    mergeDebevec = cv2.createMergeDebevec()
-    hdrDebevec = mergeDebevec.process(images, times, responseDebevec)
-    # Save HDR image.
-    cv2.imwrite(join(outputfolder,"hdrDebevec.hdr"), hdrDebevec)
-    print("saved hdrDebevec.hdr ")
+def createHDR(mypath,piclist):
 
-    # Tonemap using Drago's method to obtain 24-bit color image
-    print("Tonemaping using Drago's method ... ")
-    tonemapDrago = cv2.createTonemapDrago(1.0, 0.7)
-    ldrDrago = tonemapDrago.process(hdrDebevec)
-    ldrDrago = 3 * ldrDrago
-    cv2.imwrite(join(outputfolder,"ldr-Drago.jpg"), ldrDrago * 255)
-    print("saved ldr-Drago.jpg")
+    try:
+        images, times = readImagesAndExpos(mypath,piclist)
 
-    # Tonemap using Durand's method obtain 24-bit color image
-    print("Tonemaping using Durand's method ... ")
-    tonemapDurand = cv2.createTonemapDurand(1.5, 4, 1.0, 1, 1)
-    ldrDurand = tonemapDurand.process(hdrDebevec)
-    ldrDurand = 3 * ldrDurand
-    cv2.imwrite(join(outputfolder,"ldr-Durand.jpg"), ldrDurand * 255)
-    print("saved ldr-Durand.jpg")
+        # Align input images
+        print("Aligning images ... ")
+        alignMTB = cv2.createAlignMTB()
+        alignMTB.process(images, images)
 
-    # Tonemap using Reinhard's method to obtain 24-bit color image
-    print("Tonemaping using Reinhard's method ... ")
-    tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
-    ldrReinhard = tonemapReinhard.process(hdrDebevec)
-    cv2.imwrite(join(outputfolder,"ldr-Reinhard.jpg"), ldrReinhard * 255)
-    print("saved ldr-Reinhard.jpg")
+        # Obtain Camera Response Function (CRF)
+        print("Calculating Camera Response Function (CRF) ... ")
+        calibrateDebevec = cv2.createCalibrateDebevec()
+        responseDebevec = calibrateDebevec.process(images, times)
 
-    # Tonemap using Mantiuk's method to obtain 24-bit color image
-    print("Tonemaping using Mantiuk's method ... ")
-    tonemapMantiuk = cv2.createTonemapMantiuk(2.2, 0.85, 1.2)
-    ldrMantiuk = tonemapMantiuk.process(hdrDebevec)
-    ldrMantiuk = 3 * ldrMantiuk
-    cv2.imwrite(join(outputfolder,"ldr-Mantiuk.jpg"), ldrMantiuk * 255)
-    print("saved ldr-Mantiuk.jpg")
+        # Merge images into an HDR linear image
+        print("Merging images into one HDR image ... ")
+        mergeDebevec = cv2.createMergeDebevec()
+        hdrDebevec = mergeDebevec.process(images, times, responseDebevec)
+        # Save HDR image.
+        cv2.imwrite("./output/hdrDebevec.hdr", hdrDebevec)
+        print("saved hdrDebevec.hdr ")
 
-  except cv2.error as e:
-    print("Error: " + str(e))
+        # Tonemap using Drago's method to obtain 24-bit color image
+        print("Tonemaping using Drago's method ... ")
+        tonemapDrago = cv2.createTonemapDrago(1.0, 0.7)
+        ldrDrago = tonemapDrago.process(hdrDebevec)
+        ldrDrago = 3 * ldrDrago
+        cv2.imwrite("./output/ldr-Drago.jpg", ldrDrago * 255)
+        print("saved ldr-Drago.jpg")
+
+        # Tonemap using Durand's method obtain 24-bit color image
+        print("Tonemaping using Durand's method ... ")
+        tonemapDurand = cv2.createTonemapDurand(1.5, 4, 1.0, 1, 1)
+        ldrDurand = tonemapDurand.process(hdrDebevec)
+        ldrDurand = 3 * ldrDurand
+        cv2.imwrite("./output/ldr-Durand.jpg", ldrDurand * 255)
+        print("saved ldr-Durand.jpg")
+
+        # Tonemap using Reinhard's method to obtain 24-bit color image
+        print("Tonemaping using Reinhard's method ... ")
+        tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
+        ldrReinhard = tonemapReinhard.process(hdrDebevec)
+        cv2.imwrite("./output/ldr-Reinhard.jpg", ldrReinhard * 255)
+        print("saved ldr-Reinhard.jpg")
+
+        # Tonemap using Mantiuk's method to obtain 24-bit color image
+        print("Tonemaping using Mantiuk's method ... ")
+        tonemapMantiuk = cv2.createTonemapMantiuk(2.2, 0.85, 1.2)
+        ldrMantiuk = tonemapMantiuk.process(hdrDebevec)
+        ldrMantiuk = 3 * ldrMantiuk
+        cv2.imwrite("./output/ldr-Mantiuk.jpg", ldrMantiuk * 255)
+        print("saved ldr-Mantiuk.jpg")
+
+    except Exception as e:
+        print('readImageAndTimes: Could not read images ' + str(e))
+
+def setOwnerAndPermission(pathToFile):
+    try:
+        #uid = pwd.getpwnam('pi').pw_uid
+        #gid = grp.getgrnam('pi').gr_gid
+        #os.chown(pathToFile, uid, gid)
+        #os.chmod(pathToFile, 0o777)
+        return
+    except IOError as e:
+        print('PERM : Could not set permissions for file: ' + str(e))
+
+def createNewFolder(Path):
+    try:
+        if os.path.exists(Path):
+            shutil.rmtree(Path)
+            os.makedirs(Path)
+            setOwnerAndPermission(Path)
+    except IOError as e:
+        print('DIR : Could not create new folder: ' + str(e))
+
+def main():
+    try:
+        global Path_to_raw
+        createNewFolder('./ouput')
+        createHDR(Path_to_raw,['3','4','5'])
+
+    except Exception as e:
+        print('MAIN: Error in main: ' + str(e))
+
 
 if __name__ == '__main__':
-
-  subdirs = []
-  foldername = './pictures_forhdr/'
-
-  # Read images and exposure times
-  print("Reading images ... ")
-  try:
-
-    for i, j, y in walk(foldername):
-      subdirs.append(i)
-    subdirs.pop(0)
-
-    for picturesdirectory in subdirs:
-      newfoldername = str(picturesdirectory).split("normal/")[1]
-      outputfolder = join('./output/', ('hdr_' + newfoldername + "/"))
-      print(outputfolder)
-      if not path.exists(outputfolder):
-        makedirs(outputfolder)
-      print(picturesdirectory + str('/'))
-      makeHDR(picturesdirectory+'/', outputfolder)
-
-
-  except OSError  as e:
-    print("Error: " + str(e))
-
-
-
+    main()
