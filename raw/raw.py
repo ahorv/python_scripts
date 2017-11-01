@@ -189,7 +189,7 @@ def main():
         global Path_to_raw
         usedspace = disk_stat()
         if usedspace > 80:
-            raise RuntimeError('WARRNING: Not enough free space on SD Card!')
+            raise RuntimeError('WARNING: Not enough free space on SD Card!')
             return
 
         createNewFolder(Path_to_raw)
