@@ -22,23 +22,24 @@ from fractions import Fraction
 
 '''
 Takes pictures in raw bayer format with different shutter times
-Version: 2
-Attila Horvat
-25.10.2017
+Version: 3
+Attila Horvath
+01.11.2017
 '''
 
 global Path_to_raw
 Path_to_raw = './raw_pictures'
 
-def takepictures(mypath):
+
+def takepictures(path):
     try:
         global Path_to_raw
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        Path_to_raw = mypath + "/" + timestamp
-        os.makedirs(Path_to_raw)
-        setOwnerAndPermission(Path_to_raw)
+        subdir = path + "/" + timestamp
+        os.makedirs(subdir)
+        setOwnerAndPermission(subdir)
 
-        log = open(Path_to_raw + '/'+timestamp+'_log.txt', 'w')
+        log = open(subdir + '/'+timestamp+'_log.txt', 'w')
 
         stream = io.BytesIO()
         with picamera.PiCamera() as camera:
@@ -58,7 +59,7 @@ def takepictures(mypath):
                 # time.sleep(2)
                 fileName = 'raw_img%s.jpg' % str(i0)
                 # Capture the image, without the Bayer data to file
-                camera.capture(Path_to_raw + "/" + fileName, format='jpeg', bayer=False)
+                camera.capture(subdir + "/" + fileName, format='jpeg', bayer=False)
 
                 # Capture the image, including the Bayer data to stream
                 camera.capture(stream, format='jpeg', bayer=True)
@@ -74,14 +75,14 @@ def takepictures(mypath):
                 logdata = '{} Run: camera shutter speed:[{}] '.format(str(i0),camera.shutter_speed)
                 logdata = logdata +'| camera settings: [exposure time'
                 logdata = logdata +' %d, ag %f, dg %f, awb %s, br %d, ct = %d]' % (exp, ag, dg, str(awb), br, ct)
-                print(logdata)
+                #print(logdata)
                 log.write(logdata+ "\n")
 
                 # Extract the raw Bayer data from the end of the stream (is in jpeg-meta data), check the
                 # header and strip it off before converting the data into a numpy array
 
                 data = stream.getvalue()[-10270208:]
-                print('%s' % data[:4])
+                # print('%s' % data[:4])
                 # assert data[:4] == 'BRCM'
                 data = data[32768:4128 * 2480 + 32768]
                 data = np.fromstring(data, dtype=np.uint8)
@@ -113,12 +114,12 @@ def takepictures(mypath):
                 data = np.delete(data, np.s_[4::5], 1)
 
                 # Finally save raw (16bit data) having a size 3296 x 2464
-                fileName = 'data%d_%s.data' % (i0, str(''))
-                print('%s' % fileName)
-                with open(Path_to_raw + "/" + fileName, 'wb') as g:
+                datafileName = 'data%d_%s.data' % (i0, str(''))
+                #print('%s' % fileName)
+                with open(subdir + "/" + datafileName, 'wb') as g:
                     data.tofile(g)
 
-                setOwnerAndPermission(Path_to_raw)
+                #setOwnerAndPermission(Path_to_raw)
 
     except Exception as e:
         # camera.close()
@@ -141,31 +142,32 @@ def createNewFolder(mypath):
     except IOError as e:
         print('DIR : Could not create new folder: ' + str(e))
 
-def compressFolder(mypath, zipfilename):
-    try:
-        print("Compressed file in : {} ".format(mypath))
-        dirtozip = os.path.join(mypath, zipfilename)
-        zipfilepath = os.path.join(mypath, zipfilename + ".zip")
+def zipitall(pathtodirofdata):
+    try: 
+        for nextdir, subdirs, files in os.walk(pathtodirofdata + "/"):
+            newzipname = nextdir.split('/')[-1]         
+            if newzipname:                                    
 
-        zf = zipfile.ZipFile(zipfilepath, "w", zipfile.ZIP_DEFLATED)
-        for dirname, subdirs, files in os.walk(dirtozip):
-            print('writing dirname: {}'.format(dirname))
-            zf.write(dirname)
-            for filename in files:
-                filepath = os.path.join(dirname, filename)
-                zf.write(filepath)
-                print('adding file {} to zip'.format(filename))
-        zf.close()
-        setOwnerAndPermission(zipfilepath)
+                dirtozip    = os.path.join(pathtodirofdata,newzipname)
+                zipfilepath = os.path.join(pathtodirofdata,newzipname) 
+                
+                zf = zipfile.ZipFile(zipfilepath+'.zip', "w")                
+                for dirname, subdirs, files in os.walk(dirtozip):                                         
+                    for filename in files:                                          
+                        zf.write(os.path.join(dirname, filename), filename, compress_type = zipfile.ZIP_DEFLATED)                    
+                zf.close()
+
     except IOError as e:
-        print('ZIP : Could not create *.zip file: ' + str(e))
-
+        print('ZIPALL : Could not create *.zip file: ' + str(e))
+        
 def main():
     try:
-        global Path_to_raw
+        global Path_to_raw      
+       
         createNewFolder(Path_to_raw)
         takepictures(Path_to_raw)
-        # compressFolder(Path)
+        zipitall(Path_to_raw)
+        #print('done: ')
 
     except Exception as e:
         print('Error in Main: ' + str(e))

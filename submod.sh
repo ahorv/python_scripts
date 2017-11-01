@@ -7,4 +7,4 @@ do
   sudo chown -R pi:pi $d
   sudo chmod -R 777 $d
   echo $d
-done >output_file
+done

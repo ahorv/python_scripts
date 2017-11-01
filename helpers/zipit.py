@@ -20,6 +20,13 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from fractions import Fraction
 
+'''
+Scripts for compressing directories
+Version: 2
+Attila Horvath
+01.11.2017
+'''
+
 
 global Path
 Path = '/home/pi/python_scripts/raw/raw_pictures'
@@ -27,14 +34,24 @@ Path = '/home/pi/python_scripts/raw/raw_pictures'
 def zipitall(pathtodirofdata):
     try: 
         for nextdir, subdirs, files in os.walk(pathtodirofdata + "/"):
-            newzipname = nextdir.split('/')[-1] 
-            if newzipname:                                        
-                compressFolder(pathtodirofdata,newzipname)
-                print("{}.zip".format(newzipname))
+            newzipname = nextdir.split('/')[-1]         
+            if newzipname:                                    
+
+                dirtozip    = os.path.join(pathtodirofdata,newzipname)
+                print('dirtozip: '+str(dirtozip))
+                zipfilepath = os.path.join(pathtodirofdata,newzipname)
+                print('zipfilepath:'+ str(zipfilepath))
+                
+                zf = zipfile.ZipFile(zipfilepath+'.zip', "w")                
+                for dirname, subdirs, files in os.walk(dirtozip):                                         
+                    for filename in files:
+                        #filepath = os.path.join(dirname, filename)                      
+                        zf.write(os.path.join(dirname, filename), filename, compress_type = zipfile.ZIP_DEFLATED)
+                        print('--'+str(filename))
+                zf.close()
 
     except IOError as e:
-        print('ZIPALL : Could not create *.zip file: ' + str(e))
-    
+        print('ZIPALL : Could not create *.zip file: ' + str(e))    
 
 
 def compressFolder(mypath,zipfilename):
@@ -45,8 +62,7 @@ def compressFolder(mypath,zipfilename):
         
         zf = zipfile.ZipFile(zipfilepath, "w", zipfile.ZIP_DEFLATED)
         for dirname, subdirs, files in os.walk(dirtozip):
-            #print('writing dirname: {}'.format(dirname))
-            zf.write(dirname)        
+            #print('writing dirname: {}'.format(dirname))                  
             for filename in files:
                 filepath = os.path.join(dirname, filename)             
                 zf.write(filepath)
