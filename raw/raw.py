@@ -7,33 +7,37 @@ from __future__ import (
     division,
 )
 
+import sys
 import io
 import os
 import time
 import pwd
 import grp
-import sys
 import picamera
 import zipfile
+import shutil
 from datetime import datetime
 import numpy as np
-from numpy.lib.stride_tricks import as_strided
-from fractions import Fraction
+
 
 '''
 Takes pictures in raw bayer format with different shutter times
+Remarks: On run takes 2'30''-> herefore cronjob interval must be > 2'30''
 Version: 3
 Attila Horvath
 01.11.2017
 '''
 
 global Path_to_raw
-Path_to_raw = './raw_pictures'
+Path_to_raw = '/home/pi/python_scripts/raw/raw_pictures'
+global log
+
 
 
 def takepictures(path):
     try:
         global Path_to_raw
+        global log
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         subdir = path + "/" + timestamp
         os.makedirs(subdir)
@@ -117,12 +121,10 @@ def takepictures(path):
                 datafileName = 'data%d_%s.data' % (i0, str(''))
                 #print('%s' % fileName)
                 with open(subdir + "/" + datafileName, 'wb') as g:
-                    data.tofile(g)
-
-                #setOwnerAndPermission(Path_to_raw)
+                    data.tofile(g)   
 
     except Exception as e:
-        # camera.close()
+        camera.close()
         print('Error in takepicture: ' + str(e))
 
 def setOwnerAndPermission(pathToFile):
@@ -139,11 +141,13 @@ def createNewFolder(mypath):
         if not os.path.exists(mypath):
             os.makedirs(Path_to_raw)
             setOwnerAndPermission(mypath)
+        
     except IOError as e:
         print('DIR : Could not create new folder: ' + str(e))
 
 def zipitall(pathtodirofdata):
-    try: 
+    try:
+        dirtozip = ''
         for nextdir, subdirs, files in os.walk(pathtodirofdata + "/"):
             newzipname = nextdir.split('/')[-1]         
             if newzipname:                                    
@@ -157,17 +161,40 @@ def zipitall(pathtodirofdata):
                         zf.write(os.path.join(dirname, filename), filename, compress_type = zipfile.ZIP_DEFLATED)                    
                 zf.close()
 
+                #remove obsolete directory               
+                shutil.rmtree(dirtozip, ignore_errors=True)
+
+
     except IOError as e:
         print('ZIPALL : Could not create *.zip file: ' + str(e))
-        
+
+def disk_stat():
+
+    try:
+        total, used, free = shutil.disk_usage("/usr")
+        total_space = total / 1073741824
+        used_space = used / 1073741824
+        free_space = free / 1073741824
+        print('Disc Size: % iGB\nSpace used: % iGB\nFree space: % iGB '% (total_space,used_space,free_space ))
+
+        percent = used_space/(total_space/100)
+
+        return percent
+
+    except IOError as e:
+        print('DISKSTAT :  '+ str(e))
+
 def main():
     try:
-        global Path_to_raw      
-       
+        global Path_to_raw
+        usedspace = disk_stat()
+        if usedspace > 80:
+            raise RuntimeError('WARRNING: Not enough free space on SD Card!')
+            return
+
         createNewFolder(Path_to_raw)
         takepictures(Path_to_raw)
         zipitall(Path_to_raw)
-        #print('done: ')
 
     except Exception as e:
         print('Error in Main: ' + str(e))
