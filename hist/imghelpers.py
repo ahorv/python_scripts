@@ -16,8 +16,39 @@ from glob import glob
 global images_path
 global hdr_path
 #hdr_path = r'C:\Hoa_Python_Projects\python_scripts\hist\input\20171025_153519',0  #GESCHAEFTS-PC
-images_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\input\20171025_153519'
-hdr_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\output\20171025_153519'
+images_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\input\20171025_140139'
+hdr_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\output\20171025_140139'
+
+def load_data_as_img():
+    try:
+        data_arrays = []
+        for data in sorted(glob(images_path + '/*.data')):
+            #load binary file to array
+            np_arr = np.fromfile(data,dtype=np.uint16)
+            print('shape: ' + str(np.shape(np_arr)))
+            data_arrays.append(np_arr)
+            #print(np_arr)
+
+        return data_arrays
+
+    except Exception as e:
+        print('Could not load image: ' + str(e))
+
+def data2img(raw):
+
+    print('nraw matrix shape: '+ str(np.shape(raw)))
+    p1 = raw[1:2:, 1:2:] # blue channel
+    p2 = raw[1:2:, 2:2:] # green
+    p3 = raw[2:2:, 1:2:] # scnd green
+    p4 = raw[2:2:, 2:2:] # red
+
+
+
+def data_to_image(fetched_img_data):
+    print("length:" + str(len(fetched_img_data)))
+
+    for n in range(0, len(fetched_img_data)):
+        print('converting'+str(n))
 
 
 
