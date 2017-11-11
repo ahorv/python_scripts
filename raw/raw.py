@@ -84,24 +84,13 @@ class Logger:
 
 class Rawcamera:
 
-    def takepictures(self,path):
+    def takepictures(self):
         try:
 
-            global RAWDATAPATH
-            global LOGFILEPATH
             global SUBDIRPATH
-            global TSTAMP
-            '''
-            subdir = path + "/" + TSTAMP
-            print('SUBDIR: ' + subdir)
-            os.makedirs(subdir)
-            helper = Helpers()
-            helper.setOwnerAndPermission(subdir)
-            '''
 
             s = Logger()
             log = s.getLogger()
-
 
             stream = io.BytesIO()
             with picamera.PiCamera() as camera:
@@ -187,6 +176,33 @@ class Rawcamera:
 
 class Helpers:
 
+    def setPathAndNewFolders(self):
+        try:
+            global RAWDATAPATH
+            global LOGFILEPATH
+            global SUBDIRPATH
+            global TSTAMP
+
+            TSTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+            RAWDATAPATH = os.path.join('/home', 'pi', 'python_scripts', 'raw', 'raw_data')
+            self.createNewFolder(RAWDATAPATH)
+            SUBDIRPATH = os.path.join(RAWDATAPATH, TSTAMP)
+            self.createNewFolder(SUBDIRPATH)
+            LOGFILEPATH = os.path.join(SUBDIRPATH, TSTAMP + '_raw' + '.log')
+
+        except IOError as e:
+            print('PATH: Could not set path and folder: ' + str(e))
+
+    def createNewFolder(self,thispath):
+        try:
+            if not os.path.exists(thispath):
+                os.makedirs(thispath)
+                self.setOwnerAndPermission(thispath)
+
+        except IOError as e:
+            print('DIR : Could not create new folder: ' + str(e))
+
     def setOwnerAndPermission(self,pathToFile):
         try:
             uid = pwd.getpwnam('pi').pw_uid
@@ -196,24 +212,16 @@ class Helpers:
         except IOError as e:
             print('PERM : Could not set permissions for file: ' + str(e))
 
-    def createNewFolder(self,mypath):
+    def zipitall(self):
         try:
-            if not os.path.exists(mypath):
-                os.makedirs(RAWDATAPATH)
-                self.setOwnerAndPermission(mypath)
-
-        except IOError as e:
-            print('DIR : Could not create new folder: ' + str(e))
-
-    def zipitall(self,pathtodirofdata):
-        try:
+            global RAWDATAPATH
             dirtozip = ''
-            for nextdir, subdirs, files in os.walk(pathtodirofdata + "/"):
+            for nextdir, subdirs, files in os.walk(RAWDATAPATH + "/"):
                 newzipname = nextdir.split('/')[-1]
                 if newzipname:
 
-                    dirtozip    = os.path.join(pathtodirofdata,newzipname)
-                    zipfilepath = os.path.join(pathtodirofdata,newzipname)
+                    dirtozip    = os.path.join(RAWDATAPATH,newzipname)
+                    zipfilepath = os.path.join(RAWDATAPATH,newzipname)
 
                     zf = zipfile.ZipFile(zipfilepath+'.zip', "w")
                     for dirname, subdirs, files in os.walk(dirtozip):
@@ -249,38 +257,18 @@ class Helpers:
 
 def main():
     try:
-        global RAWDATAPATH
-        global SUBDIRPATH
-        global LOGFILEPATH
-        global TSTAMP
 
         helper = Helpers()
-        cam = Rawcamera()
-        TSTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
-
-        if sys.platform == "linux":
-            import pwd
-            import grp
-
-            RAWDATAPATH = os.path.join('/home', 'pi', 'python_scripts', 'raw', 'raw_data')
-            helper.createNewFolder(RAWDATAPATH)
-            SUBDIRPATH =  os.path.join(RAWDATAPATH, TSTAMP)
-            helper.createNewFolder(SUBDIRPATH)
-            LOGFILEPATH = os.path.join(SUBDIRPATH, TSTAMP + '_raw' + '.log')
-        else:
-            RAWDATAPATH = os.path.realpath(__file__)
-            helper.createNewFolder(RAWDATAPATH)
-            SUBDIRPATH = os.path.join(RAWDATAPATH, TSTAMP)
-            LOGFILEPATH = os.path.join(SUBDIRPATH, TSTAMP + '_raw' + '.log')
-
+        helper.setPathAndNewFolders()
 
         usedspace = helper.disk_stat()
         if usedspace > 80:
             raise RuntimeError('WARNING: Not enough free space on SD Card!')
             return
 
-        cam.takepictures(RAWDATAPATH)
-        helper.zipitall(RAWDATAPATH)
+        cam = Rawcamera()
+        cam.takepictures()
+        helper.zipitall()
 
     except Exception as e:
         print('Error in Main: ' + str(e))
