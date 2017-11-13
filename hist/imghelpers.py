@@ -15,41 +15,74 @@ from glob import glob
 
 global images_path
 global hdr_path
-#hdr_path = r'C:\Hoa_Python_Projects\python_scripts\hist\input\20171025_153519',0  #GESCHAEFTS-PC
-images_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\input\20171025_140139'
-hdr_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\output\20171025_140139'
+# hdr_path = r'C:\Hoa_Python_Projects\python_scripts\hist\input\20171025_153519',0  #GESCHAEFTS-PC
+# images_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\input\20171025_140139'  # ihomelab
+# hdr_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\output\20171025_140139'    # ihomelab
+
+images_path = r'C:\Hoa_Python_Projects\RemoteDebugEx\hist\input\20171025_140139'  # @home
+hdr_path = r'C:\Hoa_Python_Projects\RemoteDebugEx\hist\output\20171025_140139'  # @home
+
 
 def load_data_as_img():
     try:
+        print("imagehelpers loaded!")
         data_arrays = []
         for data in sorted(glob(images_path + '/*.data')):
-            #load binary file to array
-            np_arr = np.fromfile(data,dtype=np.uint16)
-            print('shape: ' + str(np.shape(np_arr)))
+            # load binary file to array
+            np_arr = np.fromfile(data, dtype=np.uint16).reshape((2464, 3296)).T
             data_arrays.append(np_arr)
-            #print(np_arr)
+            # print('shape: ' + str(np.shape(np_arr)))
 
         return data_arrays
 
     except Exception as e:
         print('Could not load image: ' + str(e))
 
+
 def data2img(raw):
+    try:
+        p1 = raw[0::2, 0::2]  # blue channel
+        p2 = raw[0::2, 1::2]  # first green channel
+        p3 = raw[1::2, 0::2]  # second green channel
+        p4 = raw[1::2, 1::2]  # red
 
-    print('nraw matrix shape: '+ str(np.shape(raw)))
-    p1 = raw[1:2:, 1:2:] # blue channel
-    p2 = raw[1:2:, 2:2:] # green
-    p3 = raw[2:2:, 1:2:] # scnd green
-    p4 = raw[2:2:, 2:2:] # red
+        print('p1' + str(p1.shape))  # -> p1: (1648, 1232)
+        print('p2:' + str(p2.shape))  # -> p2: (1648, 1231)
+        print('p3:' + str(p3.shape))  # -> p3: (1647, 1232)
+        print('p4:' + str(p4.shape))  # -> p4: (1647, 1231)
 
+        p5 = p2 + p3
+        p6 = p5 / 2
+
+        # try to create a "real" rgb-image
+        # overall scaling
+        scal = 0.5
+        # gamma correction
+        gamma = 1
+        # b, g and r gain;  wurden rausgelesen ausden picam Aufnahmedaten
+        vb = 87 / 64  # 87 / 64.
+        vg = 1  # 1.
+        vr = 235 / 128  # 235 / 128.
+        img = np.ones(2464 / 2, 3296 / 2, 3);
+        img[:: 1] = vr * 1023 * (p4[:, :].T / 1023) ** gamma
+        img[:: 2] = vg * 1023 * ((p2[:, :].T + p3[:, :].T) / (2 * 1023)) ** gamma
+        img[:: 3] = vb * (1023 * p1[:, :].T / 1023) ** gamma
+
+        # result is clipped to ubyte[0  255] figure;
+        # imshow(uint8(scal * img));
+        # title('RGB');
+
+
+    except Exception as e:
+        print('Could not convert numpy array to image: ' + str(e))
 
 
 def data_to_image(fetched_img_data):
-    print("length:" + str(len(fetched_img_data)))
+    # print("length:" + str(len(fetched_img_data)))
 
     for n in range(0, len(fetched_img_data)):
-        print('converting'+str(n))
-
+        # print('converting'+str(n))
+        return
 
 
 def load_images_EXIF():
@@ -97,7 +130,7 @@ def load_img_as_nparr():
         for n in range(0, len(onlyfiles)):
             img = cv2.imread(join(images_path, onlyfiles[n]), cv2.IMREAD_COLOR)
             image_stack[n] = np.zeros(img)
-        print('All images loaded as numpy arraies!')
+        print('All images loaded as numpy arrays!')
 
         return image_stack
 
@@ -115,7 +148,7 @@ def oldcv_hist(image, titel):
         plt.title(titel)
         plt.show()
     except Exception as e:
-        print('Could not generate histogram: '+ str(e))
+        print('Could not generate histogram: ' + str(e))
 
 
 def cv_hist_all_imgs(image_stack, cols=1, titles=None):
@@ -139,39 +172,38 @@ def cv_hist_all_imgs(image_stack, cols=1, titles=None):
         plt.show()
 
     except Exception as e:
-        print('Could not generate histogram: '+ str(e))
-
+        print('Could not generate histogram: ' + str(e))
 
 
 def plot_all_imgs(image_stack, cols=1, titles=None):
     try:
-            """Display a list of images in a single figure with matplotlib.
+        """Display a list of images in a single figure with matplotlib.
 
-            Parameters
-            ---------
-            images: List of np.arrays compatible with plt.imshow.
+        Parameters
+        ---------
+        images: List of np.arrays compatible with plt.imshow.
 
-            cols (Default = 1): Number of columns in figure (number of rows is 
-                                set to np.ceil(n_images/float(cols))).
+        cols (Default = 1): Number of columns in figure (number of rows is 
+                            set to np.ceil(n_images/float(cols))).
 
-            titles: List of titles corresponding to each image. Must have
-                    the same length as titles.
-            """
-            assert ((titles is None) or (len(image_stack) == len(titles)))
-            n_images = len(image_stack)
-            if titles is None: titles = ['Image (%d)' % i for i in range(1, n_images + 1)]
-            fig = plt.figure()
-            for n, (image, title) in enumerate(zip(image_stack, titles)):
-                a = fig.add_subplot(cols, np.ceil(n_images / float(cols)), n + 1)
-                if image.ndim == 2:
-                    plt.gray()
-                plt.imshow(image)
-                a.set_title(title)
-            fig.set_size_inches(np.array(fig.get_size_inches()) * n_images)
-            plt.show()
+        titles: List of titles corresponding to each image. Must have
+                the same length as titles.
+        """
+        assert ((titles is None) or (len(image_stack) == len(titles)))
+        n_images = len(image_stack)
+        if titles is None: titles = ['Image (%d)' % i for i in range(1, n_images + 1)]
+        fig = plt.figure()
+        for n, (image, title) in enumerate(zip(image_stack, titles)):
+            a = fig.add_subplot(cols, np.ceil(n_images / float(cols)), n + 1)
+            if image.ndim == 2:
+                plt.gray()
+            plt.imshow(image)
+            a.set_title(title)
+        fig.set_size_inches(np.array(fig.get_size_inches()) * n_images)
+        plt.show()
 
     except Exception as e:
-        print('Could not generate histogram: '+ str(e))
+        print('Could not generate plot of images: ' + str(e))
 
 
 def getEXIF_TAG(file_path, field):
@@ -183,17 +215,17 @@ def getEXIF_TAG(file_path, field):
         for k in sorted(exif.keys()):
             if k not in ['JPEGThumbnail', 'TIFFThumbnail', 'Filename', 'EXIF MakerNote']:
                 if k == field:
-                    #print('%s = %s' % (k, exif[k]))
+                    # print('%s = %s' % (k, exif[k]))
                     foundvalue = np.float32(Fraction(str(exif[k])))
                     break
 
-        return  foundvalue
+        return foundvalue
 
     except Exception as e:
         print('EXIF: Could not read exif data ' + str(e))
 
 
-#cols=1, titles=None
+# cols=1, titles=None
 
 def create_HDR_images(image_stack, exposures, cols=1, titles=None):
     try:
@@ -224,7 +256,7 @@ def create_HDR_images(image_stack, exposures, cols=1, titles=None):
         tonemapDrago = cv2.createTonemapDrago(1.0, 0.7)
         ldrDrago = tonemapDrago.process(hdrDebevec)
         ldrDrago = 3 * ldrDrago
-        cv2.imwrite(hdr_path +"/ldr-Drago.jpg", ldrDrago * 255)
+        cv2.imwrite(hdr_path + "/ldr-Drago.jpg", ldrDrago * 255)
         print("saved ldr-Drago.jpg")
         hdr_images.append(ldrDrago)
 
@@ -250,7 +282,7 @@ def create_HDR_images(image_stack, exposures, cols=1, titles=None):
         tonemapMantiuk = cv2.createTonemapMantiuk(2.2, 0.85, 1.2)
         ldrMantiuk = tonemapMantiuk.process(hdrDebevec)
         ldrMantiuk = 3 * ldrMantiuk
-        cv2.imwrite(hdr_path +"/ldr-Mantiuk.jpg", ldrMantiuk * 255)
+        cv2.imwrite(hdr_path + "/ldr-Mantiuk.jpg", ldrMantiuk * 255)
         print("saved ldr-Mantiuk.jpg")
         hdr_images.append(ldrMantiuk)
 
