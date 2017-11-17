@@ -100,7 +100,7 @@ class Rawcamera:
                 camera.framerate = 1
                 camera.exposure_mode = 'off'
                 camera.awb_mode = 'auto'
-                camera.iso = 800
+                camera.iso = 0
                 shutter_speed = 100
                 
                 for i0 in range(10):
