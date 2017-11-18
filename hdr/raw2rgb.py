@@ -11,9 +11,11 @@ import matplotlib.cm as cm
 # Quelle:
 # https://github.com/fschill/pyraw/blob/master/show_raw.py
 
-global images_path
-#images_path = r'C:\Hoa_Python_Projects\RemoteDebugEx\hist\input\20171025_140139'  # @home
-images_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\input\20171025_140139'  # @lab
+global images_in
+images_in = r'C:\Hoa_Python_Projects\python_scripts\hdr\input\20171025_140139'  # @home
+image_out = r'C:\Hoa_Python_Projects\python_scripts\hdr\output'  # @home#@ home
+#images_in = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hdr\input\20171025_140139'  # @lab
+#image_out = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hdr\output'  #@ home  # @ lab
 
 ###############################################################
 #
@@ -23,10 +25,10 @@ images_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\input\2017
 
 def main():
     try:
-        global images_path
+        global images_in
 
-        images_path = images_path + '/data5_.data'
-        data = np.fromfile(images_path, dtype='uint16')  #uint16
+        images_in = images_in + '/data5_.data'
+        data = np.fromfile(images_in, dtype='uint16')  #uint16
         data = data.reshape([2464, 3296])
 
         # de-bayering
@@ -81,10 +83,10 @@ def main():
 
         #db_rgb = db_rgb.dot(cvm)
 
-        print("Min/max values:", np.min(db_rgb), np.max(db_rgb))
+        #print("Min/max values:", np.min(db_rgb), np.max(db_rgb))
         db_rgb = (db_rgb - np.min(db_rgb)) / (np.max(db_rgb) - np.min(db_rgb))
 
-        # appy log to brighten dark tones (the added value reduces effect by flattening the curve)
+        # apply log to brighten dark tones (the added value reduces effect by flattening the curve)
         db_rgb = np.log(db_rgb + 0.1)
 
         # normalize image
@@ -95,39 +97,34 @@ def main():
         blue  = db_rgb[:, :, 2]
 
         # show color channels and RGB reconstruction
-        '''
-        f, ax = plt.subplots(2, 2, sharex=True, sharey=True)
 
-        ax[0][0].imshow(-red, interpolation='nearest', cmap=cm.binary)
-        ax[0][1].imshow(-green, interpolation='nearest', cmap=cm.binary)
-        ax[1][0].imshow(-blue, interpolation='nearest', cmap=cm.binary)
-        ax[1][1].imshow(db_rgb, interpolation='nearest', cmap=cm.binary)
-        f.tight_layout()
-        plt.show()
-        '''
-
-        #show_all = True
         show_all = False
+        show_image = False
 
-        if(show_all):
-            fig = plt.figure()
-            ax1 = fig.add_subplot(221)
-            ax2 = fig.add_subplot(222)
-            ax3 = fig.add_subplot(223)
-            ax4 = fig.add_subplot(224)
-            ax1.title.set_text('RED')
-            ax2.title.set_text('GREEN')
-            ax3.title.set_text('BLUE')
-            ax4.title.set_text('RGB')
-            ax1.imshow(-red, interpolation='nearest', cmap=cm.binary)
-            ax2.imshow(-green, interpolation='nearest', cmap=cm.binary)
-            ax3.imshow(-blue, interpolation='nearest', cmap=cm.binary)
-            ax4.imshow(db_rgb, interpolation='nearest', cmap=cm.binary)
-            plt.show()
+        if(show_image):
+            if(show_all):
+                fig = plt.figure()
+                ax1 = fig.add_subplot(221)
+                ax2 = fig.add_subplot(222)
+                ax3 = fig.add_subplot(223)
+                ax4 = fig.add_subplot(224)
+                ax1.title.set_text('RED')
+                ax2.title.set_text('GREEN')
+                ax3.title.set_text('BLUE')
+                ax4.title.set_text('RGB')
+                ax1.imshow(-red, interpolation='nearest', cmap=cm.binary)
+                ax2.imshow(-green, interpolation='nearest', cmap=cm.binary)
+                ax3.imshow(-blue, interpolation='nearest', cmap=cm.binary)
+                ax4.imshow(db_rgb, interpolation='nearest', cmap=cm.binary)
+                plt.show()
+            else:
+                plt.imshow(db_rgb, interpolation='nearest', cmap=cm.binary)
+                plt.title('RGB')
+                plt.show()
         else:
-            plt.imshow(db_rgb, interpolation='nearest', cmap=cm.binary)
-            plt.title('RGB')
-            plt.show()
+            raw_img_name = 'data.rgb'
+            with open(image_out + "/" + raw_img_name, 'wb') as g:
+                db_rgb.tofile(g)
 
     except Exception as e:
         print('Error in Main: ' + str(e))
