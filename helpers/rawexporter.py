@@ -1,10 +1,9 @@
-#!/usr/bin/env python3s
+#!/usr/bin/env python
 import os
 import sys
 import logging
 import logging.handlers
 import ftplib
-import shutil
 from glob import glob
 
 #########################################################################
@@ -113,6 +112,8 @@ class Exporter:
 
     def ftp_dir_exists(self, newdir, cwd, ftp):
         try:
+            s = Logger()
+            root_logger = s.getLogger()
 
             exists = False
             directories = []
@@ -132,8 +133,6 @@ class Exporter:
             root_logger.error('FTP_DIR: Error: ' + str(e))
 
     def sendZipToFTP(self):
-        global db_con
-        global db_path
 
         success = False
 
@@ -142,16 +141,6 @@ class Exporter:
             root_logger = s.getLogger()
 
             e = Exporter()
-
-            class Logger:
-
-    def getLogger(self):
-
-        try:
-            global ERRFILEPATH
-
-            # configure log formatter
-            logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 
             # configure file handler
             allzipfiles = e.grabAllRawZip()
