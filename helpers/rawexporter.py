@@ -33,7 +33,7 @@ if sys.platform == "linux":
 
     SCRIPTPATH = os.path.join('/home', 'pi', 'python_scripts', 'helpers')
     ERRFILEPATH = os.path.join(SCRIPTPATH, 'rawexporter.log')
-    ZIPDIRPATH = os.path.join('/home', 'pi','Desktop', 'raw_data')   # 'python_scripts','raw', 
+    ZIPDIRPATH = os.path.join('/home', 'pi','python_scripts','raw', 'raw_data') 
 else:
     SCRIPTPATH = os.path.realpath(__file__)
     ERRFILEPATH = os.path.join(SCRIPTPATH, 'rawexporter.log')
