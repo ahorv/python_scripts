@@ -3,7 +3,7 @@ import os
 import sys
 import logging
 import logging.handlers
-import ftplib
+from ftplib import FTP, error_perm
 from glob import glob
 
 #########################################################################
@@ -33,7 +33,7 @@ if sys.platform == "linux":
 
     SCRIPTPATH = os.path.join('/home', 'pi', 'python_scripts', 'helpers')
     ERRFILEPATH = os.path.join(SCRIPTPATH, 'rawexporter.log')
-    ZIPDIRPATH = os.path.join('/home', 'pi', 'python_scripts', 'raw', 'raw_data')
+    ZIPDIRPATH = os.path.join('/home', 'pi','Desktop', 'raw_data')   # 'python_scripts','raw', 
 else:
     SCRIPTPATH = os.path.realpath(__file__)
     ERRFILEPATH = os.path.join(SCRIPTPATH, 'rawexporter.log')
@@ -109,28 +109,7 @@ class Exporter:
 
         except Exception as e:
             root_logger.error('GRAB: Error: ' + str(e))
-
-    def ftp_dir_exists(self, newdir, cwd, ftp):
-        try:
-            s = Logger()
-            root_logger = s.getLogger()
-
-            exists = False
-            directories = []
-
-            FTP_DIR_LIST = ftp.nlst(cwd)
-
-            for dirs in FTP_DIR_LIST:
-                _dirs = dirs.split('/')[-1]
-                directories.append(_dirs)
-
-            if newdir in directories:
-                exists = True
-
-            return exists
-
-        except Exception as e:
-            root_logger.error('FTP_DIR: Error: ' + str(e))
+   
 
     def sendZipToFTP(self):
 
@@ -142,7 +121,6 @@ class Exporter:
 
             e = Exporter()
 
-            # configure file handler
             allzipfiles = e.grabAllRawZip()
             uploadedzip = []
             cnt = 0
@@ -150,25 +128,27 @@ class Exporter:
             zipfilename = allzipfiles[0]
             token = str(zipfilename.split('/')[-1])
             newDirName = str(token.split('_', 1)[0])
+            print('New Dir Name: '+ newDirName)
             ftpPath = '/camera_2/raw/'
 
-            ftp = ftplib.FTP('ftp.ihomelab.ch')
+            ftp = FTP('ftp.ihomelab.ch')
             ftp.login('tahorvat', '123ihomelab')
             ftp.cwd('/camera_2/raw/')
-            ftp.cwd(newDirName)
 
-            if not self.ftp_dir_exists(newDirName, ftpPath, ftp):
-                print(ftp.mkd(newDirName))
+            try:
+                ftp.cwd(newDirName)
+
+            except error_perm:
+                ftp.mkd(newDirName)
+                ftp.cwd(newDirName)
 
             for zip_file in sorted(allzipfiles):
                 zipfilename = zip_file.split('/')[-1]
                 cnt = cnt + 1
 
-                print('curr dir: ' + str(ftp.pwd()))
-                print('zip_file: ' + str(zipfilename))
-
                 with open(zip_file, 'rb') as out:
-                    print('FTP STOR: %s' % ftp.storbinary('STOR ' + zipfilename, out))
+                    #print('FTP STOR: %s' % ftp.storbinary('STOR ' + zipfilename, out))
+                    ftp.storbinary('STOR ' + zipfilename, out)
 
                 uploadedzip.append(zip_file)
                 success = True
