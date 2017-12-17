@@ -4,9 +4,25 @@ import humidity
 import RPi.GPIO as GPIO
 import sys
 
-global FAN_GPIO
+######################################################################
+## Hoa: 17.12.2017 Version 1 : run_fan.py
+######################################################################
+# Monitors the humidity in the camera dom. If humidity rises over a
+# certain value the fan is run until humidity is fallen under the
+# critical humidity value.
+#
+# New /Changes:
+# ----------------------------------------------------------------------
+#
+# 17.12.2017 : programm is started with the booting of the operating system.
+#
+#
+######################################################################
+
+
 FAN_GPIO = 18 # GPIO17 (pin 12)
-maxHumidity = 40 # Sets value of hunidity to start fan
+MAX_HUMIDITY = 55  # Sets value of humidity to start fan
+HYST_HUMIDITY = 2
 
 def setup():
     global FAN_GPIO
@@ -25,34 +41,23 @@ def fanOFF():
     GPIO.output(FAN_GPIO, GPIO.LOW)
 
 def check_humidity():
-    #dht22 = humidity.DHT22()
-    #humidity = float(dht22.humidity())
+    dht22 = humidity.DHT22()
+    h, t = dht22.get_measurements()
+    print('Humidity: {:.2f} Temperature: {:.2f}'.format(h,t))
 
-    if humidity > maxHumidity:
+    if float(h) > MAX_HUMIDITY:
         fanON()
-    else:
+    if float(h) < (MAX_HUMIDITY - HYST_HUMIDITY):
         fanOFF()
     return
 
 def main():
     try:
         setup()
-        cycles = 6
-        cnt = 1
 
-        while (cycles > cnt):
-            time.sleep(5)
-            fanON()
-            time.sleep(5)
-            fanOFF()
-            print('Counts: {}'.format(cnt))
-            cnt = cnt+1
-
-        '''
         while True:
-            check_humidity()
-            sleep(5)
-        '''
+            time.sleep(5)
+            check_humidity() #sleeps for 3.2 seconds
 
     except Exception as e:
         print('Error run-fan: {}'.format(e))
