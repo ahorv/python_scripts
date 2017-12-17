@@ -11,13 +11,13 @@ class DHT22:
    DHT22 sensor.  The sensor is also known as the AM2302.
    """
 
-   def __init__(self, pi, gpio):
+   def __init__(self, gpio=4):
       """
       Taking readings more often than about once every two seconds will
       eventually cause the DHT22 to hang.  A 3 second interval seems OK.
       """
 
-      self.pi = pi
+      self.pi = pigpio.pi()
       self.gpio = gpio
       self.powered = True
 
@@ -42,11 +42,11 @@ class DHT22:
       self.high_tick = 0
       self.bit = 40
 
-      pi.set_pull_up_down(gpio, pigpio.PUD_OFF)
+      self.pi.set_pull_up_down(gpio, pigpio.PUD_OFF)
 
-      pi.set_watchdog(gpio, 0) # Kill any watchdogs.
+      self.pi.set_watchdog(gpio, 0) # Kill any watchdogs.
 
-      self.cb = pi.callback(gpio, pigpio.EITHER_EDGE, self._cb)
+      self.cb = self.pi.callback(gpio, pigpio.EITHER_EDGE, self._cb)
 
    def _cb(self, gpio, level, tick):
       """
@@ -181,6 +181,9 @@ class DHT22:
          self.pi.set_mode(self.gpio, pigpio.INPUT)
          self.pi.set_watchdog(self.gpio, 200)
 
+   def stop(self):
+      self.pi.stop()
+
    def cancel(self):
       """Cancel the DHT22 sensor."""
 
@@ -190,38 +193,28 @@ class DHT22:
          self.cb.cancel()
          self.cb = None
 
+   def get_measurements(self):
+      try:
+         time.sleep(3)
+         self.trigger()
+         time.sleep(0.2)
+
+         return (self.humidity(), self.temperature())
+
+      except Exception as e:
+         pass
+      finally:
+         self.cancel()
+         #self.stop()
+
 '''
 if __name__ == "__main__":
 
    # Intervals of about 2 seconds or less will eventually hang the DHT22.
-   INTERVAL=3
+   dht22 = DHT22()
 
-   pi = pigpio.pi()
+   humidity,temperature = dht22.get_measurements()
 
-   s = DHT22(pi, 4)
-
-   counts = 0
-
-   next_reading = time.time()
-
-   while True:
-
-      counts += 1
-
-      s.trigger()
-
-      time.sleep(0.2)
-
-      print("{} {:.2f} {:.2f} {:3.2f} {} {} {} {}".format(
-         counts, s.humidity(), s.temperature(), s.staleness(),
-         s.bad_checksum(), s.short_message(), s.missing_message(),
-         s.sensor_resets()))
-
-      next_reading += INTERVAL
-
-      time.sleep(next_reading-time.time()) # Overall INTERVAL second polling.
-
-   s.cancel()
-
-   pi.stop()
+   print("Humidity: {:.2f} Temperature: {:.2f} ".format(humidity,temperature)) 
 '''
+
