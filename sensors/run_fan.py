@@ -128,9 +128,8 @@ def main():
         root_logger = s.getLogger()
         setup()
 
-        while True:
-            time.sleep(5)
-            check_humidity() #sleeps for 3.2 seconds
+        time.sleep(5)
+        check_humidity() #sleeps for 3.2 seconds
 
     except Exception as e:
         root_logger.error('MAIN: Error: ' + str(e))
