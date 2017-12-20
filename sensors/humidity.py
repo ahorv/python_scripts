@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 import time
-import atexit
-
 import pigpio
 
 class DHT22:
@@ -22,8 +20,6 @@ class DHT22:
       self.powered = True
 
       self.cb = None
-
-      atexit.register(self.cancel)
 
       self.bad_CS = 0 # Bad checksum count.
       self.bad_SM = 0 # Short message count.
@@ -205,7 +201,7 @@ class DHT22:
          pass
       finally:
          self.cancel()
-         #self.stop()
+         self.stop()
 
 '''
 if __name__ == "__main__":
