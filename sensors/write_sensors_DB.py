@@ -10,6 +10,7 @@ from os.path import basename
 import temperature
 import infrared
 import lux
+import rgb
 
 ######################################################################
 ## Hoa: 09.11.2017 Version 1 : write_sensors_DB.py
@@ -135,8 +136,11 @@ class DB_handler:
                     MLX_Ambi_Temp text,
                     MLX_Obj_Temp text,
                     TSL_Full_Spec text,
-                    TSL_Infra_Spec,
-                    TSL_Visib_Spec,
+                    TSL_Infra_Spec text,
+                    TSL_Visib_Spec text,
+                    TCS_RED text,
+                    TCS_GREEN text,
+                    TCS_BLUE text,
                     Uploaded                    
                   )
                """)
@@ -152,6 +156,9 @@ class DB_handler:
                                     TSL_Full_Spec,
                                     TSL_Infra_Spec,
                                     TSL_Visib_Spec,
+                                    TCS_RED,
+                                    TCS_GREEN,
+                                    TCS_BLUE,
                                     Uploaded):
                                            
         try:
@@ -169,9 +176,12 @@ class DB_handler:
                          "TSL_Full_Spec,"
                          "TSL_Infra_Spec,"
                          "TSL_Visib_Spec,"
+                         "TCS_RED,"
+                         "TCS_GREEN,"
+                         "TCS_BLUE,"
                          "Uploaded"                   
 
-                         ") VALUES (?,?,?,?,?,?,?,?,?)",
+                         ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                          (
                              Timestamp,
                              DS18B_Dome_Temp,
@@ -181,6 +191,9 @@ class DB_handler:
                              TSL_Full_Spec,
                              TSL_Infra_Spec,
                              TSL_Visib_Spec,
+                             TCS_RED,
+                             TCS_GREEN,
+                             TCS_BLUE,
                              Uploaded
                          )
                          )
@@ -210,14 +223,18 @@ class DB_handler:
         DS18B   = temperature.DS18B20()
         MLX     = infrared.MLX90614()
         TSL     = lux.TSL2561()
+        TCS     = rgb.TCS34725()
 
-        DS18B_Dome_Temp = DS18B.get_cameradome_temp()
-        DS18B_Ambi_Temp = DS18B.get_ambient_temp()
-        MLX_Ambi_Temp   = MLX.get_amb_temp()
-        MLX_Obj_Temp    = MLX.get_obj_temp()
-        TSL_Full_Spec   = TSL.get_full_spectrum()
-        TSL_Infra_Spec  = TSL.get_infrared()
-        TSL_Visib_Spec  = TSL.get_visible_spectrum()
+
+        DS18B_Dome_Temp     = DS18B.get_cameradome_temp()
+        DS18B_Ambi_Temp     = DS18B.get_ambient_temp()
+        MLX_Ambi_Temp       = MLX.get_amb_temp()
+        MLX_Obj_Temp        = MLX.get_obj_temp()
+        TSL_Full_Spec       = TSL.get_full_spectrum()
+        TSL_Infra_Spec      = TSL.get_infrared()
+        TSL_Visib_Spec      = TSL.get_visible_spectrum()
+        TCS_R,TCS_G, TCS_B  = TCS.get_raw_data()
+
         Uploaded = '0'
 
         self.update_all_senors(
@@ -229,6 +246,9 @@ class DB_handler:
             TSL_Full_Spec,
             TSL_Infra_Spec,
             TSL_Visib_Spec,
+            TCS_R,
+            TCS_G,
+            TCS_B,
             Uploaded = '0'
         )
 
