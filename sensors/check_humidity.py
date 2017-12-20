@@ -38,6 +38,7 @@ FAN_GPIO = 18 # GPIO18 (pin 12)
 MAX_HUMIDITY = 55  # Sets value of humidity to start fan
 HYST_HUMIDITY = 2
 WRITE_TOLOGG = False
+COUNTER = 0
 
 
 class Logger:
