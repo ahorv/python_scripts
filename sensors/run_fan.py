@@ -9,6 +9,8 @@ import logging.handlers
 import pwd
 import grp
 
+
+
 ######################################################################
 ## Hoa: 17.12.2017 Version 1 : run_fan.py
 ######################################################################
@@ -24,21 +26,23 @@ import grp
 #
 ######################################################################
 
+global FAN_GPIO
+global MAX_HUMIDITY
+global HYST_HUMIDITY
+global WRITE_TOLOGG
 
-FAN_GPIO = 18 # GPIO17 (pin 12)
+FAN_GPIO = 18 # GPIO18 (pin 12)
 MAX_HUMIDITY = 55  # Sets value of humidity to start fan
 HYST_HUMIDITY = 2
 WRITE_TOLOGG = False
-
-SCRIPTPATH  = os.path.join('/home', 'pi', 'python_scripts', 'sensors')
-ERRFILEPATH = os.path.join(SCRIPTPATH, 'fan.log')
 
 
 class Logger:
     def getLogger(self):
 
         try:
-            global ERRFILEPATH
+            SCRIPTPATH = os.path.join('/home', 'pi', 'python_scripts', 'sensors')
+            ERRFILEPATH = os.path.join(SCRIPTPATH, 'fan.log')
 
             # configure log formatter
             logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
@@ -66,23 +70,23 @@ class Logger:
                 self.logger.addHandler(consoleHandler)
                 # self.logger.addHandler(handler)
 
-            setOwnerAndPermission(ERRFILEPATH)
+            self.setOwnerAndPermission(ERRFILEPATH)
             return self.logger
 
         except IOError as e:
             print('Error logger:' + str(e))
 
-def setOwnerAndPermission(pathToFile):
-    try:
-        if sys.platform == "linux":
-            uid = pwd.getpwnam('pi').pw_uid
-            gid = grp.getgrnam('pi').gr_gid
-            os.chown(pathToFile, uid, gid)
-            os.chmod(pathToFile, 0o777)
-        else:
-            return
-    except IOError as e:
-        print('PERM : Could not set permissions for file: ' + str(e))
+    def setOwnerAndPermission(self, pathToFile):
+        try:
+            if sys.platform == "linux":
+                uid = pwd.getpwnam('pi').pw_uid
+                gid = grp.getgrnam('pi').gr_gid
+                os.chown(pathToFile, uid, gid)
+                os.chmod(pathToFile, 0o777)
+            else:
+                return
+        except IOError as e:
+            print('PERM : Could not set permissions for file: ' + str(e))
 
 
 
@@ -103,19 +107,21 @@ def fanOFF():
     GPIO.output(FAN_GPIO, GPIO.LOW)
 
 def check_humidity():
+    global WRITE_TOLOGG
+    global MAX_HUMIDITY
+    global HYST_HUMIDITY
+
     s = Logger()
     root_logger = s.getLogger()
     dht22 = humidity.DHT22()
     h, t = dht22.get_measurements()
 
     if float(h) > MAX_HUMIDITY:
-        global WRITE_TOLOGG
         fanON()
         root_logger.info(': Fan running: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
         WRITE_TOLOGG = True
 
     if float(h) < (MAX_HUMIDITY - HYST_HUMIDITY):
-        global WRITE_TOLOGG
         fanOFF()
         if WRITE_TOLOGG:
             root_logger.info(': Fan stopped: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
@@ -128,8 +134,10 @@ def main():
         root_logger = s.getLogger()
         setup()
 
-        time.sleep(5)
-        check_humidity() #sleeps for 3.2 seconds
+        while True:
+            time.sleep(5)
+            check_humidity() #sleeps for 3.2 seconds
+
 
     except Exception as e:
         root_logger.error('MAIN: Error: ' + str(e))
