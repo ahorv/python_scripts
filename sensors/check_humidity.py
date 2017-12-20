@@ -110,6 +110,11 @@ def fanOFF():
     global FAN_GPIO
     GPIO.output(FAN_GPIO, GPIO.LOW)
 
+def shortAirBlast(seconds):
+    fanON()
+    time.sleep(seconds)
+    fanOFF()
+
 def check_humidity():
     global WRITE_TOLOGG
     global MAX_HUMIDITY
@@ -130,10 +135,8 @@ def check_humidity():
         fanOFF()
         COUNTER += 1
 
-        if COUNTER >= 720: # each hour short air blast to the humidity sensor
-            fanON()
-            time.sleep(5)
-            fanOFF()
+        if COUNTER >= 720: # each hour short air blast sensing humidity
+            shortAirBlast(5)
             COUNTER = 0
 
         if WRITE_TOLOGG:
@@ -146,6 +149,7 @@ def main():
         s = Logger()
         root_logger = s.getLogger()
         setup()
+        shortAirBlast(15)
 
         while True:
             time.sleep(5)
