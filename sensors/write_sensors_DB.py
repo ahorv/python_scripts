@@ -233,7 +233,7 @@ class DB_handler:
         TSL_Full_Spec       = TSL.get_full_spectrum()
         TSL_Infra_Spec      = TSL.get_infrared()
         TSL_Visib_Spec      = TSL.get_visible_spectrum()
-        TCS_R,TCS_G, TCS_B  = TCS.get_raw_data()
+        TCS_R,TCS_G,TCS_B   = TCS.get_RGB()
 
         Uploaded = '0'
 
