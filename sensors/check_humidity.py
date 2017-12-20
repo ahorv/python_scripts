@@ -23,6 +23,7 @@ import grp
 #
 # 17.12.2017 : programm is started with the booting of the operating system.
 #              (runs for ever)
+# 20.12.2017 : each hour short air blast to the humidity sensor
 #
 #
 ######################################################################
@@ -31,6 +32,7 @@ global FAN_GPIO
 global MAX_HUMIDITY
 global HYST_HUMIDITY
 global WRITE_TOLOGG
+global COUNTER
 
 FAN_GPIO = 18 # GPIO18 (pin 12)
 MAX_HUMIDITY = 55  # Sets value of humidity to start fan
@@ -111,6 +113,7 @@ def check_humidity():
     global WRITE_TOLOGG
     global MAX_HUMIDITY
     global HYST_HUMIDITY
+    global COUNTER
 
     s = Logger()
     root_logger = s.getLogger()
@@ -124,6 +127,14 @@ def check_humidity():
 
     if float(h) < (MAX_HUMIDITY - HYST_HUMIDITY):
         fanOFF()
+        COUNTER += 1
+
+        if COUNTER >= 720: # each hour short air blast to the humidity sensor
+            fanON()
+            time.sleep(5)
+            fanOFF()
+            COUNTER = 0
+
         if WRITE_TOLOGG:
             root_logger.info(': Fan stopped: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
             WRITE_TOLOGG = False
