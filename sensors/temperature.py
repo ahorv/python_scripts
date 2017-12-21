@@ -1,10 +1,21 @@
-'''
-DS18B20 driver.
-'''
+#!/usr/bin/env python
 
-import smbus
-from time import  sleep
- 
+######################################################################
+## Hoa: 21.12.2017 Version 2 : temperature.py - DS18B20 driver
+######################################################################
+# Driver class for DS18B20 temperature sensor.
+# Addresses of sensors have to be set if changes in sensor configuration
+# are made, especialy if more than one sensor is used!
+#
+# New /Changes:
+# ----------------------------------------------------------------------
+#
+# 09.11.2017 : implemented
+# 21.12.2017 : changed sensor address for usage with one sensor (dom temp)
+#
+#
+######################################################################
+
 class DS18B20():
 
     path = '/sys/bus/w1/devices/'
@@ -40,7 +51,8 @@ class DS18B20():
 
     def get_cameradome_temp(self):
         try:
-            full_path = self.path + '28-0000097ef1a1' + '/w1_slave'
+            #full_path = self.path + '28-0000097ef1a1' + '/w1_slave'  # camera 3 mit zwei Temperatur-Sensoren
+            full_path = self.path +'28-000008cd0f85' + '/w1_slave'
             value = self.get_sensor(full_path)       
             return value
         
