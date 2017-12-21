@@ -17,7 +17,7 @@ from time import sleep
 import infrared
 
 
-def changeAdr(newadr):
+def changeAdr():
     try:
         bus = smbus.SMBus(1)
         print("Old Adr: 0x%02X" % bus.read_word_data(0x00, 0x2E))
@@ -28,7 +28,8 @@ def changeAdr(newadr):
         sleep(0.005)
 
         #data = [newadr, 0x00, 0xF4]
-        data = [0x5B, 0x00, 0xF4]                   # default addr: [0x5A, 0x00, 0xE1] -> PEC = 0xE1
+        #data = [0x5B, 0x00, 0xF4]        # alternate addr if two MLX are used 
+        data = [0x5A, 0x00, 0xE1]         # default addr: [0x5A, 0x00, 0xE1] -> PEC = 0xE1
         bus.write_i2c_block_data(0x00, 0x2E, data)
         sleep(0.005)
         print("New adr: 0x%02X" % bus.read_word_data(0x00, 0x2E))
@@ -41,9 +42,8 @@ def changeAdr(newadr):
     
 
 def main():
-    try:
-        NewMLXAddr = 0x5B # default 0x5A
-        changeAdr(NewMLXAddr)
+    try:        
+        changeAdr()
 
         print('Done')
 
