@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import sqlite3
 import os
 import sys
@@ -7,13 +7,15 @@ import logging.handlers
 from time import sleep
 from datetime import datetime
 from os.path import basename
+import pwd
+import grp
 import temperature
 import infrared
 import lux
 import rgb
 
 ######################################################################
-## Hoa: 09.11.2017 Version 1 : write_sensors_DB.py
+## Hoa: 09.11.2017 Version 2 : write_sensors_DB.py
 ######################################################################
 # This class collects all sensor data and writes them to a SQL database.
 #
@@ -21,6 +23,7 @@ import rgb
 # ----------------------------------------------------------------------
 #
 # 09.11.2017 : implemented
+# 21.12.2017 : Added Camera_id (Camera 1 - 3) must be set accordingly
 # 
 #
 ######################################################################
@@ -31,21 +34,15 @@ global ERRFILEPATH
 global DB_NAME
 global DB_CON
 global DB_PATH
+global CAMERA_ID
+
+CAMERA_ID = 1 # Location: rooftop of ihomelab, Horw LU
 
 DB_NAME = 'sensor_DB' + '.db'
 
-
-if sys.platform == "linux":
-    import pwd
-    import grp
-
-    SCRIPTPATH  = os.path.join('/home', 'pi', 'python_scripts', 'sensors')
-    ERRFILEPATH = os.path.join(SCRIPTPATH, 'write_sensor.log')
-    DB_PATH     = os.path.join(SCRIPTPATH, DB_NAME)
-else:
-    SCRIPTPATH  = os.path.realpath(__file__)
-    ERRFILEPATH = os.path.join(SCRIPTPATH, 'write_sensor.log')
-    DB_PATH     = os.path.join(SCRIPTPATH, DB_NAME)
+SCRIPTPATH  = os.path.join('/home', 'pi', 'python_scripts', 'sensors')
+ERRFILEPATH = os.path.join(SCRIPTPATH, 'write_sensor.log')
+DB_PATH     = os.path.join(SCRIPTPATH, DB_NAME)
 
 
 class Logger:
@@ -130,6 +127,7 @@ class DB_handler:
             curs = DB_CON.cursor()
             curs.execute("""CREATE TABLE IF NOT EXISTS sensor_data
                  (
+                    Camera_id text,
                     Timestamp text,
                     DS18B_Dome_Temp text,
                     DS18B_Ambi_Temp text,
@@ -148,6 +146,7 @@ class DB_handler:
             root_logger.error('DB  : Error creating MeterRealtime Table: ' + str(e))
 
     def update_all_senors(self,
+                                    Camera_id,
                                     Timestamp,
                                     DS18B_Dome_Temp,
                                     DS18B_Ambi_Temp,
@@ -168,9 +167,10 @@ class DB_handler:
             curs = DB_CON.cursor()
             curs.execute("INSERT INTO sensor_data"
                          "("
+                         "Camera_id,"
                          "Timestamp,"
                          "DS18B_Dome_Temp,"
-                         "DS18B_Ambi_Temp,"
+                         "DS18B_Ambi_Temp," 
                          "MLX_Ambi_Temp,"
                          "MLX_Obj_Temp,"
                          "TSL_Full_Spec,"
@@ -181,8 +181,9 @@ class DB_handler:
                          "TCS_BLUE,"
                          "Uploaded"                   
 
-                         ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                         ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                          (
+                             Camera_id,
                              Timestamp,
                              DS18B_Dome_Temp,
                              DS18B_Ambi_Temp,
@@ -215,8 +216,6 @@ class DB_handler:
             return
 
     def get_all_sensor_data(self):
-        s = Logger()
-        root_logger = s.getLogger()
 
         Timestamp = datetime.now().strftime('%yyyy %m %d - %H:%M:%S')
 
@@ -225,19 +224,19 @@ class DB_handler:
         TSL     = lux.TSL2561()
         TCS     = rgb.TCS34725()
 
-
         DS18B_Dome_Temp     = DS18B.get_cameradome_temp()
-        DS18B_Ambi_Temp     = DS18B.get_ambient_temp()
+        DS18B_Ambi_Temp     = 0     # DS18B.get_ambient_temp() # Version with one temp sensor
         MLX_Ambi_Temp       = MLX.get_amb_temp()
         MLX_Obj_Temp        = MLX.get_obj_temp()
-        TSL_Full_Spec       = TSL.get_full_spectrum()
-        TSL_Infra_Spec      = TSL.get_infrared()
-        TSL_Visib_Spec      = TSL.get_visible_spectrum()
+        TSL_Full_Spec       = 0     # TSL.get_full_spectrum()
+        TSL_Infra_Spec      = 0     # TSL.get_infrared()
+        TSL_Visib_Spec      = 0     # TSL.get_visible_spectrum()
         TCS_R,TCS_G,TCS_B   = TCS.get_RGB()
 
         Uploaded = '0'
 
         self.update_all_senors(
+            CAMERA_ID,
             Timestamp,
             DS18B_Dome_Temp,
             DS18B_Ambi_Temp,
@@ -300,7 +299,6 @@ def setOwnerAndPermission(pathToFile):
             return
     except IOError as e:
         print('PERM : Could not set permissions for file: ' + str(e))
-
 
 def main():
     try:
