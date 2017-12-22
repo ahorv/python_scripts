@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 TSL2561 driver.
 '''
@@ -7,7 +8,8 @@ from time import  sleep
  
 class TSL2561():
     
-    def __init__(self, bus_num=1):      
+    def __init__(self, address = 0x39, bus_num=1):
+
         self.bus = smbus.SMBus(bus=bus_num)   
         self.bus.write_byte_data(0x39, 0x00 | 0x80, 0x03)
         self.bus.write_byte_data(0x39, 0x01 | 0x80, 0x02) 
@@ -36,6 +38,13 @@ class TSL2561():
         ch1 = self.get_infrared()
         delta = (ch0 - ch1)
         return delta
+
+    def get_full_infra_visi(self):
+        full = self.get_full_spectrum()
+        infr = self.get_infrared()
+        visi = self.get_visible_spectrum()
+        self.bus.close()
+        return full,infr,visi
     
 
 '''
@@ -45,3 +54,4 @@ if __name__ == "__main__":
     print( "Infrared Value :{0:.4f}lux".format(sensor.get_infrared()))
     print( "Visible Value  :{0:.4f}lux".format(sensor.get_visible_spectrum()))
 '''
+
