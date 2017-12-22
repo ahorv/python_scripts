@@ -17,6 +17,7 @@ from glob import glob
 # NEW:
 # -----
 # - new directory for each day
+# - added variable to distinguish between cameras (must be set accordingly !)
 #
 #########################################################################
 
@@ -26,6 +27,9 @@ global FTPADR
 global SCRIPTPATH
 global ERRFILEPATH
 global ZIPDIRPATH
+global CAMERA
+
+CAMERA = 'camera_1'
 
 if sys.platform == "linux":
     import pwd
@@ -129,11 +133,11 @@ class Exporter:
             token = str(zipfilename.split('/')[-1])
             newDirName = str(token.split('_', 1)[0])
             print('New Dir Name: '+ newDirName)
-            ftpPath = '/camera_2/raw/'
+            ftpPath = '/'+CAMERA+'/raw/'
 
             ftp = FTP('ftp.ihomelab.ch')
             ftp.login('tahorvat', '123ihomelab')
-            ftp.cwd('/camera_2/raw/')
+            ftp.cwd(ftpPath)
 
             try:
                 ftp.cwd(newDirName)
