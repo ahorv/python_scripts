@@ -217,7 +217,7 @@ class DB_handler:
 
     def get_all_sensor_data(self):
 
-        Timestamp = datetime.now().strftime('%yyyy %m %d - %H:%M:%S')
+        Timestamp = datetime.now().strftime('%Y %m %d - %H:%M:%S')
 
         DS18B   = temperature.DS18B20()
         MLX     = infrared.MLX90614()
@@ -225,12 +225,12 @@ class DB_handler:
         TCS     = rgb.TCS34725()
 
         DS18B_Dome_Temp     = DS18B.get_cameradome_temp()
-        DS18B_Ambi_Temp     = 0     # DS18B.get_ambient_temp() # Version with one temp sensor
+        DS18B_Ambi_Temp     = 'None'     # DS18B.get_ambient_temp() # Version with one temp sensor
         MLX_Ambi_Temp       = MLX.get_amb_temp()
         MLX_Obj_Temp        = MLX.get_obj_temp()
-        TSL_Full_Spec       = 0     # TSL.get_full_spectrum()
-        TSL_Infra_Spec      = 0     # TSL.get_infrared()
-        TSL_Visib_Spec      = 0     # TSL.get_visible_spectrum()
+        TSL_Full_Spec       = TSL.get_full_spectrum()
+        TSL_Infra_Spec      = TSL.get_infrared()
+        TSL_Visib_Spec      = TSL.get_visible_spectrum()
         TCS_R,TCS_G,TCS_B   = TCS.get_RGB()
 
         Uploaded = '0'
