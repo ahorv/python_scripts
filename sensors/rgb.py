@@ -96,6 +96,7 @@ class TCS34725(object):
         self._device = smbus.SMBus(bus=bus_num)
 
         # Make sure we're connected to the sensor.
+
         chip_id = self._readU8(self.TCS34725_ID)
         if chip_id != 0x44:
             raise RuntimeError('Failed to read TCS34725 chip ID, check your wiring.')
@@ -234,6 +235,14 @@ class TCS34725(object):
         self._device.write8(0x05, low >> 8)
         self._device.write8(0x06, high & 0xFF)
         self._device.write8(0x07, high >> 8)
+
+    def get_RGB(self):
+        self.set_interrupt(True)
+        r, g, b, c = self.get_raw_data()
+        self.set_interrupt(True)
+        self.disable()
+        self._device.close()
+        return r,g,b
 
 
 '''
