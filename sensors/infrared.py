@@ -59,6 +59,13 @@ class MLX90614():
         data = self.read_reg(self.MLX90614_TOBJ1)
         return self.data_to_temp(data)
 
+    def get_amb_obj_temp(self):
+        ambi = self.read_reg(self.MLX90614_TA)
+        sleep(0.2)
+        obj = self.read_reg(self.MLX90614_TOBJ1)
+        self.bus.close()
+        return ambi,obj
+
 
 '''
 if __name__ == "__main__":
