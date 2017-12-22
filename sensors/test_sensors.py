@@ -26,19 +26,16 @@ def test_Temp():
 def test_LUX():
     try:
         TSL = lux.TSL2561()
-        TSL_Full_Spec = TSL.get_full_spectrum()
-        TSL_Infra_Spec = TSL.get_infrared()
-        TSL_Visib_Spec = TSL.get_visible_spectrum()
-        print('Lux-sensor:  Full_Spec: {} Infra_Spec: {} Visible_Spec: {}'.format(TSL_Full_Spec, TSL_Infra_Spec, TSL_Visib_Spec))
+        Full, Infra, Visib = TSL.get_full_infra_visi()
+        print('Lux-sensor:  Full_Spec: {} Infra_Spec: {} Visible_Spec: {}'.format(Full, Infra, Visib))
     except Exception as e:
         print('LUX sensor error: ' + str(e))
 
 def test_MLX():
     try:
         MLX = infrared.MLX90614()
-        MLX_Ambi_Temp = MLX.get_amb_temp()
-        MLX_Obj_Temp = MLX.get_obj_temp()
-        print('MLX-sensor:  Ambient_Temp: {} Object_Temp: {} Visible_Spec: {}'.format(MLX_Ambi_Temp, MLX_Obj_Temp))
+        print("Ambient temperature: {0:.4f}".format(MLX.get_amb_temp()))
+        print("Object temperature:  {0:.4f}".format(MLX.get_obj_temp()))
     except Exception as e:
         print('MLX error: ' + str(e))
 
@@ -57,10 +54,15 @@ def main():
         cnt = 1
 
         while cnt < 4:
+
+            sleep(3)
             test_Temp()
-            #test_LUX()
-            #test_MLX()
-            #test_RGB()
+            sleep(1)
+            test_LUX()
+            sleep(1)
+            test_MLX()
+            sleep(1)
+            test_RGB()
             cnt += 1
 
 
