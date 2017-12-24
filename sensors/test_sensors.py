@@ -12,17 +12,51 @@ import lux
 import infrared
 import temperature
 import rgb
+import humidity
+
+######################################################################
+## Hoa: 24.12.2017 Version 2 : test_sensors.py
+######################################################################
+# This script calls each sensor for testing purposes. 
+#
+# New /Changes:
+# ----------------------------------------------------------------------
+#
+# 10.12.2017 : Implemented
+# 24.12.2017 : Added second temperatur sensor for camera 3 (test_Temp_Ambi)
+#              This temperature sensor is not available in camera 1 & 2 !
+# 24.12.2017 : Added humidity sensor.
+#
+######################################################################
 
 
-def test_Temp():
+def test_Temp_Dom():
     try:
         DS18B = temperature.DS18B20()
         DS18B_Dome_Temp = DS18B.get_cameradome_temp()
 
-        print('Temp-sensor:  Temp : {} '.format(DS18B_Dome_Temp))
+        print('Dom Temp-sensor:  Temp : {} '.format(DS18B_Dome_Temp))
+    except Exception as e:
+        print('Temp sensor error: ' + str(e))
+        
+def test_Temp_Ambi():
+    try:
+        DS18B = temperature.DS18B20()
+        DS18B_Ambi_Temp = DS18B.get_ambient_temp()
+
+        print('Ambi Temp-sensor:  Temp : {} '.format(DS18B_Ambi_Temp))
     except Exception as e:
         print('Temp sensor error: ' + str(e))
 
+def test_humi_temp():
+    try:
+        DHT22 = humidity.DHT22()
+        humi,temp = DHT22.get_measurements()
+
+        print('Humidity-sensor:  Humidity: {} Temp : {} '.format(humi,temp))
+    except Exception as e:
+        print('Humidity sensor error: ' + str(e))
+    
 def test_LUX():
     try:
         TSL = lux.TSL2561()
@@ -55,8 +89,12 @@ def main():
 
         while cnt < 4:
 
-            sleep(3)
-            test_Temp()
+            sleep(1)
+            test_Temp_Dom()
+            #sleep(1)          # uncomment for camera 3
+            #test_Temp_Ambi()  # uncomment for camera 3
+            sleep(1)
+            test_humi_temp()
             sleep(1)
             test_LUX()
             sleep(1)
