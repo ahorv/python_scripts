@@ -126,17 +126,17 @@ def check_humidity():
     dht22 = humidity.DHT22()
     h, t = dht22.get_measurements()
 
-    if float(h) > MAX_HUMIDITY:
-        fanON()
+    if float(h) > MAX_HUMIDITY:    
         root_logger.info(': Fan running: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
         WRITE_TOLOGG = True
+        shortAirBlast(300)
 
     if float(h) < (MAX_HUMIDITY - HYST_HUMIDITY):
         fanOFF()
         COUNTER += 1
 
         if COUNTER >= 720: # each hour short air blast sensing humidity
-            shortAirBlast(5)
+            shortAirBlast(60)
             COUNTER = 0
 
         if WRITE_TOLOGG:
