@@ -63,9 +63,11 @@ class DS18B20():
 
 
  
-
+'''
 if __name__ == "__main__":
+    
     sensor = DS18B20()
 
     print("Dome    Temperature:{}°C".format(sensor.get_cameradome_temp()))
     print("Ambient Temperature:{}°C".format(sensor.get_ambient_temp()))
+'''
