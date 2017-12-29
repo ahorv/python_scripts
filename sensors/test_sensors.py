@@ -35,18 +35,18 @@ def test_Temp_Dom():
         DS18B = temperature.DS18B20()
         DS18B_Dome_Temp = DS18B.get_cameradome_temp()
 
-        print('Dom Temp-sensor:  Temp : {} '.format(DS18B_Dome_Temp))
+        print('DS18 Dom  Temp-sensor: Temp : {} '.format(DS18B_Dome_Temp))
     except Exception as e:
-        print('Temp sensor error: ' + str(e))
+        print('DS18 Temp sensor error: ' + str(e))
         
 def test_Temp_Ambi():
     try:
         DS18B = temperature.DS18B20()
         DS18B_Ambi_Temp = DS18B.get_ambient_temp()
 
-        print('Ambi Temp-sensor:  Temp : {} '.format(DS18B_Ambi_Temp))
+        print('DS18 Ambi Temp-sensor: Temp : {} '.format(DS18B_Ambi_Temp))
     except Exception as e:
-        print('Temp sensor error: ' + str(e))
+        print('DS18 Temp sensor error: ' + str(e))
 
 def test_humi_temp():
     try:
@@ -87,11 +87,12 @@ def main():
         print('Start test Sensors')
         cnt = 1
 
-        while cnt < 4:
+        while cnt < 21:
 
-            sleep(1)
+            print("Run: {0}".format(cnt))
+            sleep(5)
             test_Temp_Dom()
-            #sleep(1)          # uncomment for camera 3
+            #sleep(5)          # uncomment for camera 3
             #test_Temp_Ambi()  # uncomment for camera 3
             sleep(1)
             test_humi_temp()
@@ -101,6 +102,7 @@ def main():
             test_MLX()
             sleep(1)
             test_RGB()
+            print('\n')
             cnt += 1
 
 
