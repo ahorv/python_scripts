@@ -219,37 +219,55 @@ class DB_handler:
 
         Timestamp = datetime.now().strftime('%Y %m %d - %H:%M:%S')
 
-        DS18B   = temperature.DS18B20()
-        MLX     = infrared.MLX90614()
-        TSL     = lux.TSL2561()
-        TCS     = rgb.TCS34725()
+        s = Logger()
+        root_logger = s.getLogger()
 
-        DS18B_Dome_Temp     = DS18B.get_cameradome_temp()
-        DS18B_Ambi_Temp     = 'None'     # DS18B.get_ambient_temp() # Version with one temp sensor
-        MLX_Ambi_Temp       = MLX.get_amb_temp()
-        MLX_Obj_Temp        = MLX.get_obj_temp()
-        TSL_Full_Spec       = TSL.get_full_spectrum()
-        TSL_Infra_Spec      = TSL.get_infrared()
-        TSL_Visib_Spec      = TSL.get_visible_spectrum()
-        TCS_R,TCS_G,TCS_B   = TCS.get_RGB()
+        try:
+            sensor = 'DS18B'
+            DS18B = temperature.DS18B20()
+            DS18B_Dome_Temp     = DS18B.get_cameradome_temp()
+            DS18B_Ambi_Temp     = DS18B.get_ambient_temp()
 
-        Uploaded = '0'
+            sleep(3)
 
-        self.update_all_senors(
-            CAMERA_ID,
-            Timestamp,
-            DS18B_Dome_Temp,
-            DS18B_Ambi_Temp,
-            MLX_Ambi_Temp,
-            MLX_Obj_Temp,
-            TSL_Full_Spec,
-            TSL_Infra_Spec,
-            TSL_Visib_Spec,
-            TCS_R,
-            TCS_G,
-            TCS_B,
+            sensor = 'MLX'
+            MLX = infrared.MLX90614()
+            MLX_Ambi_Temp       = MLX.get_amb_temp()
+            MLX_Obj_Temp        = MLX.get_obj_temp()
+
+            sleep(3)
+
+            sensor = 'LUX'
+            TSL = lux.TSL2561()
+            TSL_Full_Spec       = TSL.get_full_spectrum()
+            TSL_Infra_Spec      = TSL.get_infrared()
+            TSL_Visib_Spec      = TSL.get_visible_spectrum()
+
+            sleep(3)
+
+            sensor = 'RGB'
+            TCS = rgb.TCS34725()
+            TCS_R,TCS_G,TCS_B   = TCS.get_RGB()
+
             Uploaded = '0'
-        )
+
+            self.update_all_senors(
+                CAMERA_ID,
+                Timestamp,
+                DS18B_Dome_Temp,
+                DS18B_Ambi_Temp,
+                MLX_Ambi_Temp,
+                MLX_Obj_Temp,
+                TSL_Full_Spec,
+                TSL_Infra_Spec,
+                TSL_Visib_Spec,
+                TCS_R,
+                TCS_G,
+                TCS_B,
+                Uploaded = '0'
+            )
+        except Exception as e:
+            root_logger.error(': {0} - SENSOR: '.format(sensor) + str(e))
 
 
     def eraseDB(self):
@@ -282,11 +300,10 @@ def do_Sensor_Data_Logging():
         if success:
             return
         else:
-            root_logger.error(
-                'DATA: Could not create SQL database.')
+            root_logger.error('DATA: Could not create SQL database.')
 
     except Exception as e:
-        root_logger.error('  DB: Retried to create database but failed to do so:' + str(e))
+        root_logger.error(' LOGGING: ' + str(e))
 
 def setOwnerAndPermission(pathToFile):
     try:
@@ -307,7 +324,6 @@ def main():
         root_logger.info('MAIN: START COLLECTING SENSOR DATA')
 
         do_Sensor_Data_Logging()
-  
 
     except Exception as e:
         root_logger.error('MAIN: Error: ' + str(e))
