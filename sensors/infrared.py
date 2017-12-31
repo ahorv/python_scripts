@@ -46,8 +46,8 @@ class MLX90614():
         #(judging by the fact we haven't returned from this function yet)
         #So let's just re-raise the last IOError we got
 
-        #raise e
-        return
+       raise e
+       
 
     def data_to_temp(self, data):
         temp = (data*0.02) - 273.15
