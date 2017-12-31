@@ -13,9 +13,10 @@ import temperature
 import infrared
 import lux
 import rgb
+import time
 
 ######################################################################
-## Hoa: 09.11.2017 Version 2 : write_sensors_DB.py
+## Hoa: 31.12.2017 Version 3 : write_sensors_DB.py
 ######################################################################
 # This class collects all sensor data and writes them to a SQL database.
 #
@@ -24,7 +25,8 @@ import rgb
 #
 # 09.11.2017 : implemented
 # 21.12.2017 : Added Camera_id (Camera 1 - 3) must be set accordingly
-# 
+# 31.12.2017 : New, run endless at boot up
+# 31.12.2017 : Added skipping sensors if they are faulty
 #
 ######################################################################
 
@@ -36,7 +38,21 @@ global DB_CON
 global DB_PATH
 global CAMERA_ID
 
-CAMERA_ID = 1 # Location: rooftop of ihomelab, Horw LU
+global skip_MLX, cnt_skip_MLX
+global skip_LUX, cnt_skip_LUX
+global skip_RGB, cnt_skip_RGB
+global max_skips
+
+# initial variable values
+skip_MLX = False
+skip_LUX = False
+skip_RGB = False
+cnt_skip_MLX = 0
+cnt_skip_LUX = 0
+cnt_skip_RGB = 0
+max_skips = 10
+
+CAMERA_ID = 1 # Location: @ roof top of Trakt IV LU Horw
 
 DB_NAME = 'sensor_DB' + '.db'
 
@@ -106,7 +122,7 @@ class DB_handler:
             if e.args[0] == 2:  # No such file or directory -> as expected(!)
                 DB_CON = sqlite3.connect(DB_PATH)
                 setOwnerAndPermission(DB_PATH)
-                self.create_SensorData_table(self)
+                self.create_SensorData_table()
                 success = True
                 root_logger.info(' DB: Created new DB: ' + str(DB_NAME.replace("/", "")))
                 return success
@@ -216,6 +232,10 @@ class DB_handler:
             return
 
     def get_all_sensor_data(self):
+        global skip_MLX, cnt_skip_MLX
+        global skip_LUX, cnt_skip_LUX
+        global skip_RGB, cnt_skip_RGB
+        global max_skips
 
         Timestamp = datetime.now().strftime('%Y %m %d - %H:%M:%S')
 
@@ -230,26 +250,52 @@ class DB_handler:
 
             sleep(3)
 
-            sensor = 'MLX'
-            MLX = infrared.MLX90614()
-            MLX_Ambi_Temp       = MLX.get_amb_temp()
-            MLX_Obj_Temp        = MLX.get_obj_temp()
+            if not skip_MLX:
+                sensor = 'MLX'
+                MLX = infrared.MLX90614()
+                MLX_Ambi_Temp       = MLX.get_amb_temp()
+                MLX_Obj_Temp        = MLX.get_obj_temp()
+                sleep(3)
+            else:
+                MLX_Ambi_Temp       = '-999'
+                MLX_Obj_Temp        = '-999'
+                cnt_skip_MLX += 1
+                
+                if cnt_skip_MLX >= max_skips:
+                    skip_MLX = False
+                    cnt_skip_MLX = 0          
+                
+            if not skip_LUX:
+                sensor = 'LUX'
+                TSL = lux.TSL2561()
+                TSL_Full_Spec       = TSL.get_full_spectrum()
+                TSL_Infra_Spec      = TSL.get_infrared()
+                TSL_Visib_Spec      = TSL.get_visible_spectrum()
+                sleep(3)
+            else:
+                TSL_Full_Spec       = '-999'
+                TSL_Infra_Spec      = '-999'
+                TSL_Visib_Spec      = '-999'
+                cnt_skip_LUX += 1
 
-            sleep(3)
+                if cnt_skip_LUX >= max_skips:
+                    skip_LUX = False
+                    cnt_skip_LUX = 0    
 
-            sensor = 'LUX'
-            TSL = lux.TSL2561()
-            TSL_Full_Spec       = TSL.get_full_spectrum()
-            TSL_Infra_Spec      = TSL.get_infrared()
-            TSL_Visib_Spec      = TSL.get_visible_spectrum()
+            if not skip_RGB:
+                sensor = 'RGB'
+                TCS = rgb.TCS34725()
+                TCS_R,TCS_G,TCS_B   = TCS.get_RGB()
+            else:
+                TCS_R               = '-999'
+                TCS_G               = '-999'
+                TCS_B               = '-999'
+                cnt_skip_RGB += 1
 
-            sleep(3)
-
-            sensor = 'RGB'
-            TCS = rgb.TCS34725()
-            TCS_R,TCS_G,TCS_B   = TCS.get_RGB()
-
-            Uploaded = '0'
+                if cnt_skip_RGB >= max_skips:
+                    skip_RGB = False
+                    cnt_skip_RGB = 0
+   
 
             self.update_all_senors(
                 CAMERA_ID,
@@ -265,8 +311,18 @@ class DB_handler:
                 TCS_G,
                 TCS_B,
                 Uploaded = '0'
-            )
+            )            
         except Exception as e:
+
+            if sensor == 'MLX':
+                skip_MLX = True
+     
+            if sensor == 'LUX':
+                skip_LUX = True
+   
+            if sensor == 'RGB':
+                skip_RGB = True
+                
             root_logger.error(': {0} - SENSOR: '.format(sensor) + str(e))
 
 
@@ -303,7 +359,7 @@ def do_Sensor_Data_Logging():
             root_logger.error('DATA: Could not create SQL database.')
 
     except Exception as e:
-        root_logger.error(' LOGGING: ' + str(e))
+        root_logger.error(': do_Sensor_Data_Logging() -> ' + str(e))
 
 def setOwnerAndPermission(pathToFile):
     try:
@@ -323,7 +379,9 @@ def main():
         root_logger = s.getLogger()
         root_logger.info('MAIN: START COLLECTING SENSOR DATA')
 
-        do_Sensor_Data_Logging()
+        while True:
+            time.sleep(60)
+            do_Sensor_Data_Logging()
 
     except Exception as e:
         root_logger.error('MAIN: Error: ' + str(e))
