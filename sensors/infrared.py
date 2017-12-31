@@ -45,7 +45,9 @@ class MLX90614():
         #By this time, we made a couple requests and the sensor didn't respond
         #(judging by the fact we haven't returned from this function yet)
         #So let's just re-raise the last IOError we got
-        raise e
+
+        #raise e
+        return
 
     def data_to_temp(self, data):
         temp = (data*0.02) - 273.15
