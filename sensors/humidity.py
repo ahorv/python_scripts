@@ -9,7 +9,7 @@ class DHT22:
    DHT22 sensor.  The sensor is also known as the AM2302.
    """
 
-   def __init__(self, gpio=4):
+   def __init__(self, gpio=23):
       """
       Taking readings more often than about once every two seconds will
       eventually cause the DHT22 to hang.  A 3 second interval seems OK.
