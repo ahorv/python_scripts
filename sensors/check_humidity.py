@@ -131,7 +131,7 @@ def check_humidity():
     COUNTER += 1  
 
     if float(h) > MAX_HUMIDITY:    
-        root_logger.info(': Fan running: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
+        root_logger.info(': Fan running: Humidity: {} Temperature: {}'.format(h, t))
         WRITE_TOLOGG = True
         shortAirBlast(900)
         COUNTER = 0
@@ -142,10 +142,10 @@ def check_humidity():
         if COUNTER >= 440: # Periodic (1h) air blast to sens humidity
             shortAirBlast(180)
             COUNTER = 0
-            root_logger.info(': Periodic fan run: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
+            root_logger.info(': Periodic fan run: Humidity: {} Temperature: {}'.format(h, t))
 
         if WRITE_TOLOGG:
-            root_logger.info(': Fan stopped: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
+            root_logger.info(': Fan stopped: Humidity: {} Temperature: {}'.format(h, t))
             WRITE_TOLOGG = False
 
 
