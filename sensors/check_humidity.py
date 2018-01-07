@@ -6,13 +6,14 @@ import sys
 import os
 import logging
 import logging.handlers
+from datetime import datetime
 import pwd
 import grp
 
 
 
 ######################################################################
-## Hoa: 17.12.2017 Version 1 : run_fan.py
+## Hoa: 07.01.2018 Version 2 : run_fan.py
 ######################################################################
 # Monitors the humidity in the camera dom. If humidity rises over a
 # certain value the fan is run until humidity is fallen under the
@@ -23,7 +24,8 @@ import grp
 #
 # 17.12.2017 : programm is started with the booting of the operating system.
 #              (runs for ever)
-# 20.12.2017 : each hour short air blast to the humidity sensor
+# 20.12.2017 : Periodic air blast to sens humidity
+# 07.01.2018 : Changed reset counter for periodic air blast
 #
 #
 ######################################################################
@@ -126,18 +128,21 @@ def check_humidity():
     dht22 = humidity.DHT22()
     h, t = dht22.get_measurements()
 
+    COUNTER += 1  
+
     if float(h) > MAX_HUMIDITY:    
         root_logger.info(': Fan running: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
         WRITE_TOLOGG = True
-        shortAirBlast(300)
+        shortAirBlast(900)
+        COUNTER = 0
 
     if float(h) < (MAX_HUMIDITY - HYST_HUMIDITY):
-        fanOFF()
-        COUNTER += 1
+        fanOFF()  
 
-        if COUNTER >= 720: # each hour short air blast sensing humidity
-            shortAirBlast(60)
+        if COUNTER >= 720: # Periodic air blast to sens humidity
+            shortAirBlast(180)
             COUNTER = 0
+            root_logger.info(': Periodic fan run: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
 
         if WRITE_TOLOGG:
             root_logger.info(': Fan stopped: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
@@ -148,6 +153,7 @@ def main():
     try:
         s = Logger()
         root_logger = s.getLogger()
+        root_logger.info(': check_humidity started')
         setup()
         shortAirBlast(15)
 
