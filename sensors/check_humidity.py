@@ -139,7 +139,7 @@ def check_humidity():
     if float(h) < (MAX_HUMIDITY - HYST_HUMIDITY):
         fanOFF()  
 
-        if COUNTER >= 720: # Periodic air blast to sens humidity
+        if COUNTER >= 440: # Periodic (1h) air blast to sens humidity
             shortAirBlast(180)
             COUNTER = 0
             root_logger.info(': Periodic fan run: Humidity: {:.2f} Temperature: {:.2f}'.format(h, t))
