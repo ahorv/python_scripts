@@ -50,6 +50,7 @@ def shoot(request, ss=50000, iso=100):
     """
     #Check that camera is available.
     Q=timelapser.objects.all()[0]
+    location = '' # hoa -> error not defined
     if Q.active: return HttpResponse(location)
     Q.set_active(True)
     Q.set_status('Taking manual photo')

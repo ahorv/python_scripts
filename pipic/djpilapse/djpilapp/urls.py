@@ -1,8 +1,10 @@
-from django.conf.urls import patterns, url
+#from django.conf.urls import patterns, url
+from django.conf.urls import *   # hoa
+
 
 from djpilapp import views
 
-urlpatterns = patterns('',
+urlpatterns = [
     url(r'^$', views.index, name='index'),
     url('^shoot/(\d+)/(\d+)/$', views.shoot, name='shoot'),
     url('^findinitialparams/$', views.findinitialparams, name='findinitialparams'),
@@ -14,6 +16,6 @@ urlpatterns = patterns('',
     url('^deactivate/$', views.deactivate, name='deactivate'),
     url('^reboot/$', views.reboot, name='reboot'),
     url('^poweroff/$', views.poweroff, name='poweroff'),
-    url('^deleteall/$', views.deleteall, name='deleteall'),    
+    url('^deleteall/$', views.deleteall, name='deleteall'),
     url('^newProjectSubmit/$', views.newProjectSubmit, name='newProjectSubmit'),
-)
+]

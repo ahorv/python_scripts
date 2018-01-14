@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import sys, getopt
 import subprocess
@@ -19,7 +19,7 @@ def main(argv):
     try:
        opts, args = getopt.getopt(argv,"hr:n:", ["root=", "hostname=",])
     except getopt.GetoptError:
-       print usageString
+       print('{}'.format(usageString))
        sys.exit(2)
 
     #default value for pi root is None
@@ -27,22 +27,22 @@ def main(argv):
     hostname=""
     for opt, arg in opts:
         if opt == '-h':
-            print usageString
+            print('{}'.format(usageString))
             sys.exit()
         elif opt in ("-r", "--root"):
-            print opt, arg.strip()
+            print('{} | {}'.format(opt,arg.strip()))
             piroot = arg.strip()
             if piroot[-1]!='/': piroot.append('/')
             try:
                 os.listdir(piroot)
             except:
-                print "Root directory not found."
+                print("Root directory not found.")
                 sys.exit(2)
         elif opt in ("-n", "--hostname"):
           hostname = arg.strip()
           if hostname not in hostcolors:
-            print "Not a defined hostname.  Try one of these, or specify none and I'll pick one at random:"
-            print hostcolors
+            print ("Not a defined hostname.  Try one of these, or specify none and I'll pick one at random:")
+            print('{}'.format(hostcolors))
             return False
     if hostname=="": hostname=hostcolors[random.randint(0,len(hostcolors))]
 

@@ -1,12 +1,12 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 from PIL import Image
 import os, sys, argparse
 import subprocess
 import time
-import math
+import picamera
 import zmq
-import io, picamera
+import io
 from fractions import Fraction
 
 class timelapse_config(object):
@@ -317,7 +317,7 @@ class timelapse(object):
     tmp = tmpl % (state.currentss, round(x,2), state.lastbr, state.shots_taken)
     print(tmp)
 
-  def run_timelapse(self, cotnfig=None, state=None):
+  def run_timelapse(self, config=None, state=None):
     """
     Takes pictures at specified interval.
     """
@@ -336,11 +336,12 @@ class timelapse(object):
                 or config.maxshots == -1)):
       loopstart = time.time()
       dtime = subprocess.check_output(['date', '+%y%m%d_%T']).strip()
+      dtime = dtime.decode('UTF-8')
       dtime = dtime.replace(':', '.')
       #Broadcast options for this picture on zmq.
-      command='0 shoot {} {} {} {}'.format(config.w, config.h, 
-                                           state.currentss, dtime)
-      self.socket.send(command)
+      command='0 shoot {} {} {} {}'.format(config.w, config.h, state.currentss, dtime)
+      #self.socket.send(command)
+      self.socket.send_string(command)
 
       #Take a picture.
       filename = ('/home/pi/pictures/%s_%s.jpg' % (self.hostname, dtime))

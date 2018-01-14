@@ -1,4 +1,6 @@
-import Image
+#!/usr/bin/env python
+
+from PIL import Image
 import subprocess
 import random
 import os, sys, getopt
@@ -20,7 +22,7 @@ def argassign(arg, typ='int'):
         else:
             return str(arg)
     except:
-       print usagestring
+       print('{}'.format(usagestring))
        sys.exit(2)
     return False
 
@@ -44,12 +46,12 @@ def main(argv):
     try:
        opts, args = getopt.getopt(argv,"qn:s:o:", [])
     except getopt.GetoptError:
-       print usagestring
-       sys.exit(2)
+        print('{}'.format(usagestring))
+        sys.exit(2)
 
     for opt, arg in opts:
         if opt == '-q':
-            print usagestring
+            print('{}'.format(usagestring))
             sys.exit()
         elif opt=="-n":
             nshots=argassign(arg,'int')
@@ -65,7 +67,7 @@ def main(argv):
     hostname=f.read().strip().replace(' ','')
     f.close()
 
-    if not os.path.exists("/home/pi/brdata")
+    if not os.path.exists("/home/pi/brdata"):
         os.mkdir('/home/pi/brdata/')
 
     for i in range(nshots):

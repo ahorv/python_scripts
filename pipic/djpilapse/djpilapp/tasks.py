@@ -3,7 +3,7 @@ from celery import shared_task
 from djpilapp.models import timelapser
 import os, subprocess
 from time import time, sleep
-import Image
+from PIL import Image
 
 @shared_task
 def add(x, y):
@@ -60,12 +60,12 @@ def timelapse_shoot(L=None, width=20, gamma=None):
     options+=' -o '+tempfile
     try:
         subprocess.call('raspistill '+options, shell=True)
-        print 'raspistill ' +options
+        print('raspistill {}'.format(options))
         im=Image.open(tempfile)
         #Saves file without exif and raster data; reduces file size by 90%,
         if filename!=None:
             im.save(filename)
-        print filename
+        print('{}'.format(filename))
     except:
         return False
 
@@ -77,10 +77,9 @@ def timelapse_shoot(L=None, width=20, gamma=None):
     T.avgbr=avgbr
 
     #Dynamically adjust ss and iso.
-    (T.ss, T.iso)=T.dynamic_adjust(target=proj.brightness,
-                                   lastbr=avgbr, gamma=gamma)
-    print str(L)
-    print str(newbr)+'\t'+str(avgbr)+'\t'+str(T.ss)+'\t'+str(T.iso)
+    (T.ss, T.iso)=T.dynamic_adjust(target=proj.brightness,lastbr=avgbr, gamma=gamma)
+    print('{}'.format(str(L)))
+    print('{}\t {}\t {}\t {}\t'.format( str(newbr),str(avgbr),str(T.ss),str(T.iso)))
     T.shots_taken+=1
 
     delta=proj.brightness-avgbr
