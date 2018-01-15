@@ -12,7 +12,7 @@ from djpilapp.models import *
 from djpilapp.tasks import *
 
 
-basedir='/home/pi/pipic/djpilapse/djpilapp/'
+basedir='/home/pi/python_scripts/pipic/djpilapse/djpilapp/'
 staticdir='static/'
 
 
@@ -22,7 +22,7 @@ def index(request):
         P = pilapse_project.objects.all()[0]
     except:
         P=pilapse_project.objects.create( project_name='pipic',
-            folder='/home/pi/pipic', keep_images=False,
+            folder='/home/pi/python_scripts/pipic', keep_images=False,
             brightness=128, interval=15, width=1292, height=972, maxtime=-1,
             maxshots=-1, delta=32, alpha=0.1, listen=False)
         P.save()
@@ -50,7 +50,6 @@ def shoot(request, ss=50000, iso=100):
     """
     #Check that camera is available.
     Q=timelapser.objects.all()[0]
-    location = '' # hoa -> error not defined
     if Q.active: return HttpResponse(location)
     Q.set_active(True)
     Q.set_status('Taking manual photo')

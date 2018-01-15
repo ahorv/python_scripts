@@ -1,16 +1,17 @@
-from django.conf.urls import patterns, include, url
+from django.conf.urls import include, url
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
 admin.autodiscover()
 
-urlpatterns = patterns('',
+urlpatterns = [
     # Examples:
     # url(r'^$', 'djpilapse.views.home', name='home'),
     # url(r'^djpilapse/', include('djpilapse.foo.urls')),
 
     url(r'^djpilapp/', include('djpilapp.urls')),
 
+    url(r'', include('djpilapp.urls')),
     url(r'^$', include('djpilapp.urls')),
     url(r'^/$', include('djpilapp.urls')),
 
@@ -20,4 +21,4 @@ urlpatterns = patterns('',
 
     # Uncomment the next line to enable the admin:
     url(r'^admin/', include(admin.site.urls)),
-)
+]

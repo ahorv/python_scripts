@@ -1,21 +1,19 @@
-#from django.conf.urls import patterns, url
-from django.conf.urls import *   # hoa
-
+from django.conf.urls import url
 
 from djpilapp import views
 
 urlpatterns = [
     url(r'^$', views.index, name='index'),
-    url('^shoot/(\d+)/(\d+)/$', views.shoot, name='shoot'),
-    url('^findinitialparams/$', views.findinitialparams, name='findinitialparams'),
-    url('^jsonupdate/$', views.jsonupdate, name='jsonupdate'),
-    url('^newProject/$', views.newProjectSubmit, name='newProjectSubmit'),
+    url(r'^shoot/(\d+)/(\d+)/$', views.shoot, name='shoot'),
+    url(r'^findinitialparams/$', views.findinitialparams, name='findinitialparams'),
+    url(r'^jsonupdate/$', views.jsonupdate, name='jsonupdate'),
+    url(r'^newProject/$', views.newProjectSubmit, name='newProjectSubmit'),
     ## add URL for newProject view
-    url('^saveproj/$', views.saveProjectSettings, name='saveProjectSettings'),
-    url('^startlapse/$', views.startlapse, name='startlapse'),
-    url('^deactivate/$', views.deactivate, name='deactivate'),
-    url('^reboot/$', views.reboot, name='reboot'),
-    url('^poweroff/$', views.poweroff, name='poweroff'),
-    url('^deleteall/$', views.deleteall, name='deleteall'),
-    url('^newProjectSubmit/$', views.newProjectSubmit, name='newProjectSubmit'),
+    url(r'^saveproj/$', views.saveProjectSettings, name='saveProjectSettings'),
+    url(r'^startlapse/$', views.startlapse, name='startlapse'),
+    url(r'^deactivate/$', views.deactivate, name='deactivate'),
+    url(r'^reboot/$', views.reboot, name='reboot'),
+    url(r'^poweroff/$', views.poweroff, name='poweroff'),
+    url(r'^deleteall/$', views.deleteall, name='deleteall'),
+    url(r'^newProjectSubmit/$', views.newProjectSubmit, name='newProjectSubmit'),
 ]

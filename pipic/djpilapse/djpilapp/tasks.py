@@ -49,7 +49,7 @@ def timelapse_shoot(L=None, width=20, gamma=None):
     filename=proj.folder
     if filename[-1]!='/': filename+='/'
     filename+= proj.project_name + '_' + dtime + '.jpg'
-    tempfile='/home/pi/pipic/djpilapse/djpilapp/static/new.jpg'
+    tempfile='/home/pi/python_scripts/pipic/djpilapse/djpilapp/static/new.jpg'
 
     #Take a picture
     options='-awb auto -n'
@@ -77,9 +77,10 @@ def timelapse_shoot(L=None, width=20, gamma=None):
     T.avgbr=avgbr
 
     #Dynamically adjust ss and iso.
-    (T.ss, T.iso)=T.dynamic_adjust(target=proj.brightness,lastbr=avgbr, gamma=gamma)
+    (T.ss, T.iso)=T.dynamic_adjust(target=proj.brightness,
+                                   lastbr=avgbr, gamma=gamma)
     print('{}'.format(str(L)))
-    print('{}\t {}\t {}\t {}\t'.format( str(newbr),str(avgbr),str(T.ss),str(T.iso)))
+    print('{} \t{} \t{} \t{}'.format(str(newbr),str(avgbr),str(T.ss),str(T.iso)))
     T.shots_taken+=1
 
     delta=proj.brightness-avgbr
