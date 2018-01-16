@@ -188,7 +188,7 @@ class timelapser(models.Model):
 
             #Dynamically adjust ss and iso.
             (self.ss, self.iso)=self.dynamic_adjust(gamma=2.5)
-            print('{} {} {}'.format(self.ss, self.iso, self.lastbr))
+            print(self.ss, self.iso, self.lastbr)
             #We use a killtoken so that the while loop runs one extra time before
             #deciding to quit because the max/min iso and ss have been reached.
             if self.ss==self.maxss and self.iso==self.maxiso: 
