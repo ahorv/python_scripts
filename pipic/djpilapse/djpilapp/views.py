@@ -18,7 +18,8 @@ staticdir='static/'
 
 def index(request):
     s = get_template('index.html')
-    try:    
+    try:
+        print('index')
         P = pilapse_project.objects.all()[0]
     except:
         P=pilapse_project.objects.create( project_name='pipic',
@@ -49,6 +50,7 @@ def shoot(request, ss=50000, iso=100):
     Take a photo and save it as new.jpg.
     """
     #Check that camera is available.
+    print('shoot')
     Q=timelapser.objects.all()[0]
     if Q.active: return HttpResponse(location)
     Q.set_active(True)
@@ -145,6 +147,7 @@ def boot_timelapse():
     T=timelapser.objects.all()[0]
     if T.boot or T.active:
         T.set_active(True)
+        print('--> views.py : boot_timelaps()')
         timelapse()
     else:
         T.set_active(False)

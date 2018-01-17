@@ -10,7 +10,7 @@ urlpatterns = [
     url('^newProject/$', views.newProjectSubmit, name='newProjectSubmit'),
     ## add URL for newProject view
     url('^saveproj/$', views.saveProjectSettings, name='saveProjectSettings'),
-    url('^startlapse/$', views.startlapse, name='startlapse'),
+    url('^startlapse/', views.startlapse, name='startlapse'),
     url('^deactivate/$', views.deactivate, name='deactivate'),
     url('^reboot/$', views.reboot, name='reboot'),
     url('^poweroff/$', views.poweroff, name='poweroff'),

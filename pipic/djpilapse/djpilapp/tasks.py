@@ -12,6 +12,7 @@ def add(x, y):
 @shared_task
 def timelapse(width=20):
     #try:
+    print('--> task.py : ')
     T=timelapser.objects.all()[0]
     T.set_status('Timelapse active')
     L=[T.project.brightness]
@@ -20,6 +21,7 @@ def timelapse(width=20):
         T=timelapser.objects.all()[0]
         proj=T.project
         L=timelapse_shoot(L, width)
+        print('--> task.py after timelaps_shoot() L : {}'.format(L))
         if not T.active: break
         loopend=time()
         sleep(max([0,proj.interval-(loopend-loopstart)]))
@@ -37,6 +39,7 @@ def timelapse_shoot(L=None, width=20, gamma=None):
     `L` is a list of recent image brightnesses.
     `width` is the number of images to use in finding average brightness.
     """
+    print('--> task.py -> timelapse_shoot() : L:{}, gamma:{}'.format(L, gamma))
     T=timelapser.objects.all()[0]
     if not T.active: return None
     proj=T.project
@@ -44,12 +47,13 @@ def timelapse_shoot(L=None, width=20, gamma=None):
     if gamma==None: gamma=1.0/width
 
     #figure out the filename.
-    dtime=subprocess.check_output(['date', '+%y%m%d_%T']).strip()
+    dtime=subprocess.check_output(['date', '+%y%m%d_%T']).decode("utf-8").strip()
     dtime=dtime.replace(':', '.')
+
     filename=proj.folder
     if filename[-1]!='/': filename+='/'
     filename+= proj.project_name + '_' + dtime + '.jpg'
-    tempfile='/home/pi/pipic/djpilapse/djpilapp/static/new.jpg'
+    tempfile='/home/pi/python_scripts/pipic/djpilapse/djpilapp/static/new.jpg'
 
     #Take a picture
     options='-awb auto -n'
@@ -70,6 +74,7 @@ def timelapse_shoot(L=None, width=20, gamma=None):
         return False
 
     newbr=T.avgbrightness(im)
+    print('--> taskr.py -> timelapse_shoot() -> newbr : {}'.format(newbr))
     if len(L)>=width: L=L[1:]
     L.append(newbr)
     avgbr=sum(L)/len(L)
@@ -77,9 +82,10 @@ def timelapse_shoot(L=None, width=20, gamma=None):
     T.avgbr=avgbr
 
     #Dynamically adjust ss and iso.
+    print('--> taskr.py -> timelapse_shoot() -> dynamic_adjust(bright:{}, lastbr:{}, gamma:{})'.format(proj.brightness,avgbr,gamma))
     (T.ss, T.iso)=T.dynamic_adjust(target=proj.brightness,
                                    lastbr=avgbr, gamma=gamma)
-    print('{}'.format(str(L)))
+    print('L : {}'.format(str(L)))
     print('{} \t{} \t{} \t{}').format(str(newbr),str(avgbr),+str(T.ss),str(T.iso))
     T.shots_taken+=1
 

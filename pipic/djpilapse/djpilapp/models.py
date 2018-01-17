@@ -124,6 +124,8 @@ class timelapser(models.Model):
         actual timelapse.  (A high value of gamma coincident with a large
         averaging period can lead to oscillating brightness.)
         """
+        print('--> models.py : Dynamic Adjust')
+
         if target==None: target=self.project.brightness
         if lastbr==None: lastbr=self.lastbr
         delta=target-lastbr
@@ -167,6 +169,8 @@ class timelapser(models.Model):
         Take a number of small shots in succession to determine a shutterspeed
         and ISO for taking photos of the desired brightness.
         """
+        print('--> models.py : find initial parameters')
+
         if self.active:
             return False
         self.set_active(True)
