@@ -13,15 +13,23 @@ import shutil
 
 print('Version opencv: ' + cv2.__version__)
 
-'''
-hdr.py 
-Version 2
-29.10.2017
-Attila Horvath
-'''
+######################################################################
+## Hoa: 29.10.2017 Version 2 : hdr.py
+######################################################################
+# This class collects all sensor data and writes them to a SQL database.
+# Takes pictures in raw bayer format with different shutter times
+# Remarks: On run takes 2'30''-> therefore cronjob interval must be > 2'30''
+#
+# New /Changes:
+# ----------------------------------------------------------------------
+#
+# 10.11.2017 : Added new logging
+#
+#
+######################################################################
 
 global Path_to_raw
-Path_to_raw ='./jpg/2'
+Path_to_raw ='./raw_data/20180325_151016'
 
 
 def getEXIF_TAG(file_path, field):
@@ -143,7 +151,7 @@ def main():
     try:
         global Path_to_raw
         createNewFolder('./ouput')
-        createHDR(Path_to_raw,['3','4','5'])
+        createHDR(Path_to_raw,['0','5','9'])
 
     except Exception as e:
         print('MAIN: Error in main: ' + str(e))

@@ -7,11 +7,25 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 global images_in
-images_in = r'C:\Hoa_Python_Projects\python_scripts\hdr\input\20171025_140139'  # @home
-image_out = r'C:\Hoa_Python_Projects\python_scripts\hdr\output'  # @home#@ home
+images_in = r'./raw_data/20180325_151016'  # @home
+image_out = r'./output'  # @home
 #images_in = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hdr\input\20171025_140139'  # @lab
 #image_out = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hdr\output'  #@ home  # @ lab
 
+######################################################################
+## Hoa: 09.11.2017 Version 1 : raw2rgb.py
+######################################################################
+# Using opencv to debayer a numpy array of an image.
+# Given a numpy array of an image, the script debayers and interpolates
+# and shows the result as (LDR) jpg image.
+#
+# New /Changes:
+# ----------------------------------------------------------------------
+#
+# 09.11.2017 : first implemented
+#
+#
+######################################################################
 
 def main():
     try:
