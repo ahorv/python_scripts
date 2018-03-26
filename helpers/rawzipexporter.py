@@ -18,6 +18,8 @@ from glob import glob
 # ftp addr: ftp.ihomelab.ch / resolved: 147.88.219.198:21
 # Path to directory on the ftp server: /camera_2/raw/
 #
+# The variable CAMERA has to be set according to the camera in use!
+#
 # NEW:
 # -----
 # - new directory for each day
@@ -36,7 +38,6 @@ global CAMERA
 
 CAMERA = 'camera_3'
 
-'''
 if sys.platform == "linux":
     import pwd
     import grp
@@ -48,14 +49,7 @@ else:
     SCRIPTPATH = os.path.realpath(__file__)
     ERRFILEPATH = os.path.join(SCRIPTPATH, 'rawexporter.log')
     ZIPDIRPATH = os.path.join(SCRIPTPATH, 'raw_data')
-'''
 
-SCRIPTPATH = r'C:\Users\ati\Desktop\raw_data'
-ERRFILEPATH = r'C:\Users\ati\Desktop\raw_data\rawexporter.log'
-ZIPDIRPATH = SCRIPTPATH
-
-# ACHTUNG setPermission ist AUSKOMMENTIERT !
-# ACHTUNG FTP UPLOAD Auskommentiert !
 
 class Logger:
     def getLogger(self):
@@ -98,8 +92,6 @@ class Logger:
 
 def setOwnerAndPermission(pathToFile):
     try:
-        return
-
         if sys.platform == "linux":
             uid = pwd.getpwnam('pi').pw_uid
             gid = grp.getgrnam('pi').gr_gid
@@ -115,17 +107,18 @@ class Exporter:
     def getDirs(self):
         try:
             global ZIPDIRPATH
+            s = Logger()
+            root_logger = s.getLogger()
             allDirs = []
 
             for dirs in sorted(glob(os.path.join(ZIPDIRPATH, "*", ""))):
                 if os.path.isdir(dirs):
                     allDirs.append(dirs)
-                    print(dirs)
 
             return allDirs
 
         except Exception as e:
-            print('getDirectories: Error: ' + str(e))
+            root_logger.info('GETDIRS: Error: ' + str(e))
 
     def zipitall(self):
         try:
@@ -136,9 +129,6 @@ class Exporter:
             allDirs = self.getDirs()
 
             for dirs in allDirs:
-
-                print('Zipping directory: {}'.format(dirs))
-
                 dirtozip = ''
                 for nextdir, subdirs, files in os.walk(dirs + "/"):
                     newzipname = nextdir.split('/')[-1]
@@ -149,9 +139,7 @@ class Exporter:
 
                         zf = zipfile.ZipFile(zipfilepath + '.zip', "w")
                         for dirname, subdirs, files in os.walk(dirtozip):
-                            print('{}:'.format(dirname))
                             for filename in files:
-                                print('\t'+'- {}'.format(filename))
                                 zf.write(os.path.join(dirname, filename), filename, compress_type=zipfile.ZIP_DEFLATED)
 
                         zf.close()
@@ -198,20 +186,12 @@ class Exporter:
             zipfilename = allzipfiles[0]
             token = str(zipfilename.split('/')[-1])
             newDirName = str(token.split('_', 1)[0])
-            print('New Dir Name: ' + newDirName)
 
-            #############################################
-            #   ACHTUNG FTP AUSKOMMENTIERT
-            #############################################
-            return
-
-            '''
             ftpPath = '/' + CAMERA + '/raw/'
 
             ftp = FTP('ftp.ihomelab.ch')
             ftp.login('tahorvat', '123ihomelab')
             ftp.cwd(ftpPath)
-            '''
 
             try:
                 ftp.cwd(newDirName)
