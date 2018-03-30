@@ -25,8 +25,11 @@ import numpy as np
 ######################################################################
 ## Hoa: 09.11.2017 Version 4 : raw.py
 ######################################################################
-# This class collects all sensor data and writes them to a SQL database.
-# Takes pictures in raw bayer format with different shutter times
+# This class takes 10 consecutive images with increasing shutter times.
+# Pictures are in raw bayer format. In addition a jpg as reference is
+# taken in addition.
+# Aim is to merge a sequence of images to a HDR image.
+#
 # Remarks: On run takes 2'30''-> therefore cronjob interval must be > 2'30''
 #
 # New /Changes:
