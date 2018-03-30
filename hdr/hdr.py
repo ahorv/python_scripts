@@ -45,7 +45,7 @@ def getEXIF_TAG(file_path, field):
                     foundvalue = np.float32(Fraction(str(exif[k])))
                     break
 
-        return  foundvalue
+        return foundvalue
 
     except Exception as e:
         print('EXIF: Could not read exif data ' + str(e))
