@@ -12,13 +12,14 @@ print('Version opencv: ' + cv2.__version__)
 ######################################################################
 ## Hoa: 26.03.2018 Version 1 : grab_JPG_5.py
 ######################################################################
-# Grabs from a image collection all raw_img5.jpg 's
+# Grabs from a image collection all raw_img5.jpg 's and shows them as
+# Slideshow
 #
 # New /Changes:
 # ----------------------------------------------------------------------
 #
 # 26.03.2018 : first implemented
-#
+# 30.03.2018 : added copy img to new folder
 #
 ######################################################################
 
