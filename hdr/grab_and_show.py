@@ -50,6 +50,7 @@ def readAllImages(allDirs):
         list_names = []
         list_images = []
         cnt = 1
+        print('Converting jpg to opencv, may take some time!')
 
         t_start = time.time()
         for next_dir in allDirs:
@@ -98,7 +99,7 @@ def main():
         list_images = []
         allDirs = []
         allDirs = getDirectories(Path_to_raw)
-        copyAll_img5(allDirs)
+        #copyAll_img5(allDirs)
         list_images = readAllImages(allDirs)
 
         counter = 0
@@ -112,7 +113,7 @@ def main():
             plt.title('Image: {}'.format(counter))
             cur_window.set_data(next)
 
-            plt.pause(.01)
+            plt.pause(.05)
             plt.draw()
 
             counter += 1
