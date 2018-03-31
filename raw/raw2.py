@@ -25,7 +25,7 @@ if sys.platform == "linux":
     import picamera
 
 ######################################################################
-## Hoa: 25.03.2018 Version 5 : raw.py
+## Hoa: 31.03.2018 Version 2 : raw2.py
 ######################################################################
 # This class takes 10 consecutive images with increasing shutter times.
 # Pictures are in raw bayer format. In addition a jpg as reference is

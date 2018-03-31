@@ -9,7 +9,7 @@ from ftplib import FTP, error_perm
 from glob import glob
 
 #########################################################################
-##  26.03.2018 Version 3 : rawzipexporter.py
+##  26.03.2018 Version 1 : rawzipexporter.py
 #########################################################################
 # New Version of the former rawexporter.py
 #
