@@ -6,20 +6,23 @@ from __future__ import (
     print_function,
     division,
 )
-
 import sys
 import io
 import os
 import time
-import pwd
-import grp
-import picamera
-import zipfile
 import shutil
+import tempfile
 import logging
 import logging.handlers
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
+
+if sys.platform == "linux":
+    import pwd
+    import grp
+    import stat
+    import fcntl
+    import picamera
 
 ######################################################################
 ## Hoa: 25.03.2018 Version 5 : raw.py
@@ -29,13 +32,14 @@ import numpy as np
 # taken in addition.
 # Aim is to merge a sequence of images to a HDR image.
 # Runtime for a sequence of 3 images is about 21 sec
-# Shutter times: img0: 85, img5: 595, img9: 992 microsecs
+# Shutter times: img0: 85, img5: 595, img9: 992 micro secs
 #
 # New /Changes:
 # ----------------------------------------------------------------------
 #
 # 10.11.2017 : Added new logging
 # 25.03.2018 : new version only 3 shutter times
+# 31.03.2018 : added single instance functionality by a lock file
 #
 ######################################################################
 
@@ -167,6 +171,38 @@ class Rawcamera:
 
 
 class Helpers:
+
+    def ensure_single_instance_of_app(self):
+        app_name = 'raw2'  # app name to be monitored
+
+        if sys.platform == "linux":
+            s = Logger()
+            log = s.getLogger()
+
+            # Establish lock file settings
+            lf_name = '.{}.lock'.format(app_name)
+            lf_path = os.path.join(tempfile.gettempdir(), lf_name)
+            lf_flags = os.O_WRONLY | os.O_CREAT
+            lf_mode = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH  # This is 0o222, i.e. 146
+
+            # Create lock file
+            # Regarding umask, see https://stackoverflow.com/a/15015748/832230
+            umask_original = os.umask(0)
+            try:
+                lf_fd = os.open(lf_path, lf_flags, lf_mode)
+            finally:
+                os.umask(umask_original)
+
+            # Try locking the file
+            try:
+                fcntl.lockf(lf_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except IOError as e:
+                msg = ('{} may already be running. Only one instance of it '
+                       'allowed.'
+                       ).format('raw2')
+                log.info(' LOCK: ' + str(msg))
+                exit()
+
     def setPathAndNewFolders(self):
         try:
             global RAWDATAPATH
@@ -224,24 +260,56 @@ class Helpers:
         except IOError as e:
             print('DISKSTAT :  ' + str(e))
 
+    def getRunTime(self, start_time,end_time):
+
+        formated = '%H:%M:%S'
+        tdelta = datetime.strptime(end_time, formated) - datetime.strptime(start_time, formated)
+
+        td = format(tdelta)
+        print('tdelta: ' + td)
+        h, m, s = [int(i) for i in td.split(':')]
+
+        return h,m,s
 
 def main():
     try:
+        s = Logger()
+        log = s.getLogger()
+        helper = Helpers()
+        helper.ensure_single_instance_of_app()
+        helper.setPathAndNewFolders()
+        usedspace = helper.disk_stat()
+
+        if usedspace > 80:
+            raise RuntimeError('WARNING: Not enough free space on SD Card!')
+            return
+
+        cam = Rawcamera()
+
+        t_start = '19:00:00'  # Start time to capture images
+        t_end   = '20:15:00'  # Stop time ends script
+
+        h,m,s, = helper.getRunnTime(t_start,t_end)
+
+        # Sets the duration of time lapse run
+        runtime = datetime.now() + timedelta(days=0) + timedelta(hours=h) + \
+                  timedelta(minutes=m) + timedelta(seconds=s)
 
         while (True):
-            helper = Helpers()
-            helper.setPathAndNewFolders()
 
-            usedspace = helper.disk_stat()
-            if usedspace > 80:
-                raise RuntimeError('WARNING: Not enough free space on SD Card!')
-                return
+            time.sleep(1)
+            time_now = time.strftime("%H:%M:%S")
 
-            cam = Rawcamera()
-            cam.takepictures()
+            if t_start == time_now:
+
+                while runtime > datetime.now():
+                    cam.takepictures()
+
+                log.info(' TIME LAPS STOPPED: {} '.format(time.strftime("%H:%M:%S")))
+                sys.exit()
 
     except Exception as e:
-        print('Error in Main: ' + str(e))
+        log.error(' MAIN: Error in main: ' + str(e))
 
 
 if __name__ == '__main__':
