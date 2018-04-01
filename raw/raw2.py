@@ -28,7 +28,7 @@ if sys.platform == "linux":
 ## Hoa: 31.03.2018 Version 2 : raw2.py
 ######################################################################
 # This class takes 10 consecutive images with increasing shutter times.
-# Pictures are in raw bayer format. In addition a jpg as reference is
+# Pictures are in raw bayer format. In addition a jpg asreference is
 # taken in addition.
 # Aim is to merge a sequence of images to a HDR image.
 # Runtime for a sequence of 3 images is about 21 sec
@@ -176,8 +176,6 @@ class Helpers:
         app_name = 'raw2'  # app name to be monitored
 
         if sys.platform == "linux":
-            s = Logger()
-            log = s.getLogger()
 
             # Establish lock file settings
             lf_name = '.{}.lock'.format(app_name)
@@ -200,7 +198,7 @@ class Helpers:
                 msg = ('{} may already be running. Only one instance of it '
                        'allowed.'
                        ).format('raw2')
-                log.info(' LOCK: ' + str(msg))
+                print(' LOCK: ' + str(msg))
                 exit()
 
     def setPathAndNewFolders(self):
@@ -266,19 +264,18 @@ class Helpers:
         tdelta = datetime.strptime(end_time, formated) - datetime.strptime(start_time, formated)
 
         td = format(tdelta)
-        print('tdelta: ' + td)
         h, m, s = [int(i) for i in td.split(':')]
 
         return h,m,s
 
 def main():
     try:
-        s = Logger()
-        log = s.getLogger()
         helper = Helpers()
-        helper.ensure_single_instance_of_app()
         helper.setPathAndNewFolders()
         usedspace = helper.disk_stat()
+        helper.ensure_single_instance_of_app()
+        s = Logger()
+        log = s.getLogger()
 
         if usedspace > 80:
             raise RuntimeError('WARNING: Not enough free space on SD Card!')
@@ -286,10 +283,10 @@ def main():
 
         cam = Rawcamera()
 
-        t_start = '19:00:00'  # Start time to capture images
-        t_end   = '20:15:00'  # Stop time ends script
+        t_start = '20:38:00'  # Start time to capture images
+        t_end   = '20:40:00'  # Stop time ends script
 
-        h,m,s, = helper.getRunnTime(t_start,t_end)
+        h,m,s, = helper.getRunTime(t_start,t_end)
 
         # Sets the duration of time lapse run
         runtime = datetime.now() + timedelta(days=0) + timedelta(hours=h) + \
@@ -303,13 +300,14 @@ def main():
             if t_start == time_now:
 
                 while runtime > datetime.now():
+                    helper.setPathAndNewFolders()
                     cam.takepictures()
 
                 log.info(' TIME LAPS STOPPED: {} '.format(time.strftime("%H:%M:%S")))
                 sys.exit()
 
     except Exception as e:
-        log.error(' MAIN: Error in main: ' + str(e))
+        print(' MAIN: Error in main: ' + str(e))
 
 
 if __name__ == '__main__':
