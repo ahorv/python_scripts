@@ -305,8 +305,8 @@ def main():
 
         cam = Rawcamera()
 
-        time_start = '14:12:00' # Start time of time laps
-        time_end   = '14:14:00' # Stop time of time laps
+        time_start =  '7:30:00' # Start time of time laps
+        time_end   = '16:30:00' # Stop time of time laps
 
         t_start = datetime.strptime(time_start, "%H:%M:%S").time()
         t_end = datetime.strptime(time_end, "%H:%M:%S").time()
