@@ -51,6 +51,9 @@ SCRIPTPATH  = os.path.join('/home', 'pi', 'python_scripts', 'raw')
 RAWDATAPATH = os.path.join(SCRIPTPATH, 'raw_data')
 
 class Logger:
+    def __init__(self):
+        self.logger = None
+
     def getLogger(self, newLogPath = None):
 
         try:
@@ -60,10 +63,12 @@ class Logger:
                 LOGFILEPATH = os.path.join(SCRIPTPATH, 'raw2.log')
                 logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
                 fileHandler = logging.FileHandler(LOGFILEPATH)
+                name = 'rootlogger'
             else:
                 LOGFILEPATH = newLogPath
                 logFormatter = logging.Formatter('%(message)s')
                 fileHandler = logging.FileHandler(LOGFILEPATH)
+                name = 'camstatslogger'
 
             # configure file handler
             #fileHandler = logging.FileHandler(LOGFILEPATH)
@@ -74,19 +79,30 @@ class Logger:
             consoleHandler.setFormatter(logFormatter)
 
             # get the logger instance
-            self.logger = logging.getLogger(__name__)
+            self.logger = logging.getLogger(name)
 
             # set the logging level
             self.logger.setLevel(logging.INFO)
 
             if not len(self.logger.handlers):
-                print('not len handlers-> len: {}'.format(len(self.logger.handlers)))
                 self.logger.addHandler(fileHandler)
                 self.logger.addHandler(consoleHandler)
 
             helper = Helpers()
             helper.setOwnerAndPermission(LOGFILEPATH)
             return self.logger
+
+        except IOError as e:
+            print('Error logger:' + str(e))
+
+    def closeLogHandler(self):
+        try:
+            print('Trying to close Logger Handler')
+            handlers = self.logger.handlers[:]
+            for handler in handlers:
+                print('removing handler: {}'.format(str(handler)))
+                handler.close()
+                self.logger.removeHandler(handler)
 
         except IOError as e:
             print('Error logger:' + str(e))
@@ -102,6 +118,7 @@ class Rawcamera:
             camLogPath = h.createNewRawFolder()
             s = Logger()
             cameralog = s.getLogger(camLogPath)
+            cameralog.info('Date and Time: {}'.format(datetime.now().strftime('%Y%m%d_%H%M%S')))
 
             stream = io.BytesIO()
             with picamera.PiCamera() as camera:
@@ -171,6 +188,8 @@ class Rawcamera:
 
                     with open(SUBDIRPATH + "/" + datafileName, 'wb') as g:
                         data.tofile(g)
+
+                s.closeLogHandler()
 
         except Exception as e:
             camera.close()
@@ -287,8 +306,8 @@ def main():
 
         cam = Rawcamera()
 
-        time_start = '11:56:00' # Start time to capture images
-        time_end   = '11:58:00' # Stop time ends script
+        time_start = '13:47:00' # Start time to capture images
+        time_end   = '13:50:00' # Stop time ends script
 
         t_start = datetime.strptime(time_start, "%H:%M:%S").time()
         t_end = datetime.strptime(time_end, "%H:%M:%S").time()
@@ -305,13 +324,13 @@ def main():
             print('waiting time start: {} time now: {}  time end: {}'.format(time_start, time_now, time_end))
 
             if t_start < time_now < t_end:
-                print('time now: {}  time start: {}'.format(time_now, time_start))
+                print('time start: {} < time now: {}  < time end: {}'.format(time_start, time_now, time_end))
 
                 while runtime > datetime.now():
-                    print('runtime: {}  datetime.now: {}'.format(runtime, datetime.now()))
+                    print('runtime: {}  > datetime.now: {}'.format(runtime, datetime.now()))
                     cam.takepictures()
 
-                log.info(' TIME LAPS STOPPED: {} '.format(time.strftime("%H:%M:%S")))
+                log.info('TIME LAPS STOPPED')
                 sys.exit()
 
     except Exception as e:
