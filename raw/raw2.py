@@ -43,23 +43,30 @@ if sys.platform == "linux":
 #
 ######################################################################
 
+global SCRIPTPATH
 global RAWDATAPATH
-global LOGFILEPATH
 global SUBDIRPATH
-global TSTAMP
+
+SCRIPTPATH  = os.path.join('/home', 'pi', 'python_scripts', 'raw')
+RAWDATAPATH = os.path.join(SCRIPTPATH, 'raw_data')
 
 class Logger:
-    def getLogger(self):
+    def getLogger(self, newLogPath = None):
 
         try:
-            global LOGFILEPATH
+            global SCRIPTPATH
 
-            # configure log formatter
-            # logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-            logFormatter = logging.Formatter('%(message)s')
+            if newLogPath is None:
+                LOGFILEPATH = os.path.join(SCRIPTPATH, 'raw2.log')
+                logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+                fileHandler = logging.FileHandler(LOGFILEPATH)
+            else:
+                LOGFILEPATH = newLogPath
+                logFormatter = logging.Formatter('%(message)s')
+                fileHandler = logging.FileHandler(LOGFILEPATH)
 
             # configure file handler
-            fileHandler = logging.FileHandler(LOGFILEPATH)
+            #fileHandler = logging.FileHandler(LOGFILEPATH)
             fileHandler.setFormatter(logFormatter)
 
             # configure stream handler
@@ -69,17 +76,14 @@ class Logger:
             # get the logger instance
             self.logger = logging.getLogger(__name__)
 
-            # set rotating filehandler
-            handler = logging.handlers.RotatingFileHandler(LOGFILEPATH, encoding='utf8',
-                                                           maxBytes=1024 * 10000, backupCount=1)
-
             # set the logging level
             self.logger.setLevel(logging.INFO)
 
             if not len(self.logger.handlers):
+                print('not len handlers-> len: {}'.format(len(self.logger.handlers)))
                 self.logger.addHandler(fileHandler)
                 self.logger.addHandler(consoleHandler)
-                # self.logger.addHandler(handler)
+
             helper = Helpers()
             helper.setOwnerAndPermission(LOGFILEPATH)
             return self.logger
@@ -87,14 +91,17 @@ class Logger:
         except IOError as e:
             print('Error logger:' + str(e))
 
+
 class Rawcamera:
     def takepictures(self):
         try:
 
             global SUBDIRPATH
 
+            h = Helpers()
+            camLogPath = h.createNewRawFolder()
             s = Logger()
-            log = s.getLogger()
+            cameralog = s.getLogger(camLogPath)
 
             stream = io.BytesIO()
             with picamera.PiCamera() as camera:
@@ -157,7 +164,7 @@ class Rawcamera:
                         **cam_stats)
                     logdata = logdata + ' || timing: [t_jpg:{t_jpg}, t_raw:{t_raw}, t_tot:{t_tot}]'.format(**t_stats)
 
-                    log.info(logdata)
+                    cameralog.info(logdata)
 
                     # Finally save raw (16bit data) having a size 3296 x 2464
                     datafileName = 'data%d_%s.data' % (i0, str(''))
@@ -201,20 +208,18 @@ class Helpers:
                 print(' LOCK: ' + str(msg))
                 exit()
 
-    def setPathAndNewFolders(self):
+    def createNewRawFolder(self):
         try:
             global RAWDATAPATH
-            global LOGFILEPATH
             global SUBDIRPATH
-            global TSTAMP
 
             TSTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
-
-            RAWDATAPATH = os.path.join('/home', 'pi', 'python_scripts', 'raw', 'raw_data')
             self.createNewFolder(RAWDATAPATH)
             SUBDIRPATH = os.path.join(RAWDATAPATH, TSTAMP)
             self.createNewFolder(SUBDIRPATH)
-            LOGFILEPATH = os.path.join(SUBDIRPATH, TSTAMP + '_raw' + '.log')
+            camLogPath = os.path.join(SUBDIRPATH, 'camstats.log')
+
+            return camLogPath
 
         except IOError as e:
             print('PATH: Could not set path and folder: ' + str(e))
@@ -271,7 +276,6 @@ class Helpers:
 def main():
     try:
         helper = Helpers()
-        helper.setPathAndNewFolders()
         usedspace = helper.disk_stat()
         helper.ensure_single_instance_of_app()
         s = Logger()
@@ -283,10 +287,12 @@ def main():
 
         cam = Rawcamera()
 
-        t_start = '20:38:00'  # Start time to capture images
-        t_end   = '20:40:00'  # Stop time ends script
+        time_start = '11:56:00' # Start time to capture images
+        time_end   = '11:58:00' # Stop time ends script
 
-        h,m,s, = helper.getRunTime(t_start,t_end)
+        t_start = datetime.strptime(time_start, "%H:%M:%S").time()
+        t_end = datetime.strptime(time_end, "%H:%M:%S").time()
+        h,m,s, = helper.getRunTime(time_start,time_end)
 
         # Sets the duration of time lapse run
         runtime = datetime.now() + timedelta(days=0) + timedelta(hours=h) + \
@@ -295,12 +301,14 @@ def main():
         while (True):
 
             time.sleep(1)
-            time_now = time.strftime("%H:%M:%S")
+            time_now = datetime.now().time().replace(microsecond=0)
+            print('waiting time start: {} time now: {}  time end: {}'.format(time_start, time_now, time_end))
 
-            if t_start == time_now:
+            if t_start < time_now < t_end:
+                print('time now: {}  time start: {}'.format(time_now, time_start))
 
                 while runtime > datetime.now():
-                    helper.setPathAndNewFolders()
+                    print('runtime: {}  datetime.now: {}'.format(runtime, datetime.now()))
                     cam.takepictures()
 
                 log.info(' TIME LAPS STOPPED: {} '.format(time.strftime("%H:%M:%S")))
