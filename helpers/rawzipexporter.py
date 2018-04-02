@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import sys
+import time
 import zipfile
 import logging
 import logging.handlers
@@ -36,7 +37,7 @@ global ERRFILEPATH
 global ZIPDIRPATH
 global CAMERA
 
-CAMERA = 'camera_3'
+CAMERA = 'camera_1'
 
 if sys.platform == "linux":
     import pwd
@@ -47,7 +48,7 @@ if sys.platform == "linux":
     ZIPDIRPATH = os.path.join('/home', 'pi', 'python_scripts', 'raw', 'raw_data')
 else:
     SCRIPTPATH = os.path.realpath(__file__)
-    ERRFILEPATH = os.path.join(SCRIPTPATH, 'rawexporter.log')
+    ERRFILEPATH = os.path.join(SCRIPTPATH, 'rawzipexporter.log')
     ZIPDIRPATH = os.path.join(SCRIPTPATH, 'raw_data')
 
 
@@ -122,6 +123,7 @@ class Exporter:
 
     def zipitall(self):
         try:
+            global ZIPDIRPATH
             s = Logger()
             root_logger = s.getLogger()
 
@@ -129,23 +131,24 @@ class Exporter:
             allDirs = self.getDirs()
 
             for dirs in allDirs:
-                dirtozip = ''
-                for nextdir, subdirs, files in os.walk(dirs + "/"):
-                    newzipname = nextdir.split('/')[-1]
+
+                for nextdir, subdirs, files in os.walk(dirs):
+                    newzipname = nextdir.split('/')[-2]
+
                     if newzipname:
 
-                        dirtozip = os.path.join(dirs, newzipname)
-                        zipfilepath = os.path.join(dirs, newzipname)
+                        zipfilepath = os.path.join(ZIPDIRPATH, newzipname + '.zip')
 
-                        zf = zipfile.ZipFile(zipfilepath + '.zip', "w")
-                        for dirname, subdirs, files in os.walk(dirtozip):
+                        zf = zipfile.ZipFile(zipfilepath, "w")
+
+                        for dirname, subdirs, files in os.walk(dirs):
                             for filename in files:
                                 zf.write(os.path.join(dirname, filename), filename, compress_type=zipfile.ZIP_DEFLATED)
 
                         zf.close()
 
-                        # delete zipped directories
-                        shutil.rmtree(dirtozip, ignore_errors=True)
+                        # delete zipped directory
+                        shutil.rmtree(dirs, ignore_errors=True)
 
         except IOError as e:
             root_logger.error('ZIPALL :Error: ' + str(e))
@@ -172,17 +175,19 @@ class Exporter:
         success = False
 
         try:
-            s = Logger()
-            root_logger = s.getLogger()
-
-            e = Exporter()
-
-            e.zipitall()
-
-            allzipfiles = e.grabAllRawZip()
             uploadedzip = []
             cnt = 0
 
+            s = Logger()
+            root_logger = s.getLogger()
+
+            time_to_zip_start = time.time()
+            self.zipitall()
+            time_to_zip_end = time.time()
+            time_to_zip = time_to_zip_end-time_to_zip_start
+            root_logger.info('Time to zip all files: {}'.format(round(time_to_zip,1)))
+
+            allzipfiles = self.grabAllRawZip()
             zipfilename = allzipfiles[0]
             token = str(zipfilename.split('/')[-1])
             newDirName = str(token.split('_', 1)[0])
@@ -200,21 +205,23 @@ class Exporter:
                 ftp.mkd(newDirName)
                 ftp.cwd(newDirName)
 
+            time_to_send_start = time.time()
             for zip_file in sorted(allzipfiles):
                 zipfilename = zip_file.split('/')[-1]
                 cnt = cnt + 1
 
                 with open(zip_file, 'rb') as out:
-                    # print('FTP STOR: %s' % ftp.storbinary('STOR ' + zipfilename, out))
                     ftp.storbinary('STOR ' + zipfilename, out)
 
                 uploadedzip.append(zip_file)
                 success = True
 
             ftp.close()
+            time_to_send_end = time.time()
+            time_to_send = time_to_send_end-time_to_send_start
 
-            root_logger.info(' FTP : {} *.zip files uploaded to ftp.ihomelab.ch'.format(cnt))
-            e.deleteUploadedZip(uploadedzip)
+            root_logger.info('FTP : {} zip files uploaded in {} sec'.format(cnt, round(time_to_send,1)))
+            self.deleteUploadedZip(uploadedzip)
             return success
 
         except Exception as e:
@@ -233,7 +240,7 @@ class Exporter:
                 os.remove(zip_file)
                 success = True
 
-            root_logger.info('DEL : {} *.zip removed '.format(cnt))
+            root_logger.info('DEL : {} zip removed '.format(cnt))
 
             return success
 
