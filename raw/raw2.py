@@ -290,6 +290,7 @@ class Helpers:
 
         return h,m,s
 
+
 def main():
     try:
         helper = Helpers()
@@ -319,7 +320,6 @@ def main():
 
             time.sleep(1)
             time_now = datetime.now().time().replace(microsecond=0)
-            print('waiting time start: {} time now: {}  time end: {}'.format(time_start, time_now, time_end))
 
             if t_start < time_now < t_end:
                 log.info('TIME LAPS STARTED')
