@@ -40,6 +40,7 @@ if sys.platform == "linux":
 # 10.11.2017 : Added new logging
 # 25.03.2018 : new version only 3 shutter times
 # 31.03.2018 : added single instance functionality by a lock file
+# 02.04.2018 : Logging to multiple files
 #
 ######################################################################
 
@@ -71,7 +72,6 @@ class Logger:
                 name = 'camstatslogger'
 
             # configure file handler
-            #fileHandler = logging.FileHandler(LOGFILEPATH)
             fileHandler.setFormatter(logFormatter)
 
             # configure stream handler
@@ -97,10 +97,8 @@ class Logger:
 
     def closeLogHandler(self):
         try:
-            print('Trying to close Logger Handler')
             handlers = self.logger.handlers[:]
             for handler in handlers:
-                print('removing handler: {}'.format(str(handler)))
                 handler.close()
                 self.logger.removeHandler(handler)
 
@@ -306,8 +304,8 @@ def main():
 
         cam = Rawcamera()
 
-        time_start = '13:47:00' # Start time to capture images
-        time_end   = '13:50:00' # Stop time ends script
+        time_start = '14:12:00' # Start time of time laps
+        time_end   = '14:14:00' # Stop time of time laps
 
         t_start = datetime.strptime(time_start, "%H:%M:%S").time()
         t_end = datetime.strptime(time_end, "%H:%M:%S").time()
@@ -324,17 +322,16 @@ def main():
             print('waiting time start: {} time now: {}  time end: {}'.format(time_start, time_now, time_end))
 
             if t_start < time_now < t_end:
-                print('time start: {} < time now: {}  < time end: {}'.format(time_start, time_now, time_end))
+                log.info('TIME LAPS STARTED')
 
                 while runtime > datetime.now():
-                    print('runtime: {}  > datetime.now: {}'.format(runtime, datetime.now()))
                     cam.takepictures()
 
                 log.info('TIME LAPS STOPPED')
                 sys.exit()
 
     except Exception as e:
-        print(' MAIN: Error in main: ' + str(e))
+        log.error(' MAIN: Error in main: ' + str(e))
 
 
 if __name__ == '__main__':
