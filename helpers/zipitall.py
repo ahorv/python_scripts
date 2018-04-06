@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import io
 import os
 import time
 import sys
@@ -9,9 +8,8 @@ import logging.handlers
 import shutil
 from glob import glob
 
-
 #########################################################################
-##  26.04.2018 Version 1 : zipall.py
+##  26.04.2018 Version 1 : zipitall.py
 #########################################################################
 # Zips all image folders in /raw/raw_data.
 # Processed folders will be deleted, leaving zipped files only.
@@ -136,14 +134,13 @@ def main():
     try:
         s = Logger()
         root_logger = s.getLogger()
-        root_logger.info('ZIPALL: Zipping files started')
+        root_logger.info('ZIPITALL: STARTED')
 
         time_to_zip_start = time.time()
         zipitall()
         time_to_zip_end = time.time()
         time_to_zip = time_to_zip_end - time_to_zip_start
         root_logger.info('Time to zip all files: {}'.format(round(time_to_zip, 1)))
-
 
     except Exception as e:
         root_logger.error('MAIN: Error: ' + str(e))
