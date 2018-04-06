@@ -2,30 +2,25 @@
 import os
 import sys
 import time
-import zipfile
 import logging
 import logging.handlers
-import shutil
 from ftplib import FTP, error_perm
 from glob import glob
 
 #########################################################################
-##  26.03.2018 Version 1 : rawzipexporter.py
+##  06.04.2018 Version 1 : ftpexporter.py
 #########################################################################
-# New Version of the former rawexporter.py
+# Collects all zip files in raw/raw_data/ and sends them via ftp to
+# the ihomelab ftp server.
 #
-# Collects all image directories, zips and sends them to the ihomelab ftp.
-# All directories will be deleted after zipping.
 # ftp addr: ftp.ihomelab.ch / resolved: 147.88.219.198:21
-# Path to directory on the ftp server: /camera_2/raw/
+# Path to directory on the ftp server: /camera_x/raw/
 #
 # The variable CAMERA has to be set according to the camera in use!
 #
 # NEW:
 # -----
-# - new directory for each day
-# - added variable to distinguish between cameras (must be set accordingly !)
-# - added zipping
+# -
 #
 #########################################################################
 
@@ -105,55 +100,6 @@ def setOwnerAndPermission(pathToFile):
 
 class Exporter:
 
-    def getDirs(self):
-        try:
-            global ZIPDIRPATH
-            s = Logger()
-            root_logger = s.getLogger()
-            allDirs = []
-
-            for dirs in sorted(glob(os.path.join(ZIPDIRPATH, "*", ""))):
-                if os.path.isdir(dirs):
-                    allDirs.append(dirs)
-
-            return allDirs
-
-        except Exception as e:
-            root_logger.info('GETDIRS: Error: ' + str(e))
-
-    def zipitall(self):
-        try:
-            global ZIPDIRPATH
-            s = Logger()
-            root_logger = s.getLogger()
-
-            allDirs = []
-            allDirs = self.getDirs()
-
-            for dirs in allDirs:
-
-                for nextdir, subdirs, files in os.walk(dirs):
-                    newzipname = nextdir.split('/')[-2]
-
-                    if newzipname:
-
-                        zipfilepath = os.path.join(ZIPDIRPATH, newzipname + '.zip')
-
-                        zf = zipfile.ZipFile(zipfilepath, "w")
-
-                        for dirname, subdirs, files in os.walk(dirs):
-                            for filename in files:
-                                zf.write(os.path.join(dirname, filename), filename, compress_type=zipfile.ZIP_DEFLATED)
-
-                        zf.close()
-
-                        # delete zipped directory
-                        shutil.rmtree(dirs, ignore_errors=True)
-
-        except IOError as e:
-            root_logger.error('ZIPALL :Error: ' + str(e))
-
-
     def grabAllRawZip(self):
         global ZIPDIRPATH
         try:
@@ -180,12 +126,6 @@ class Exporter:
 
             s = Logger()
             root_logger = s.getLogger()
-
-            time_to_zip_start = time.time()
-            self.zipitall()
-            time_to_zip_end = time.time()
-            time_to_zip = time_to_zip_end-time_to_zip_start
-            root_logger.info('Time to zip all files: {}'.format(round(time_to_zip,1)))
 
             allzipfiles = self.grabAllRawZip()
             zipfilename = allzipfiles[0]
