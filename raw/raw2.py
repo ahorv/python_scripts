@@ -25,7 +25,7 @@ if sys.platform == "linux":
     import picamera
 
 ######################################################################
-## Hoa: 31.03.2018 Version 2 : raw2.py
+## Hoa: 05.04.2018 Version 2 : raw2.py
 ######################################################################
 # This class takes 10 consecutive images with increasing shutter times.
 # Pictures are in raw bayer format. In addition a jpg asreference is
@@ -33,6 +33,8 @@ if sys.platform == "linux":
 # Aim is to merge a sequence of images to a HDR image.
 # Runtime for a sequence of 3 images is about 21 sec
 # Shutter times: img0: 85, img5: 595, img9: 992 micro secs
+#
+# Periodic cronjob calls in intervals of 10 min needed.
 #
 # New /Changes:
 # ----------------------------------------------------------------------
@@ -48,14 +50,15 @@ global SCRIPTPATH
 global RAWDATAPATH
 global SUBDIRPATH
 
-SCRIPTPATH  = os.path.join('/home', 'pi', 'python_scripts', 'raw')
+SCRIPTPATH = os.path.join('/home', 'pi', 'python_scripts', 'raw')
 RAWDATAPATH = os.path.join(SCRIPTPATH, 'raw_data')
+
 
 class Logger:
     def __init__(self):
         self.logger = None
 
-    def getLogger(self, newLogPath = None):
+    def getLogger(self, newLogPath=None):
 
         try:
             global SCRIPTPATH
@@ -195,7 +198,6 @@ class Rawcamera:
 
 
 class Helpers:
-
     def ensure_single_instance_of_app(self):
         app_name = 'raw2'  # app name to be monitored
 
@@ -280,15 +282,20 @@ class Helpers:
         except IOError as e:
             print('DISKSTAT :  ' + str(e))
 
-    def getRunTime(self, start_time,end_time):
+    def str2time(self, time_as_str):
 
-        formated = '%H:%M:%S'
-        tdelta = datetime.strptime(end_time, formated) - datetime.strptime(start_time, formated)
+        try:
+            now = datetime.now()
+            year = str(now.year)
+            month = str(now.month)
+            day = str(now.day)
+            temp = year + '-' + month + '-' + day + '_' + time_as_str
+            str_as_time = datetime.strptime(temp, '%Y-%m-%d_%H:%M:%S')
 
-        td = format(tdelta)
-        h, m, s = [int(i) for i in td.split(':')]
+            return str_as_time
 
-        return h,m,s
+        except Exception as e:
+            print('str2time: ' + str(e))
 
 
 def main():
@@ -305,30 +312,21 @@ def main():
 
         cam = Rawcamera()
 
-        time_start =  '7:30:00' # Start time of time laps
-        time_end   = '16:30:00' # Stop time of time laps
+        time_start = '9:00:00'  # Start time of time laps
+        time_end = '15:00:00'  # Stop time of time laps
 
-        t_start = datetime.strptime(time_start, "%H:%M:%S").time()
-        t_end = datetime.strptime(time_end, "%H:%M:%S").time()
-        h,m,s, = helper.getRunTime(time_start,time_end)
-
-        # Sets the duration of time lapse run
-        runtime = datetime.now() + timedelta(days=0) + timedelta(hours=h) + \
-                  timedelta(minutes=m) + timedelta(seconds=s)
+        t_start = helper.str2time(time_start)
+        t_end = helper.str2time(time_end)
 
         while (True):
-
-            time.sleep(1)
-            time_now = datetime.now().time().replace(microsecond=0)
+            time_now = datetime.now().replace(microsecond=0)
 
             if t_start < time_now < t_end:
-                log.info('TIME LAPS STARTED')
+                cam.takepictures()
 
-                while runtime > datetime.now():
-                    cam.takepictures()
-
-                log.info('TIME LAPS STOPPED')
+            elif t_end > time_now or t_start < time_now:
                 sys.exit()
+
 
     except Exception as e:
         log.error(' MAIN: Error in main: ' + str(e))
