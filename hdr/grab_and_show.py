@@ -163,30 +163,21 @@ class Helpers:
         except IOError as e:
             print('unzipall: Error: ' + str(e))
 
-        '''
-        for next_dir in allzipDirs:
-            #zip_ref = zipfile.ZipFile(next_dir, 'r')
-            path_to_extract = os.path.join(path_to_extract,next_dir)
-            print('Next dir to extract to: {}'.format(path_to_extract ))
-            #zip_ref.extractall(path_to_extract)
-            #zip_ref.close()
-        '''
-
 def main():
     try:
         global Path_to_raw
+        runslideshow = False
+
         h = Helpers()
 
-        #h.createVideo()
-
         h.unzipall(Path_to_raw)
-
-        return
-
-        allDirs = []
         allDirs = h.getDirectories(Path_to_raw)
-        #h.copyAll_img5(allDirs)
+        h.copyAll_img5(allDirs)
         list_images = h.readAllImages(allDirs)
+        h.createVideo()
+
+        if not runslideshow:
+            return
 
         counter = 0
         fig = plt.figure()
