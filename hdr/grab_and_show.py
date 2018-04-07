@@ -4,9 +4,11 @@ import os
 import cv2
 import sys
 import time
+import shutil
 from shutil import copy2
 from glob import glob
 import subprocess
+import zipfile
 from matplotlib import pyplot as plt
 
 print('Version opencv: ' + cv2.__version__)
@@ -29,12 +31,12 @@ print('Version opencv: ' + cv2.__version__)
 global Path_to_raw
 global Path_to_copy
 global Path_to_ffmpeg
-Path_to_raw = r'C:\Users\ati\Desktop\raw_data'
-Path_to_copy = r'C:\Users\ati\Desktop\raw_data_img5'
+Path_to_raw = r'G:\SkyCam\camera_2\20180403_raw_cam2'
+Path_to_copy = os.path.join(Path_to_raw,'raw_data_img5')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 
 class Helpers:
-    def createVideo():
+    def createVideo(self):
         try:
             global Path_to_ffmpeg                            # path to ffmpeg executable
             fsp = ' -r 10 '                                  # frame per sec images taken
@@ -57,7 +59,7 @@ class Helpers:
         except Exception as e:
             print('createVideo: Error: ' + str(e))
 
-    def getDirectories(pathToDirectories):
+    def getDirectories(self,pathToDirectories):
         try:
             allDirs = []
             temp = ''
@@ -75,7 +77,19 @@ class Helpers:
         except Exception as e:
             print('getDirectories: Error: ' + str(e))
 
-    def readAllImages(allDirs):
+    def getZipDirs(self,pathToDirectories):
+        allZipFiles = []
+        cnt = 0
+
+        for zipfile in sorted(glob(os.path.join(pathToDirectories, "*.zip"))):
+            if os.path.isfile(zipfile):
+                allZipFiles.append(zipfile)
+                cnt +=1
+
+        print('Found {} files to unzip '.format(cnt))
+        return allZipFiles
+
+    def readAllImages(self,allDirs):
         try:
             global Path_to_raw
             list_names = []
@@ -102,7 +116,7 @@ class Helpers:
         except Exception as e:
             print('readAllImages: Error: ' + str(e))
 
-    def copyAll_img5(list_alldirs):
+    def copyAll_img5(self,list_alldirs):
 
         try:
             print('\nCopying all raw_img_5 to \img_5')
@@ -123,16 +137,50 @@ class Helpers:
         except Exception as e:
             print('copyAll_img5: Error: ' + str(e))
 
+    def unzipall(self,path_to_extract):
+
+        try:
+            allzipDirs = self.getZipDirs(path_to_extract)
+
+            for dirs in allzipDirs:
+
+                newDirname = dirs.replace('.zip','')
+
+                if newDirname:
+
+                    zipfilepath = os.path.join(dirs)
+
+                    zf = zipfile.ZipFile(zipfilepath, "r")
+                    zf.extractall(os.path.join(newDirname))
+                    zf.close()
+                    print('Unzipped: {}'.format(newDirname))
+
+                    # delete unzipped directory
+                    shutil.rmtree(dirs, ignore_errors=True)
+
+        except IOError as e:
+            print('unzipall: Error: ' + str(e))
+
+        '''
+        for next_dir in allzipDirs:
+            #zip_ref = zipfile.ZipFile(next_dir, 'r')
+            path_to_extract = os.path.join(path_to_extract,next_dir)
+            print('Next dir to extract to: {}'.format(path_to_extract ))
+            #zip_ref.extractall(path_to_extract)
+            #zip_ref.close()
+        '''
+
 def main():
     try:
         global Path_to_raw
-
         h = Helpers()
 
-        h.createVideo()
+        #h.createVideo()
+
+        h.unzipall(Path_to_raw)
+
         return
 
-        list_images = []
         allDirs = []
         allDirs = h.getDirectories(Path_to_raw)
         #h.copyAll_img5(allDirs)
