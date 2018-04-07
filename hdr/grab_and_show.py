@@ -158,6 +158,8 @@ class Helpers:
                     # delete unzipped directory
                     shutil.rmtree(dirs, ignore_errors=True)
 
+            print('unzip finished.')
+
         except IOError as e:
             print('unzipall: Error: ' + str(e))
 
