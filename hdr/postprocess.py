@@ -7,16 +7,21 @@ import cv2
 import sys
 import time
 import shutil
+import exifread
 from shutil import copy2
 from glob import glob
 import subprocess
 import zipfile
 from matplotlib import pyplot as plt
+from os import listdir
+from os.path import isfile, join
+import numpy as np
+from fractions import Fraction
 
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 26.03.2018 Version 1 : grab_JPG_5.py
+## Hoa: 26.03.2018 Version 1 : postprocess.py
 ######################################################################
 # Grabs from a image collection all raw_img5.jpg 's and shows them as
 # Slideshow
@@ -65,8 +70,6 @@ class Helpers:
     def getDirectories(self,pathToDirectories):
         try:
             allDirs = []
-            temp = ''
-            cnt = 0
 
             for dirs in sorted(glob(os.path.join(pathToDirectories, "*", ""))):
                 if os.path.isdir(dirs):
@@ -168,39 +171,163 @@ class Helpers:
         except IOError as e:
             print('unzipall: Error: ' + str(e))
 
+class HDR:
+    def getEXIF_TAG(self, file_path, field):
+        try:
+            foundvalue = '0'
+            with open(file_path, 'rb') as f:
+                exif = exifread.process_file(f)
+
+            for k in sorted(exif.keys()):
+                if k not in ['JPEGThumbnail', 'TIFFThumbnail', 'Filename', 'EXIF MakerNote']:
+                    if k == field:
+                        # print('%s = %s' % (k, exif[k]))
+                        foundvalue = np.float32(Fraction(str(exif[k])))
+                        break
+
+            return foundvalue
+
+        except Exception as e:
+            print('EXIF: Could not read exif data ' + str(e))
+
+    def readImagesAndExpos(self, mypath, piclist):
+        try:
+            onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
+            image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
+            expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
+            for n in range(0, len(onlyfiles)):
+                picnumber = ''.join(filter(str.isdigit, onlyfiles[n]))
+                pos = 0
+                for pic in piclist:
+                    if str(picnumber) == str(pic):
+                        expos_stack[pos] = self.getEXIF_TAG(join(mypath, onlyfiles[n]), "EXIF ExposureTime")
+                        image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
+                        print('Pic {}, reading data from : {}, exif: {}'.format(str(picnumber), onlyfiles[n], expos_stack[n]))
+                    pos +=1
+
+            return image_stack, expos_stack
+
+        except Exception as e:
+            print('readImagesAndExpos: Could not read images ' + str(e))
+
+    def composeOneHDRimg(self,oneDirsPath, piclist = [0,5,9]):
+        try:
+
+            images, times = self.readImagesAndExpos(oneDirsPath, piclist)
+
+            # Align input images
+            alignMTB = cv2.createAlignMTB()
+            alignMTB.process(images, images)
+
+            # Obtain Camera Response Function (CRF)
+            calibrateDebevec = cv2.createCalibrateDebevec()
+            responseDebevec = calibrateDebevec.process(images, times)
+
+            # Merge images into an HDR linear image
+            mergeDebevec = cv2.createMergeDebevec()
+            hdrDebevec = mergeDebevec.process(images, times, responseDebevec)
+
+            # Tonemap using Reinhard's method to obtain 24-bit color image
+            tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
+            ldrReinhard = tonemapReinhard.process(hdrDebevec)
+
+            return ldrReinhard * 255
+
+        except Exception as e:
+            print('composeOneHDRimg: Error: ' + str(e))
+
+    def createAllHDR(self, ListofAllDirs):
+        global Path_to_raw
+        try:
+            cnt = 0
+            if not os.path.exists(join(Path_to_raw,'hdr')):
+                os.makedirs(join(Path_to_raw,'hdr'))
+
+            for oneDir in ListofAllDirs:
+                cnt += 1
+                ldrReinhard = self.composeOneHDRimg(oneDir)
+                cv2.imwrite(join(Path_to_raw,'hdr',str(cnt) + "_ldr-Reinhard.jpg"), ldrReinhard)
+
+            print("Done creating all HDR images")
+
+        except Exception as e:
+            print('createAllHDR: Error: ' + str(e))
+
+    def createHDRVideo(self):
+        try:
+            global Path_to_raw
+            hdrpath = join(Path_to_raw, 'hdr')
+            global Path_to_ffmpeg                                 # path to ffmpeg executable
+            fsp = ' -r 10 '                                       # frame per sec images taken
+            stnb = '-start_number 1 '                             # what image to start at
+            imgpath = '-i ' + hdrpath + '\%d_ldr-Reinhard.jpg '   # path to images
+            res = '-s 2592x1944 '                                 # output resolution
+            outpath = Path_to_copy+'\sky_video.mp4 '              # output file name
+            codec = '-vcodec libx264'                             # codec to use
+
+            command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
+
+            if sys.platform == "linux":
+                subprocess(command, shell=True)
+            else:
+                print(' {}'.format(command))
+                ffmpeg = subprocess.Popen(command, stderr=subprocess.PIPE ,stdout = subprocess.PIPE)
+                out, err = ffmpeg.communicate()
+                if (err): print(err)
+                print('ffmpeg ldr Video done.')
+
+        except Exception as e:
+            print('createVideo: Error: ' + str(e))
+
+
 def main():
     try:
         global Path_to_raw
         runslideshow = False
+        postprocess = False
+        createhdr = True
 
-        h = Helpers()
-        h.createVideo()  # loeschen
-        return   # loeschen
+        help = Helpers()
+        hdr = HDR()
+        allDirs = help.getDirectories(Path_to_raw)
 
-        h.unzipall(Path_to_raw)
-        allDirs = h.getDirectories(Path_to_raw)
-        h.copyAll_img5(allDirs)
-        list_images = h.readAllImages(allDirs)
-        h.createVideo()
 
-        if not runslideshow:
-            return
+        if postprocess:
+            help.unzipall(Path_to_raw)
+            help.copyAll_img5(allDirs)
+            help.createVideo()
 
-        counter = 0
-        fig = plt.figure()
-        ax = plt.gca()
-        cur_window = ax.imshow(list_images[0])
+        if createhdr:
+            hdrstart = time.time()
+            hdr.createAllHDR(allDirs)
+            hdrend = time.time()
+            print('Time to create HDR images: {}'.format(hdrend-hdrstart))
+            hdrvidstart = time.time()
+            hdr.createVideo()
+            hdrvidend = time.time()
+            print('Time to create HDR images: {}'.format(hdrvidend-hdrvidstart))
 
-        while counter < len(list_images):
+        if runslideshow:
 
-            next = list_images[counter]
-            plt.title('Image: {}'.format(counter))
-            cur_window.set_data(next)
+            counter = 0
+            fig = plt.figure()
+            ax = plt.gca()
 
-            plt.pause(.05)
-            plt.draw()
+            list_images = help.readAllImages(allDirs)
+            cur_window = ax.imshow(list_images[0])
 
-            counter += 1
+            while counter < len(list_images):
+
+                next = list_images[counter]
+                plt.title('Image: {}'.format(counter))
+                cur_window.set_data(next)
+
+                plt.pause(.05)
+                plt.draw()
+
+                counter += 1
+
+        print('Postprocess.py done')
 
     except Exception as e:
         print('MAIN: Error in main: ' + str(e))
