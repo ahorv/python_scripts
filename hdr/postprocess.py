@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import os
 import cv2
 import sys
@@ -32,7 +34,7 @@ global Path_to_raw
 global Path_to_copy
 global Path_to_ffmpeg
 Path_to_raw = r'G:\SkyCam\camera_2\20180403_raw_cam2'
-Path_to_copy = os.path.join(Path_to_raw,'raw_data_img5')
+Path_to_copy = os.path.join(Path_to_raw,'imgs5')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 
 class Helpers:
@@ -55,6 +57,7 @@ class Helpers:
                 ffmpeg = subprocess.Popen(command, stderr=subprocess.PIPE ,stdout = subprocess.PIPE)
                 out, err = ffmpeg.communicate()
                 if (err): print(err)
+                print('Ffmpeg done.')
 
         except Exception as e:
             print('createVideo: Error: ' + str(e))
@@ -119,20 +122,19 @@ class Helpers:
     def copyAll_img5(self,list_alldirs):
 
         try:
-            print('\nCopying all raw_img_5 to \img_5')
-            global Path_to_raw
-            new_path = Path_to_raw +'\imgs5'
+            global Path_to_copy
+            print('\nCopying all raw_img_5 to: {}'.format(Path_to_copy))
             prefix = 0
 
-            if not os.path.exists(new_path):
-                os.makedirs(new_path)
+            if not os.path.exists(Path_to_copy):
+                os.makedirs(Path_to_copy)
 
             for next_dir in list_alldirs:
                 newimg = next_dir+'raw_img5.jpg'
                 prefix += 1
-                copy2(newimg,new_path+'/' + '{}_img5.jpg'.format(prefix))
+                copy2(newimg,Path_to_copy+'/' + '{}_img5.jpg'.format(prefix))
 
-            print('All raw_5.jpg copied to: {}'.format(new_path))
+            print('Done copying.')
 
         except Exception as e:
             print('copyAll_img5: Error: ' + str(e))
@@ -141,6 +143,8 @@ class Helpers:
 
         try:
             allzipDirs = self.getZipDirs(path_to_extract)
+            numb_to_unzip = len(allzipDirs)
+            cnt = 0
 
             for dirs in allzipDirs:
 
@@ -149,11 +153,12 @@ class Helpers:
                 if newDirname:
 
                     zipfilepath = os.path.join(dirs)
-
+                    cnt +=1
                     zf = zipfile.ZipFile(zipfilepath, "r")
                     zf.extractall(os.path.join(newDirname))
                     zf.close()
-                    print('Unzipped: {}'.format(newDirname))
+                    percent = round(cnt/numb_to_unzip*100,2)
+                    print(str(percent)+' percent completed' + '\r')
 
                     # delete unzipped directory
                     shutil.rmtree(dirs, ignore_errors=True)
@@ -169,6 +174,8 @@ def main():
         runslideshow = False
 
         h = Helpers()
+        h.createVideo()  # loeschen
+        return   # loeschen
 
         h.unzipall(Path_to_raw)
         allDirs = h.getDirectories(Path_to_raw)
