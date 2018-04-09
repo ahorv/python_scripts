@@ -279,7 +279,25 @@ class HDR:
         except Exception as e:
             print('composeOneHDRimg: Error: ' + str(e))
 
-    def createAllHDR(self, ListofAllDirs):
+    def makeHDR_from_jpg(self, ListofAllDirs):
+        global Path_to_raw
+        try:
+            cnt = 0
+            if not os.path.exists(join(Path_to_raw,'hdr')):
+                os.makedirs(join(Path_to_raw,'hdr'))
+
+            for oneDir in ListofAllDirs:
+                cnt += 1
+                ldrReinhard = self.composeOneHDRimg(oneDir)
+                cv2.imwrite(join(Path_to_raw,'hdr',str(cnt) + "_ldr-Reinhard.jpg"), ldrReinhard)
+
+            print("Done creating all HDR images")
+
+        except Exception as e:
+            print('createAllHDR: Error: ' + str(e))
+
+
+    def makeHDR_from_data(self, ListofAllDirs):
         global Path_to_raw
         try:
             cnt = 0
@@ -326,9 +344,10 @@ class HDR:
 def main():
     try:
         global Path_to_raw
-        runslideshow = False
-        postprocess = False
-        createhdr = True
+        runslideshow  = False
+        postprocess   = False
+        hdr_from_jpg  = False
+        hdr_from_data = True
 
         help = Helpers()
         hdr = HDR()
@@ -340,15 +359,18 @@ def main():
             help.copyAll_img5(allDirs)
             help.createVideo()
 
-        if createhdr:
+        if hdr_from_jpg:
             hdrstart = time.time()
-            hdr.createAllHDR(allDirs)
+            hdr.makeHDR_from_jpg(allDirs)
             hdrend = time.time()
             print('Time to create HDR images: {}'.format(hdrend-hdrstart))
             hdrvidstart = time.time()
             hdr.createVideo()
             hdrvidend = time.time()
             print('Time to create HDR images: {}'.format(hdrvidend-hdrvidstart))
+
+        if hdr_from_data:
+            hdr.readRawImages(Path_to_raw)
 
         if runslideshow:
 
