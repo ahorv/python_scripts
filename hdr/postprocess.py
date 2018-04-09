@@ -38,7 +38,7 @@ print('Version opencv: ' + cv2.__version__)
 global Path_to_raw
 global Path_to_copy
 global Path_to_ffmpeg
-Path_to_raw = r'G:\SkyCam\camera_2\20180403_raw_cam2'
+Path_to_raw = r'E:\SkyCam\camera_2\20180403_raw_cam2'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 Path_to_copy = os.path.join(Path_to_raw,'imgs5')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 
@@ -190,7 +190,7 @@ class HDR:
         except Exception as e:
             print('EXIF: Could not read exif data ' + str(e))
 
-    def readRawImages(self,mypath, piclist):
+    def readRawImages(self,mypath, piclist = [0,5,9]):
         try:
             onlyfiles_data = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.data')]
             onlyfiles_jpg  = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
@@ -233,7 +233,7 @@ class HDR:
         except Exception as e:
             print('readRawImages: Could not read *.data files ' + str(e))
 
-    def readImagesAndExpos(self, mypath, piclist):
+    def readImagesAndExpos(self, mypath, piclist=[0,5,9]):
         try:
             onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
             image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
