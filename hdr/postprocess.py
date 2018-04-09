@@ -192,17 +192,40 @@ class HDR:
 
     def readRawImages(self,mypath, piclist):
         try:
-            onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.data')]
-            image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
-            expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
-            for n in range(0, len(onlyfiles)):
-                picnumber = ''.join(filter(str.isdigit, onlyfiles[n]))
+            onlyfiles_data = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.data')]
+            onlyfiles_jpg  = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
+            image_stack = np.empty(len(piclist), dtype=object)
+            expos_stack = np.empty(len(piclist), dtype=np.float32)
+
+            imrows = 2464
+            imcols = 3296
+
+            imsize = imrows * imcols
+
+            # Importing and debayering raw images
+            for n in range(0, len(onlyfiles_data)):
+                picnumber = ''.join(filter(str.isdigit, onlyfiles_data[n]))
                 pos = 0
                 for pic in piclist:
                     if str(picnumber) == str(pic):
-                        expos_stack[pos] = self.getEXIF_TAG(join(mypath, onlyfiles[n]), "EXIF ExposureTime")
-                        image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
-                        print('Pic {}, reading data from : {}, exif: {}'.format(str(picnumber), onlyfiles[n], expos_stack[n]))
+
+                        with open(join(mypath, onlyfiles_data[n]), "rb") as rawimage:
+                            # images[image_idx] = cv2.imread(path)
+                            img_np = np.fromfile(rawimage, np.dtype('u2'), imsize).reshape([imrows,imcols])
+                            img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BAYER_BG2BGR)
+
+                        image_stack[pos] = img_rgb
+                        print('Pic {}, reading data : {}'.format(str(picnumber), onlyfiles_data[n]))
+                    pos +=1
+
+            #Importing exif data
+            for n in range(0, len(onlyfiles_jpg)):
+                picnumber = ''.join(filter(str.isdigit, onlyfiles_jpg[n]))
+                pos = 0
+                for pic in piclist:
+                    if str(picnumber) == str(pic):
+                        expos_stack[pos] = self.getEXIF_TAG(join(mypath, onlyfiles_jpg[n]), "EXIF ExposureTime")
+                        print('Pic {}, reading exif: {}'.format(str(picnumber), expos_stack[n]))
                     pos +=1
 
             return image_stack, expos_stack
