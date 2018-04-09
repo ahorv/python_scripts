@@ -20,8 +20,11 @@ import imageio
 global images_path
 global output_path
 #images_path = r'C:\Hoa_Python_Projects\RemoteDebugEx\hist\input\20171025_140139'  # @home
-images_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\input\20171025_140139'  # @lab
-output_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\output'
+#images_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\input\20171025_140139'  # @lab
+#output_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hist\output'
+
+images_path = r'C:\Users\tahorvat\Desktop\20180409_090414'
+output_path = r'C:\Users\tahorvat\Desktop\20180409_090414'
 
 
 def load_data_as_img():
