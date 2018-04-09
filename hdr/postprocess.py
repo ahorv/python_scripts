@@ -190,6 +190,26 @@ class HDR:
         except Exception as e:
             print('EXIF: Could not read exif data ' + str(e))
 
+    def readRawImages(self,mypath, piclist):
+        try:
+            onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.data')]
+            image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
+            expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
+            for n in range(0, len(onlyfiles)):
+                picnumber = ''.join(filter(str.isdigit, onlyfiles[n]))
+                pos = 0
+                for pic in piclist:
+                    if str(picnumber) == str(pic):
+                        expos_stack[pos] = self.getEXIF_TAG(join(mypath, onlyfiles[n]), "EXIF ExposureTime")
+                        image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
+                        print('Pic {}, reading data from : {}, exif: {}'.format(str(picnumber), onlyfiles[n], expos_stack[n]))
+                    pos +=1
+
+            return image_stack, expos_stack
+
+        except Exception as e:
+            print('readRawImages: Could not read *.data files ' + str(e))
+
     def readImagesAndExpos(self, mypath, piclist):
         try:
             onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
