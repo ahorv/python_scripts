@@ -63,9 +63,12 @@ def main():
             plt.show()
         if(save_img):
             raw_img_name = 'cv_data.rgb'
-            print('rgb file path: '+ str(Path_to_raw + '\\' + raw_img_name))
             with open(join(Path_to_raw,raw_img_name), 'wb') as g:
                 db_rgb.tofile(g)
+            raw_img_name = 'cv_data.jpg'
+            db_rgb_ds = (db_rgb / 256).astype('uint8')
+            with open(join(Path_to_raw,raw_img_name), 'wb') as f:
+                db_rgb_ds.tofile(f)
 
         print('Done')
 
