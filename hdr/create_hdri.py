@@ -38,9 +38,11 @@ APP_PREFIX = '[' + APP_NAME + '] '
 
 global input_path
 global output_path
-input_path = r'C:\Hoa_Python_Projects\python_scripts\hdr\input'  # @ home
-output_path = r'C:\Hoa_Python_Projects\python_scripts\hdr\output'  # @ home
-#input_path = r'C:\Users\tahorvat\PycharmProjects\python_scripts\hdr\input\20171025_140139'  # @ Lab
+#input_path = r'C:\Hoa_Python_Projects\python_scripts\hdr\input'  # @ home
+#output_path = r'C:\Hoa_Python_Projects\python_scripts\hdr\output'  # @ home
+input_path = r'C:\Users\tahorvat\Desktop\20180409_090414'   # @ Lab
+output_path = r'C:\Users\tahorvat\Desktop\20180409_090414'   # @ Lab
+
 
 def read_images(path):
     '''Reads all the images in folder <path> (any common format), and convert every
@@ -62,14 +64,16 @@ def read_images(path):
     exp_imgs_stack = dict()
 
     # Get all files in folder.
-    image_files = sorted(os.listdir(path))
+    image_files = []
+    dir_list = sorted(os.listdir(path))
     # Remove files that do not have the appropriate extension.
-    for img in image_files:
-        if img.split(".")[-1].lower() not in file_extensions:
-            image_files.remove(img)
+    for img in dir_list:
+        print('found: {}'.format(img))
+
+        if img.endswith('.data'):
+            image_files.append(img)
 
     for n in range(0, len(image_files)):
-        print('file: {}'.format(image_files[n]))
 
         with open(join(path,image_files[n]), "rb") as rawimage:
             # images[image_idx] = cv2.imread(path)
