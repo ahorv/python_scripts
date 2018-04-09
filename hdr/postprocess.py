@@ -38,7 +38,7 @@ print('Version opencv: ' + cv2.__version__)
 global Path_to_raw
 global Path_to_copy
 global Path_to_ffmpeg
-Path_to_raw = r'E:\SkyCam\camera_2\20180403_raw_cam2'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
+Path_to_raw = r'G:\SkyCam\camera_2\20180403_raw_cam2'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 Path_to_copy = os.path.join(Path_to_raw,'imgs5')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 
@@ -218,7 +218,7 @@ class HDR:
                         print('Pic {}, reading data : {}'.format(str(picnumber), onlyfiles_data[n]))
                     pos +=1
 
-            #Importing exif data
+            #Importing exif data from jpg images
             for n in range(0, len(onlyfiles_jpg)):
                 picnumber = ''.join(filter(str.isdigit, onlyfiles_jpg[n]))
                 pos = 0
@@ -253,7 +253,7 @@ class HDR:
         except Exception as e:
             print('readImagesAndExpos: Could not read images ' + str(e))
 
-    def composeOneHDRimg(self,oneDirsPath, piclist = [0,5,9]):
+    def composeOneHDRimgJpg(self, oneDirsPath, piclist = [0, 5, 9]):
         try:
 
             images, times = self.readImagesAndExpos(oneDirsPath, piclist)
@@ -279,6 +279,32 @@ class HDR:
         except Exception as e:
             print('composeOneHDRimg: Error: ' + str(e))
 
+    def composeOneHDRimgData(self,oneDirsPath, piclist = [0,5,9]):
+        try:
+
+            images, times = self.readRawImages(oneDirsPath, piclist)
+
+            # Align input images
+            alignMTB = cv2.createAlignMTB()
+            alignMTB.process(images, images)
+
+            # Obtain Camera Response Function (CRF)
+            calibrateDebevec = cv2.createCalibrateDebevec()
+            responseDebevec = calibrateDebevec.process(images, times)
+
+            # Merge images into an HDR linear image
+            mergeDebevec = cv2.createMergeDebevec()
+            hdrDebevec = mergeDebevec.process(images, times, responseDebevec)
+
+            # Tonemap using Reinhard's method to obtain 24-bit color image
+            tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
+            ldrReinhard = tonemapReinhard.process(hdrDebevec)
+
+            return ldrReinhard * 255
+
+        except Exception as e:
+            print('composeOneHDRimgData: Error: ' + str(e))
+
     def makeHDR_from_jpg(self, ListofAllDirs):
         global Path_to_raw
         try:
@@ -288,7 +314,7 @@ class HDR:
 
             for oneDir in ListofAllDirs:
                 cnt += 1
-                ldrReinhard = self.composeOneHDRimg(oneDir)
+                ldrReinhard = self.composeOneHDRimgJpg(oneDir)
                 cv2.imwrite(join(Path_to_raw,'hdr',str(cnt) + "_ldr-Reinhard.jpg"), ldrReinhard)
 
             print("Done creating all HDR images")
@@ -301,13 +327,13 @@ class HDR:
         global Path_to_raw
         try:
             cnt = 0
-            if not os.path.exists(join(Path_to_raw,'hdr')):
-                os.makedirs(join(Path_to_raw,'hdr'))
+            if not os.path.exists(join(Path_to_raw,'raw_hdr')):
+                os.makedirs(join(Path_to_raw,'raw_hdr'))
 
             for oneDir in ListofAllDirs:
                 cnt += 1
-                ldrReinhard = self.composeOneHDRimg(oneDir)
-                cv2.imwrite(join(Path_to_raw,'hdr',str(cnt) + "_ldr-Reinhard.jpg"), ldrReinhard)
+                ldrReinhard = self.composeOneHDRimgData(oneDir)
+                cv2.imwrite(join(Path_to_raw,'raw_hdr',str(cnt) + "_ldr-Reinhard.jpg"), ldrReinhard)
 
             print("Done creating all HDR images")
 
@@ -370,7 +396,7 @@ def main():
             print('Time to create HDR images: {}'.format(hdrvidend-hdrvidstart))
 
         if hdr_from_data:
-            hdr.readRawImages(Path_to_raw)
+            hdr.makeHDR_from_data(allDirs)
 
         if runslideshow:
 
