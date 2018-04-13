@@ -2,6 +2,9 @@
 import sqlite3
 import os
 import sys
+import stat
+import fcntl
+import tempfile
 import logging
 import logging.handlers
 from time import sleep
@@ -16,9 +19,10 @@ import rgb
 import time
 
 ######################################################################
-## Hoa: 31.12.2017 Version 3 : write_sensors_DB.py
+## Hoa: 13.04.2018 Version 4 : write_sensors_DB.py
 ######################################################################
 # This class collects all sensor data and writes them to a SQL database.
+# Script must be called each minute by cronjob.
 #
 # New /Changes:
 # ----------------------------------------------------------------------
@@ -27,6 +31,7 @@ import time
 # 21.12.2017 : Added Camera_id (Camera 1 - 3) must be set accordingly
 # 31.12.2017 : New, run endless at boot up
 # 31.12.2017 : Added skipping sensors if they are faulty
+# 13.04.2018 : Script runs new as singleton
 #
 ######################################################################
 
@@ -373,15 +378,41 @@ def setOwnerAndPermission(pathToFile):
     except IOError as e:
         print('PERM : Could not set permissions for file: ' + str(e))
 
+def ensure_single_instance_of_app():
+    app_name = 'write_sensors_DB'  # app name to be monitored
+
+    if sys.platform == "linux":
+
+        # Establish lock file settings
+        lf_name = '.{}.lock'.format(app_name)
+        lf_path = os.path.join(tempfile.gettempdir(), lf_name)
+        lf_flags = os.O_WRONLY | os.O_CREAT
+        lf_mode = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH  # This is 0o222, i.e. 146
+
+        # Create lock file
+        # Regarding umask, see https://stackoverflow.com/a/15015748/832230
+        umask_original = os.umask(0)
+        try:
+            lf_fd = os.open(lf_path, lf_flags, lf_mode)
+        finally:
+            os.umask(umask_original)
+
+        # Try locking the file
+        try:
+            fcntl.lockf(lf_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except IOError as e:
+            msg = ('{} may already be running. Only one instance of it '
+                   'allowed.'
+                   ).format('raw2')
+            print(' LOCK: ' + str(msg))
+            exit()
+
 def main():
     try:
         s = Logger()
         root_logger = s.getLogger()
-        root_logger.info('MAIN: START COLLECTING SENSOR DATA')
-
-        while True:
-            time.sleep(60)
-            do_Sensor_Data_Logging()
+        ensure_single_instance_of_app()
+        do_Sensor_Data_Logging()
 
     except Exception as e:
         root_logger.error('MAIN: Error: ' + str(e))
