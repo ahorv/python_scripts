@@ -349,7 +349,7 @@ class HDR:
             stnb = '-start_number 1 '                             # what image to start at
             imgpath = '-i ' + hdrpath + '\%d_ldr-Reinhard.jpg '   # path to images
             res = '-s 2592x1944 '                                 # output resolution
-            outpath = Path_to_copy+'\sky_video.mp4 '              # output file name
+            outpath = Path_to_copy+'\sky_HDR_video.mp4 '              # output file name
             codec = '-vcodec libx264'                             # codec to use
 
             command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
@@ -371,10 +371,11 @@ def main():
     try:
         global Path_to_raw
         unzipall = False
-        runslideshow  = False
-        postprocess   = False
-        hdr_from_jpg  = True
-        hdr_from_data = False
+        runslideshow    = False
+        postprocess     = False
+        hdr_from_jpg    = False
+        creat_HDR_Video = True
+        hdr_from_data   = False
 
         if not os.path.isdir(Path_to_raw):
             print('\nError: Image directory does not exist! -> Aborting.')
@@ -396,6 +397,12 @@ def main():
             hdr.makeHDR_from_jpg(allDirs)
             hdrend = time.time()
             print('Time to create HDR images: {}'.format(hdrend-hdrstart))
+
+        if creat_HDR_Video:
+            hdrstart = time.time()
+            hdr.createHDRVideo()
+            hdrend = time.time()
+            print('Time to create HDR Video: {}'.format(hdrend-hdrstart))
 
         if hdr_from_data:
             hdr.makeHDR_from_data(allDirs)
