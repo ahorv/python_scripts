@@ -38,7 +38,7 @@ print('Version opencv: ' + cv2.__version__)
 global Path_to_raw
 global Path_to_copy
 global Path_to_ffmpeg
-Path_to_raw = r'G:\SkyCam\camera_2\20180403_raw_cam2'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
+Path_to_raw = r'G:\SkyCam\camera_1\20180403_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 Path_to_copy = os.path.join(Path_to_raw,'imgs5')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 
@@ -370,18 +370,24 @@ class HDR:
 def main():
     try:
         global Path_to_raw
+        unzipall = False
         runslideshow  = False
         postprocess   = False
-        hdr_from_jpg  = False
-        hdr_from_data = True
+        hdr_from_jpg  = True
+        hdr_from_data = False
+
+        if not os.path.isdir(Path_to_raw):
+            print('\nError: Image directory does not exist! -> Aborting.')
+            return;
 
         help = Helpers()
         hdr = HDR()
         allDirs = help.getDirectories(Path_to_raw)
 
+        if unzipall:
+            help.unzipall(Path_to_raw)
 
         if postprocess:
-            help.unzipall(Path_to_raw)
             help.copyAll_img5(allDirs)
             help.createVideo()
 
@@ -390,10 +396,6 @@ def main():
             hdr.makeHDR_from_jpg(allDirs)
             hdrend = time.time()
             print('Time to create HDR images: {}'.format(hdrend-hdrstart))
-            hdrvidstart = time.time()
-            hdr.createVideo()
-            hdrvidend = time.time()
-            print('Time to create HDR images: {}'.format(hdrvidend-hdrvidstart))
 
         if hdr_from_data:
             hdr.makeHDR_from_data(allDirs)
