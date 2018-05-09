@@ -36,47 +36,56 @@ print('Version opencv: ' + cv2.__version__)
 ######################################################################
 
 global Path_to_raw
-global Path_to_copy
+global Path_to_copy_img5s
 global Path_to_ffmpeg
-Path_to_raw = r'G:\SkyCam\camera_1\20180403_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
-Path_to_copy = os.path.join(Path_to_raw,'imgs5')
+global Avoid_This_Directories
+Path_to_raw = r'G:\SkyCam\camera_2\20180505_raw_cam2'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
+Path_to_copy_img5s = os.path.join(Path_to_raw, 'imgs5')
+Path_to_copy_HDR = os.path.join(Path_to_raw,'hdr')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
+Avoid_This_Directories = ['imgs5','hdr','rest']
 
 class Helpers:
     def createVideo(self):
         try:
-            global Path_to_ffmpeg                            # path to ffmpeg executable
-            fsp = ' -r 10 '                                  # frame per sec images taken
-            stnb = '-start_number 1 '                        # what image to start at
-            imgpath = '-i ' + Path_to_copy + '\%d_img5.jpg ' # path to images
-            res = '-s 2592x1944 '                            # output resolution
-            outpath = Path_to_copy+'\sky_video.mp4 '         # output file name
-            codec = '-vcodec libx264'                        # codec to use
+
+            global Path_to_copy_img5s                                   # path to images
+            global Path_to_ffmpeg                                       # path to ffmpeg executable
+            fsp = ' -r 10 '                                             # frame per sec images taken
+            stnb = '-start_number 0001 '                   # what image to start at
+            imgpath = '-i ' + join(Path_to_copy_img5s,'%4d.jpg')+' '  # path to images
+            res = '-s 2592x1944 '                                       # output resolution
+            outpath = Path_to_copy_img5s + '\sky_video.mp4 '            # output file name
+            codec = '-vcodec libx264'                                   # codec to use
 
             command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
 
             if sys.platform == "linux":
                 subprocess(command, shell=True)
             else:
-                print(' {}'.format(command))
+                print('\n{}'.format(command))
                 ffmpeg = subprocess.Popen(command, stderr=subprocess.PIPE ,stdout = subprocess.PIPE)
                 out, err = ffmpeg.communicate()
                 if (err): print(err)
                 print('Ffmpeg done.')
 
         except Exception as e:
-            print('createVideo: Error: ' + str(e))
+            print('createVideo from jpg\'s: Error: ' + str(e))
 
     def getDirectories(self,pathToDirectories):
         try:
+            global Avoid_This_Directories
             allDirs = []
+            img_cnt = 1
 
             for dirs in sorted(glob(os.path.join(pathToDirectories, "*", ""))):
                 if os.path.isdir(dirs):
-                    allDirs.append(dirs)
-                    print('{}'.format(str(dirs)))
+                    if dirs.rstrip('\\').rpartition('\\')[-1] not in Avoid_This_Directories:
+                        allDirs.append(dirs)
+                        #print('{}'.format(str(dirs)))
+                        img_cnt +=1
 
-            print('All images loaded !')
+            print('All images loaded! - Found {} images.'.format(img_cnt))
 
             return allDirs
 
@@ -92,7 +101,7 @@ class Helpers:
                 allZipFiles.append(zipfile)
                 cnt +=1
 
-        print('Found {} files to unzip '.format(cnt))
+        print('Found {} *.ZIP files '.format(cnt))
         return allZipFiles
 
     def readAllImages(self,allDirs):
@@ -122,25 +131,39 @@ class Helpers:
         except Exception as e:
             print('readAllImages: Error: ' + str(e))
 
-    def copyAll_img5(self,list_alldirs):
+    def copyAndMaskAll_img5(self, list_alldirs):
 
         try:
-            global Path_to_copy
-            print('\nCopying all raw_img_5 to: {}'.format(Path_to_copy))
-            prefix = 0
+            imgproc = IMGPROC()
+            global Path_to_copy_img5s
+            cnt = 1
 
-            if not os.path.exists(Path_to_copy):
-                os.makedirs(Path_to_copy)
+            if not os.path.exists(Path_to_copy_img5s):
+                os.makedirs(Path_to_copy_img5s)
 
             for next_dir in list_alldirs:
-                newimg = next_dir+'raw_img5.jpg'
-                prefix += 1
-                copy2(newimg,Path_to_copy+'/' + '{}_img5.jpg'.format(prefix))
+                newimg = join(next_dir,'raw_img5.jpg')
+                masked_img = imgproc.maske_jpg_Image(cv2.imread(newimg))
+                dateAndTime = (next_dir.rstrip('\\').rpartition('\\')[-1]).replace('_',' ')
+                prefix = '{0:04d}'.format(cnt)
+                year  = dateAndTime[:4]
+                month = dateAndTime[4:6]
+                day   = dateAndTime[6:8]
+                hour  = dateAndTime[9:11]
+                min   = dateAndTime[11:13]
+                sec   = dateAndTime[13:15]
+                img_txt = imgproc.write2img(masked_img, '#: '+str(cnt) , (30, 1720))
+                img_txt = imgproc.write2img(masked_img,year+" "+month+" "+day,(30, 1800))
+                img_txt = imgproc.write2img(masked_img, hour+":"+min+":"+sec, (30, 1880))
+                new_img_path = join(Path_to_copy_img5s, '{}.jpg'.format(prefix))
 
-            print('Done copying.')
+                cv2.imwrite(new_img_path,masked_img)
+                cnt += 1
+
+            print('Masked {} images and copyied to imgs5.'.format(cnt))
 
         except Exception as e:
-            print('copyAll_img5: Error: ' + str(e))
+            print('Error in copyAndMaskAll_img5: {}'.format(e))
 
     def unzipall(self,path_to_extract):
 
@@ -163,10 +186,24 @@ class Helpers:
                     percent = round(cnt/numb_to_unzip*100,2)
                     print(str(percent)+' percent completed' + '\r')
 
-                    # delete unzipped directory
-                    shutil.rmtree(dirs, ignore_errors=True)
-
             print('unzip finished.')
+
+        except IOError as e:
+            print('unzipall: Error: ' + str(e))
+
+    def delAllZIP(self,path_to_extract):
+
+        try:
+            allzipDirs = self.getZipDirs(path_to_extract)
+            numb_to_unzip = len(allzipDirs)
+            cnt = 0
+
+            for zipdir in allzipDirs:
+                # delete unzipped directory
+                print('deleting: '+str(zipdir))
+                os.remove(zipdir)
+
+            print('deleted all ZIP files.')
 
         except IOError as e:
             print('unzipall: Error: ' + str(e))
@@ -322,7 +359,6 @@ class HDR:
         except Exception as e:
             print('createAllHDR: Error: ' + str(e))
 
-
     def makeHDR_from_data(self, ListofAllDirs):
         global Path_to_raw
         try:
@@ -349,7 +385,7 @@ class HDR:
             stnb = '-start_number 1 '                             # what image to start at
             imgpath = '-i ' + hdrpath + '\%d_ldr-Reinhard.jpg '   # path to images
             res = '-s 2592x1944 '                                 # output resolution
-            outpath = Path_to_copy+'\sky_HDR_video.mp4 '              # output file name
+            outpath = Path_to_copy_HDR+'\sky_HDR_video.mp4 '              # output file name
             codec = '-vcodec libx264'                             # codec to use
 
             command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
@@ -366,16 +402,90 @@ class HDR:
         except Exception as e:
             print('createVideo: Error: ' + str(e))
 
+class IMGPROC(object):
+
+    def __init__(self):
+        # Create image mask
+        size = 1944, 2592, 3
+        empty_img = np.zeros(size, dtype=np.uint8)
+        self.mask = self.cmask([880, 1190], 1117, empty_img)
+
+    def cmask(self, index, radius, array):
+        """Generates the mask for a given input image.
+        The generated mask is needed to remove occlusions during post-processing steps.
+
+        Args:
+            index (numpy array): Array containing the x- and y- co-ordinate of the center of the circular mask.
+            radius (float): Radius of the circular mask.
+            array (numpy array): Input sky/cloud image for which the mask is generated.
+
+        Returns:
+            numpy array: Generated mask image."""
+
+        a, b = index
+        is_rgb = len(array.shape)
+
+        if is_rgb == 3:
+            ash = array.shape
+            nx = ash[0]
+            ny = ash[1]
+        else:
+            nx, ny = array.shape
+
+        s = (nx, ny)
+        image_mask = np.zeros(s)
+        y, x = np.ogrid[-a:nx - a, -b:ny - b]
+        mask = x * x + y * y <= radius * radius
+        image_mask[mask] = 1
+
+        return (image_mask)
+
+    def maske_jpg_Image(self, input_image):
+
+        red   = input_image[:, :, 0]
+        green = input_image[:, :, 1]
+        blue  = input_image[:, :, 2]
+
+        r_img = red.astype(float)   * self.mask
+        g_img = green.astype(float) * self.mask
+        b_img = blue.astype(float) * self.mask
+
+        dimension = (input_image.shape[0], input_image.shape[1], 3)
+        output_img = np.zeros(dimension, dtype=np.uint8)
+
+        output_img[..., 0] = r_img[:, :]
+        output_img[..., 1] = g_img[:, :]
+        output_img[..., 2] = b_img[:, :]
+
+        return output_img
+
+    def write2img(self,input_image,text, xy):
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        bottomLeftCornerOfText = xy
+        fontScale = 2
+        fontColor = (255, 255, 255)
+        lineType = 3
+
+        output_image = cv2.putText(input_image, text,
+                    bottomLeftCornerOfText,
+                    font,
+                    fontScale,
+                    fontColor,
+                    lineType)
+
+        return output_image
 
 def main():
     try:
         global Path_to_raw
-        unzipall = False
-        runslideshow    = False
-        postprocess     = False
-        hdr_from_jpg    = False
-        creat_HDR_Video = True
-        hdr_from_data   = False
+        unzipall          = False
+        delallzip         = False
+        runslideshow      = False
+        copyAndMask       = True
+        hdr_pics_from_jpg = False
+        creat_HDR_Video   = False
+        hdr_from_data     = False
 
         if not os.path.isdir(Path_to_raw):
             print('\nError: Image directory does not exist! -> Aborting.')
@@ -388,11 +498,14 @@ def main():
         if unzipall:
             help.unzipall(Path_to_raw)
 
-        if postprocess:
-            help.copyAll_img5(allDirs)
+        if delallzip:
+            help.delAllZIP(Path_to_raw)
+
+        if copyAndMask:
+            help.copyAndMaskAll_img5(allDirs)
             help.createVideo()
 
-        if hdr_from_jpg:
+        if hdr_pics_from_jpg:
             hdrstart = time.time()
             hdr.makeHDR_from_jpg(allDirs)
             hdrend = time.time()
