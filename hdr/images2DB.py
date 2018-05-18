@@ -4,8 +4,6 @@ import numpy as np
 import sqlite3
 import cv2
 
-PATH_IMAGES = 'Images/'
-
 ######################################################################
 ## Hoa: 18.05.2018 Version 1 : images2DB.py
 ######################################################################
@@ -19,7 +17,7 @@ PATH_IMAGES = 'Images/'
 #
 ######################################################################
 
-
+PATH_IMAGES = r'G:\SkyCam\camera_1\20180429_raw_cam1\imgs5'
 
 # --- Extract files from folder following pattern
 files = glob.glob(PATH_IMAGES + "*.jpg")
