@@ -39,7 +39,7 @@ global Path_to_raw
 global Path_to_copy_img5s
 global Path_to_ffmpeg
 global Avoid_This_Directories
-Path_to_raw = r'G:\SkyCam\camera_2\20180505_raw_cam2'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
+Path_to_raw = r'G:\SkyCam\camera_1\20180429_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 Path_to_copy_img5s = os.path.join(Path_to_raw, 'imgs5')
 Path_to_copy_HDR = os.path.join(Path_to_raw,'hdr')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
@@ -169,6 +169,11 @@ class Helpers:
 
         try:
             allzipDirs = self.getZipDirs(path_to_extract)
+
+            if not allzipDirs:
+                print('Nothing to unzip.')
+                return
+
             numb_to_unzip = len(allzipDirs)
             cnt = 0
 
@@ -195,8 +200,10 @@ class Helpers:
 
         try:
             allzipDirs = self.getZipDirs(path_to_extract)
-            numb_to_unzip = len(allzipDirs)
-            cnt = 0
+
+            if not allzipDirs:
+                print("No zip files to delete.")
+                return
 
             for zipdir in allzipDirs:
                 # delete unzipped directory
@@ -346,13 +353,15 @@ class HDR:
         global Path_to_raw
         try:
             cnt = 0
+
             if not os.path.exists(join(Path_to_raw,'hdr')):
                 os.makedirs(join(Path_to_raw,'hdr'))
 
             for oneDir in ListofAllDirs:
                 cnt += 1
                 ldrReinhard = self.composeOneHDRimgJpg(oneDir)
-                cv2.imwrite(join(Path_to_raw,'hdr',str(cnt) + "_ldr-Reinhard.jpg"), ldrReinhard)
+                prefix = '{0:04d}'.format(cnt)
+                cv2.imwrite(join(Path_to_raw,'hdr',"{}.jpg".format(prefix)), ldrReinhard)
 
             print("Done creating all HDR images")
 
@@ -482,9 +491,9 @@ def main():
         unzipall          = False
         delallzip         = False
         runslideshow      = False
-        copyAndMask       = True
-        hdr_pics_from_jpg = False
-        creat_HDR_Video   = False
+        copyAndMask       = False
+        hdr_pics_from_jpg = True
+        creat_HDR_Video   = True
         hdr_from_data     = False
 
         if not os.path.isdir(Path_to_raw):
