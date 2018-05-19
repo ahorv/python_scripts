@@ -26,12 +26,16 @@ print('Version opencv: ' + cv2.__version__)
 # Grabs from a image collection all raw_img5.jpg 's and shows them as
 # Slideshow
 #
+# Remarks:
+# - je nach cam1/2 den Mittelpkt der maske setzen -> var cam = cam1 oder cam2
+#
 # New /Changes:
 # ----------------------------------------------------------------------
 #
 # 26.03.2018 : first implemented
 # 30.03.2018 : added copy img to new folder
 # 30.03.2018 : added video creation by ffmpeg
+# 15.18.2018 : added info text to images
 #
 ######################################################################
 
@@ -39,11 +43,14 @@ global Path_to_raw
 global Path_to_copy_img5s
 global Path_to_ffmpeg
 global Avoid_This_Directories
+global CAM
 Path_to_raw = r'G:\SkyCam\camera_1\20180429_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 Path_to_copy_img5s = os.path.join(Path_to_raw, 'imgs5')
 Path_to_copy_HDR = os.path.join(Path_to_raw,'hdr')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Avoid_This_Directories = ['imgs5','hdr','rest']
+CAM = Path_to_raw.rstrip('\\').rpartition('\\')[-1][-1]  # determin if cam1 or cam2
+
 
 class Helpers:
     def createVideo(self):
@@ -136,6 +143,7 @@ class Helpers:
         try:
             imgproc = IMGPROC()
             global Path_to_copy_img5s
+            global CAM
             cnt = 1
 
             if not os.path.exists(Path_to_copy_img5s):
@@ -152,8 +160,10 @@ class Helpers:
                 hour  = dateAndTime[9:11]
                 min   = dateAndTime[11:13]
                 sec   = dateAndTime[13:15]
-                img_txt = imgproc.write2img(masked_img, '#: '+str(cnt) , (30, 1720))
-                img_txt = imgproc.write2img(masked_img,year+" "+month+" "+day,(30, 1800))
+
+                img_txt = imgproc.write2img(masked_img, 'cam ' + CAM, (30, 70))
+                img_txt = imgproc.write2img(masked_img,year+" "+month+" "+day,(30,1720))
+                img_txt = imgproc.write2img(masked_img, '#: ' + str(cnt), (30,1800))
                 img_txt = imgproc.write2img(masked_img, hour+":"+min+":"+sec, (30, 1880))
                 new_img_path = join(Path_to_copy_img5s, '{}.jpg'.format(prefix))
 
@@ -169,11 +179,6 @@ class Helpers:
 
         try:
             allzipDirs = self.getZipDirs(path_to_extract)
-
-            if not allzipDirs:
-                print('Nothing to unzip.')
-                return
-
             numb_to_unzip = len(allzipDirs)
             cnt = 0
 
@@ -200,10 +205,8 @@ class Helpers:
 
         try:
             allzipDirs = self.getZipDirs(path_to_extract)
-
-            if not allzipDirs:
-                print("No zip files to delete.")
-                return
+            numb_to_unzip = len(allzipDirs)
+            cnt = 0
 
             for zipdir in allzipDirs:
                 # delete unzipped directory
@@ -278,6 +281,7 @@ class HDR:
             print('readRawImages: Could not read *.data files ' + str(e))
 
     def readImagesAndExpos(self, mypath, piclist=[0,5,9]):
+        postproc = IMGPROC()
         try:
             onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
             image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
@@ -288,7 +292,7 @@ class HDR:
                 for pic in piclist:
                     if str(picnumber) == str(pic):
                         expos_stack[pos] = self.getEXIF_TAG(join(mypath, onlyfiles[n]), "EXIF ExposureTime")
-                        image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
+                        image_stack[pos] = postproc.maske_jpg_Image(cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR))
                         print('Pic {}, reading data from : {}, exif: {}'.format(str(picnumber), onlyfiles[n], expos_stack[n]))
                     pos +=1
 
@@ -318,7 +322,9 @@ class HDR:
             tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
             ldrReinhard = tonemapReinhard.process(hdrDebevec)
 
-            return ldrReinhard * 255
+            _ldrReinhard = ldrReinhard * 255
+
+            return _ldrReinhard
 
         except Exception as e:
             print('composeOneHDRimg: Error: ' + str(e))
@@ -344,24 +350,43 @@ class HDR:
             tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
             ldrReinhard = tonemapReinhard.process(hdrDebevec)
 
-            return ldrReinhard * 255
+            _ldrReinhard = ldrReinhard * 255
+
+            return _ldrReinhard
 
         except Exception as e:
             print('composeOneHDRimgData: Error: ' + str(e))
 
     def makeHDR_from_jpg(self, ListofAllDirs):
         global Path_to_raw
+        global CAM
+        imgproc = IMGPROC()
         try:
             cnt = 0
-
             if not os.path.exists(join(Path_to_raw,'hdr')):
                 os.makedirs(join(Path_to_raw,'hdr'))
 
-            for oneDir in ListofAllDirs:
+            for next_dir in ListofAllDirs:
                 cnt += 1
-                ldrReinhard = self.composeOneHDRimgJpg(oneDir)
                 prefix = '{0:04d}'.format(cnt)
-                cv2.imwrite(join(Path_to_raw,'hdr',"{}.jpg".format(prefix)), ldrReinhard)
+                ldrReinhard = self.composeOneHDRimgJpg(next_dir)
+
+                remasked_img = imgproc.maske_jpg_Image(ldrReinhard)
+
+                dateAndTime = (next_dir.rstrip('\\').rpartition('\\')[-1]).replace('_',' ')
+                year  = dateAndTime[:4]
+                month = dateAndTime[4:6]
+                day   = dateAndTime[6:8]
+                hour  = dateAndTime[9:11]
+                min   = dateAndTime[11:13]
+                sec   = dateAndTime[13:15]
+
+                ldrReinhard_txt = imgproc.write2img(remasked_img,'cam '+CAM,(30,70))
+                ldrReinhard_txt = imgproc.write2img(remasked_img,year+" "+month+" "+day,(30,1720))
+                ldrReinhard_txt = imgproc.write2img(remasked_img, '#: ' + str(cnt), (30,1800))
+                ldrReinhard_txt = imgproc.write2img(remasked_img, hour+":"+min+":"+sec, (30, 1880))
+
+                cv2.imwrite(join(Path_to_raw, 'hdr', "{}.jpg".format(prefix)), ldrReinhard_txt)
 
             print("Done creating all HDR images")
 
@@ -414,10 +439,14 @@ class HDR:
 class IMGPROC(object):
 
     def __init__(self):
+        global CAM
         # Create image mask
         size = 1944, 2592, 3
         empty_img = np.zeros(size, dtype=np.uint8)
-        self.mask = self.cmask([880, 1190], 1117, empty_img)
+        if CAM is '1':
+            self.mask = self.cmask([880, 1190], 1117, empty_img)
+        if CAM is '2':
+            self.mask = self.cmask([950, 1340], 1117, empty_img)
 
     def cmask(self, index, radius, array):
         """Generates the mask for a given input image.
@@ -491,7 +520,7 @@ def main():
         unzipall          = False
         delallzip         = False
         runslideshow      = False
-        copyAndMask       = False
+        copyAndMask       = True
         hdr_pics_from_jpg = True
         creat_HDR_Video   = True
         hdr_from_data     = False
