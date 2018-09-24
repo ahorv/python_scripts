@@ -25,16 +25,17 @@ if sys.platform == "linux":
     import picamera
 
 ######################################################################
-## Hoa: 05.04.2018 Version 2 : raw2.py
+## Hoa: 24.09.2018 Version 2 : raw2.py
 ######################################################################
-# This class takes 10 consecutive images with increasing shutter times.
-# Pictures are in raw bayer format. In addition a jpg asreference is
+# This class takes 3 consecutive images with increasing shutter times.
+# Pictures are in raw bayer format. In addition a jpg as reference is
 # taken in addition.
 # Aim is to merge a sequence of images to a HDR image.
 # Runtime for a sequence of 3 images is about 21 sec
 # Shutter times: img0: 85, img5: 595, img9: 992 micro secs
 #
-# Periodic cronjob calls in intervals of 10 min needed.
+# Start and end time, are set here inside the script ! Script is run
+# by a cronjob.
 #
 # New /Changes:
 # ----------------------------------------------------------------------
@@ -43,6 +44,7 @@ if sys.platform == "linux":
 # 25.03.2018 : new version only 3 shutter times
 # 31.03.2018 : added single instance functionality by a lock file
 # 02.04.2018 : Logging to multiple files
+# 24.09.2018 : Changed description in header
 #
 ######################################################################
 
