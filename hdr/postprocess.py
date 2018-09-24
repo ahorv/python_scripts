@@ -416,10 +416,10 @@ class HDR:
             hdrpath = join(Path_to_raw, 'hdr')
             global Path_to_ffmpeg                                 # path to ffmpeg executable
             fsp = ' -r 10 '                                       # frame per sec images taken
-            stnb = '-start_number 1 '                             # what image to start at
-            imgpath = '-i ' + hdrpath + '\%d_ldr-Reinhard.jpg '   # path to images
+            stnb = '-start_number 0001 '                          # what image to start at
+            imgpath = '-i ' + join(hdrpath ,'%4d.jpg ')           # path to images
             res = '-s 2592x1944 '                                 # output resolution
-            outpath = Path_to_copy_HDR+'\sky_HDR_video.mp4 '              # output file name
+            outpath = Path_to_copy_HDR+'\sky_HDR_video.mp4 '      # output file name
             codec = '-vcodec libx264'                             # codec to use
 
             command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
@@ -517,7 +517,7 @@ class IMGPROC(object):
 def main():
     try:
         global Path_to_raw
-        unzipall          = False
+        unzipall          = True
         delallzip         = False
         runslideshow      = False
         copyAndMask       = True
