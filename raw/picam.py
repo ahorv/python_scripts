@@ -18,6 +18,7 @@ import logging.handlers
 from datetime import datetime, timedelta
 import numpy as np
 from fractions import Fraction
+from math import abs, ceil
 import pwd
 import grp
 import stat
@@ -563,6 +564,23 @@ class Camera:
         except Exception as e:
             print('Error in adjust_ss: ' + str(e))
             return found_ss
+
+    def adjust_ev(self, ss, ev):
+        # Falsch! ein +1ev entspricht einer verdopplung!
+        exp = 2 ** abs(ev)
+        new_ss = 0
+
+        try:
+            if ev < 0:
+                new_ss = ceil(ss **(float(1/exp)))
+            else:
+                new_ss = ss ** exp
+
+            return new_ss
+
+        except Exception as e:
+            print("Error in adjust_ev")
+            return ev
 
     def takepictures(self):
         try:
