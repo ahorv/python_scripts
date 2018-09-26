@@ -12,18 +12,22 @@ import os
 import time
 import shutil
 import cv2
+import picamera
 import logging
 import logging.handlers
 from datetime import datetime, timedelta
 import numpy as np
 from fractions import Fraction
+import pwd
+import grp
+import stat
 
 if sys.platform == "linux":
     import pwd
     import grp
     import stat
     import fcntl
-    import picamera
+
 
 ######################################################################
 ## Hoa: 24.09.2018 Version 1 : picam.py
@@ -109,6 +113,40 @@ class Logger:
 
 class Helpers:
 
+    def createNewFolder(self, thispath):
+        try:
+            if not os.path.exists(thispath):
+                os.makedirs(thispath)
+                self.setOwnerAndPermission(thispath)
+
+        except IOError as e:
+            print('DIR : Could not create new folder: ' + str(e))
+
+    def createNewRawFolder(self):
+        try:
+            global RAWDATAPATH
+            global SUBDIRPATH
+
+            TSTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
+            self.createNewFolder(RAWDATAPATH)
+            SUBDIRPATH = os.path.join(RAWDATAPATH, TSTAMP)
+            self.createNewFolder(SUBDIRPATH)
+            camLogPath = os.path.join(SUBDIRPATH, 'camstats.log')
+
+            return camLogPath
+
+        except IOError as e:
+            print('PATH: Could not set path and folder: ' + str(e))
+
+    def setOwnerAndPermission(self, pathToFile):
+        try:
+            uid = pwd.getpwnam('pi').pw_uid
+            gid = grp.getgrnam('pi').gr_gid
+            os.chown(pathToFile, uid, gid)
+            os.chmod(pathToFile, 0o777)
+        except IOError as e:
+            print('PERM : Could not set permissions for file: ' + str(e))
+
     def disk_stat(self):
 
         try:
@@ -149,16 +187,38 @@ class Current_State(object):
     """Container class for exposure controller state.
     """
     def __init__(self, config, state_map={}):
+        # Current Shutter Speed
+        self.currentSS = state_map.get('currentSS', 0)
+        # Current Frame Rate
+        self.currentFR = state_map.get('currentFR', config.max_fr)
+        # Current Frame Rate
+        self.currentEXP = state_map.get('currentEXP', 0)
+        # Current WB Gains
+        self.currentWB_Gains = state_map.get('currentWB_Gains', 0)
+        # Current AWB Gains
+        self.currentAWB_Gains = state_map.get('currentAWB_Gains', 0)
         # List of average brightness of recent images.
         self.brData = state_map.get('brData', [])
         # List of shutter speeds of recent images.
         self.xData = state_map.get('xData', [])
         # Number of pictures taken
         self.shots_taken = state_map.get('shots_taken', 0)
-        # Current framerate
-        self.framerate = state_map.get('max_fr', config.max_fr)
         # White balance
         self.wb = state_map.get('wb', (Fraction(337, 256), Fraction(343, 256)))
+        # Duration to find new shutter time
+        self.found_ss_dur = state_map.get('found_ss_dur',0)
+        # Duration to take jpg image triplet
+        self.low_jpg_dur  = state_map.get('low_jpg_dur',0)
+        self.well_jpg_dur = state_map.get('well_jpg_dur', 0)
+        self.over_jpg_dur = state_map.get('over_jpg_dur', 0)
+        # Duration to take data image triplet
+        self.low_data_dur  = state_map.get('low_data_dur',0)
+        self.well_data_dur = state_map.get('well_data_dur', 0)
+        self.over_data_dur = state_map.get('over_data_dur', 0)
+        # Shutter time used to take image triplet
+        self.low_exp_ss = state_map.get('low_exp_ss', 0)
+        self.well_exp_ss = state_map.get('well_exp_ss', 0)
+        self.over_exp_ss = state_map.get('over_exp_ss', 0)
 
 class Camera_config(object):
   """Config Options:
@@ -183,9 +243,7 @@ class Camera_config(object):
     `brightwidth` : number of previous readings to store for choosing next
       shutter speed.
     `gamma` : determines size of steps to take when adjusting shutterspeed.
-    ``disable_led` : Whether to disable the LED.
   """
-
   def __init__(self, config_map={}):
       self.w = config_map.get('w', 2592)
       self.h = config_map.get('h', 1944)
@@ -232,7 +290,6 @@ class Camera_config(object):
       'min_fr': self.min_fr,
       'brightwidth': self.brightwidth,
       'gamma': self.gamma,
-      'disable_led': self.disable_led,
     }
 
 class Camera:
@@ -252,21 +309,20 @@ class Camera:
         self.camera = picam_instance
         self.camera.resolution = (config.w, config.h)
         self.camera.iso = config.iso
-
         # Shutter speed normalized between 0 and 1 as floating point number,
         # denoting position between the max and min shutterspeed.
 
         self.current_state = Current_State(config)
-        self.camera.framerate = self.current_state.framerate
+        self.camera.framerate = self.current_state.currentFR
 
         print('Finding initial SS....')
         # Give the camera's auto-exposure and auto-white-balance algorithms
         # some time to measure the scene and determine appropriate values
         time.sleep(2)
         # This capture discovers initial AWB and SS.
-        self.camera.capture('test_img.jpg')
+        self.camera.capture('ini_img.jpg')
         self.camera.shutter_speed = self.camera.exposure_speed
-        self.current_state.currentss = self.camera.exposure_speed
+        self.current_state.currentSS = self.camera.exposure_speed
         self.camera.exposure_mode = 'off'
         self.current_state.wb_gains = self.camera.awb_gains
         print('WB: ', self.current_state.wb_gains)
@@ -280,24 +336,28 @@ class Camera:
 
     def avgbrightness(self, im, config=None):
         """
-        Find the average brightness of the provided image according to the method
+        Find the average brightness of the provided image.
 
         Args:
-          im: A PIL image.
+          im: A opencv image.
           config: A timelapseConfig object.  Defaults to self.config.
         Returns:
           Average brightness of the image.
         """
         if config is None: config = self.config
         aa = im.copy()
-        if aa.size[0] > 128:
-            aa.thumbnail((128, 96), Image.ANTIALIAS)
-        aa = im.convert('L')  # Converts to greyscale
-        (h, w) = aa.size
-        pixels = (aa.size[0] * aa.size[1])
-        h = aa.histogram()
+        heigth, width, channels = aa.shape
+
+        if width > 128:
+            imRes = cv2.resize(aa, (128, 96), interpolation=cv2.INTER_AREA)
+            aa = cv2.cvtColor(imRes, cv2.COLOR_BGR2GRAY)
+        else:
+            aa = cv2.cvtColor(aa, cv2.COLOR_BGR2GRAY)
+
+        pixels = (aa.shape[0] * aa.shape[1])
+        h = cv2.calcHist([aa], [0], None, [256], [0, 256])
         mu0 = 1.0 * sum([i * h[i] for i in range(len(h))]) / pixels
-        return round(mu0, 2)
+        return round(mu0[0], 2)
 
     def dynamic_adjust(self, config=None, state=None):
         """
@@ -308,49 +368,25 @@ class Camera:
         if state is None: state = self.state
 
         delta = config.targetBrightness - state.brData[-1]
-        Adj = lambda v: v * (1.0 + 1.0 * delta * config.gamma
-                             / config.targetBrightness)
-        x = config.SSToFloat(state.currentss)
+
+        Adj = lambda v: v * (1.0 + 1.0 * delta * config.gamma/ config.targetBrightness)
+        x = config.SSToFloat(state.currentSS)
         x = Adj(x)
         if x < 0: x = 0
         if x > 1: x = 1
-        state.currentss = config.floatToSS(x)
+        state.currentSS = config.floatToSS(x)
+
         # Find an appropriate framerate.
         # For low shutter speeds, ths can considerably speed up the capture.
-        FR = Fraction(1000000, state.currentss)
+        FR = Fraction(1000000, state.currentSS)
         if FR > config.max_fr: FR = Fraction(config.max_fr)
         if FR < config.min_fr: FR = Fraction(config.min_fr)
-        state.framerate = FR
-
-    def capture(self, config=None, state=None):
-        """
-        Take a picture, returning a PIL image.
-        """
-        if config is None: config = self.config
-        if state is None: state = self.state
-
-        # Create the in-memory stream
-        stream = io.BytesIO()
-        self.camera.ISO = config.iso
-        self.camera.shutter_speed = state.currentss
-        self.camera.framerate = state.framerate
-        self.camera.resolution = (config.w, config.h)
-        x = config.SSToFloat(state.currentss)
-        capstart = time.time()
-        self.camera.capture(stream, format='jpeg')
-        capend = time.time()
-        print('Exp: %d\tFR: %f\t Capture Time: %f'
-              % (self.camera.exposure_speed,
-                 round(float(self.camera.framerate), 2),
-                 round(capend - capstart, 2)))
-        # "Rewind" the stream to the beginning so we can read its content
-        stream.seek(0)
-        image = Image.open(stream)
-        return image
+        state.currentFR = FR
 
     def findinitialparams(self, config=None, state=None):
+
         """
-        Take a number of small shots in succession to determine a shutterspeed
+        Take a number of small shots in succession to determine shutterspeed
         and ISO for taking photos of the desired brightness.
         """
         if config is None: config = self.config
@@ -359,8 +395,6 @@ class Camera:
 
         # Find init params with small pictures and high gamma, to work quickly.
         cfg = config.to_dict()
-        cfg['w'] = 128
-        cfg['h'] = 96
         cfg['gamma'] = 2.0
         init_config = Camera_config(cfg)
 
@@ -368,14 +402,13 @@ class Camera:
         state.xData = [0]
 
         while abs(config.targetBrightness - state.brData[-1]) > 4:
-            im = self.capture(init_config, state)
-            state.brData = [self.avgbrightness(im)]
-            state.xData = [self.config.SSToFloat(state.currentss)]
+            im = self.single_shoot(128, 96, None, init_config, state)
+            state.brData = [self.avgbrightness(im,None)]
+            state.xData = [self.config.SSToFloat(state.currentSS)]
 
             # Dynamically adjust ss and iso.
             self.dynamic_adjust(init_config, state)
-            print('ss: % 10d\tx: % 6.4f br: % 4d\t'
-                  % (state.currentss, round(state.xData[-1], 4), round(state.brData[-1], 4)))
+            print('Searching init. params{ ss: % 10d\tx: % 6.4f br: % 4d\t}' % (state.currentSS, round(state.xData[-1], 4), round(state.brData[-1], 4)))
             if state.xData[-1] >= 1.0:
                 if killtoken == True:
                     break
@@ -389,22 +422,30 @@ class Camera:
         return True
 
     def single_shoot(self, resize_width=None, resize_hight = None, shutter_speed=None, config=None, state=None):
-        # One stop is an exposure factor of 2 (2x or 1/2). Verdopplung oder halbieren
-        # One EV is a step of one stop compensation.
+        '''
+        Takes a single image as jpeg and returns it as opencv image.
+        :param resize_width:  new image width
+        :param resize_hight:  new image heigth
+        :param shutter_speed: overwrite shuter speed in config file
+        :param config: current camera settings
+        :param state:  current state
+        :return: image as opencv image
+        '''
+
+        start_timer = time.time()
 
         if config is None: config = self.config
-        if state is None: state = self.state
+        if state is None: state = self.current_state
 
-        # adjust picamera settings
+        # update camera parameters
         self.camera.ISO = config.iso
-        self.camera.framerate = state.framerate
+        self.camera.framerate = state.currentFR
         self.camera.resolution = (config.w, config.h)
 
         if shutter_speed is None:
-            self.camera.shutter_speed = state.currentss
+            self.camera.shutter_speed = state.currentSS
         else:
             self.camera.shutter_speed = shutter_speed
-
         stream = io.BytesIO()
 
         if (resize_width is not None and resize_hight is not None):
@@ -412,26 +453,92 @@ class Camera:
         else:
             self.camera.capture(stream, format='jpeg',bayer=False)
 
-        data = np.fromstring(stream.getvalue(), dtype=np.uint8)
-        image = cv2.imdecode(data, 1)
+        nparray = np.fromstring(stream.getvalue(), dtype=np.uint8)
+        image = cv2.imdecode(nparray, 1)
+        end_time = time.time()
+
+        # print to console
+        ss = self.camera.shutter_speed
+        exp = self.camera.exposure_speed
+        frmr = round(float(self.camera.framerate), 2)
+        durration = round(end_time - start_timer,2)
+        #print('Single shoot: Exp: %d\t SS: %10d\t Framerate: %f\t Duration Time: %f' % (exp,ss,frmr, durration))
 
         return image
 
-    def shoot_raw
+    def single_shoot_data(self, resize_width=None, resize_hight = None, shutter_speed=None, config=None, state=None):
+        '''
+        Takes a single image in raw and returns it as numpy array.
+        :param resize_width:  new image width
+        :param resize_hight:  new image heigth
+        :param shutter_speed: overwrite shuter speed in config file
+        :param config: current camera settings
+        :param state:  current state
+        :return: image as numpy array
+        '''
+        start_timer = time.time()
 
+        if config is None: config = self.config
+        if state is None: state = self.current_state
 
-    def adjust_SS(self, config=None, state=None):
+        # update camera parameters
+        self.camera.ISO = config.iso
+        self.camera.framerate = state.currentFR
+        self.camera.resolution = (config.w, config.h)
+
+        if shutter_speed is None:
+            self.camera.shutter_speed = state.currentSS
+        else:
+            self.camera.shutter_speed = shutter_speed
+        stream = io.BytesIO()
+
+        if (resize_width is not None and resize_hight is not None):
+            self.camera.capture(stream, format='jpeg',resize=(resize_width, resize_hight), bayer=True)
+        else:
+            self.camera.capture(stream, format='jpeg',bayer=True)
+
+        print("single shoot data: exp_mode: %s, awb_mode: %s", str(self.camera.exposure_mode), str(self.camera.awb_mode))
+
+        data = stream.getvalue()[-10270208:]
+        data = data[32768:4128 * 2480 + 32768]
+        data = np.fromstring(data, dtype=np.uint8)
+        data = data.reshape((2480, 4128))[:2464, :4120]
+        data = data.astype(np.uint16) << 2
+        for byte in range(4):
+            data[:, byte::5] |= ((data[:, 4::5] >> ((4 - byte) * 2)) & 0b11)
+
+        data = np.delete(data, np.s_[4::5], 1)
+        end_time = time.time()
+
+        # print to console
+        ss = self.camera.shutter_speed
+        exp = self.camera.exposure_speed
+        frmr = round(float(self.camera.framerate), 2)
+        durration = round(start_timer - end_time,2)
+        print('Single shoot data: Exp: %d\t SS: %10d\t Framerate: %f\t Duration Time: %f' % (exp,ss,frmr, durration))
+
+        return data
+
+    def adjust_ss(self, ss_adjust=True, config=None, state=None):
         try:
+            '''
+            By default ss_adjust = true.
+            Take and evaluate pictures as long ss is not adjusted
+            '''
+            if not ss_adjust: return
+            if config is None: config = self.config
+            if state is None: state = self.current_state
 
-            # adjust shutter time
+            found_ss = False
+            start_time = time.time()
 
-            im = self.capture(config, state)
+            im = self.single_shoot(128, 96, None, config, state)
 
             state.lastbr = self.avgbrightness(im)
             if len(state.brData) >= config.brightwidth:
                 state.brData = state.brData[1:]
                 state.xData = state.xData[1:]
-            state.xData.append(self.config.SSToFloat(state.currentss))
+            state.xData.append(self.config.SSToFloat(state.currentSS))
             state.brData.append(state.lastbr)
 
             # Dynamically adjust ss and iso.
@@ -444,16 +551,24 @@ class Camera:
                 # Too far from target brightness.
                 state.shots_taken -= 1
              #   os.remove(filename)
+            else:
+                found_ss = True
 
-            return img
+            end_time = time.time()
+            duration = round(start_time - end_time,2)
+            state.found_ss_dur = duration
+
+            return found_ss
 
         except Exception as e:
-            camera.close()
-            print('Error in takepicture: ' + str(e))
+            print('Error in adjust_ss: ' + str(e))
+            return found_ss
 
-    def takepicture(self):
+    def takepictures(self):
         try:
             global SUBDIRPATH
+            state = self.current_state
+            found_ss = self.adjust_ss(True,None,None)
 
             h = Helpers()
             camLogPath = h.createNewRawFolder()
@@ -461,79 +576,59 @@ class Camera:
             cameralog = s.getLogger(camLogPath)
             cameralog.info('Date and Time: {}'.format(datetime.now().strftime('%Y%m%d_%H%M%S')))
 
-            stream = io.BytesIO()
-            with picamera.PiCamera() as camera:
-                camera.resolution = (2592, 1944)
-                # shutter speed is limited by framerate!
-                camera.framerate = 1
-                camera.exposure_mode = 'off'
-                camera.awb_mode = 'auto'
-                camera.iso = 0
-                shutter_speed = 100
-                loopstart = time.time()
-                # for i0 in range(10):
-                for i0 in [0, 5, 9]:
-                    # set shutter speed
-                    loopstart_tot = time.time()
-                    camera.shutter_speed = (i0 + 1) * shutter_speed
-                    fileName = 'raw_img%s.jpg' % str(i0)
+            # One stop is an exposure factor of 2 (2x or 1/2). Verdopplung oder halbieren
+            # One EV is a step of one stop compensation.
 
-                    # Capture the image, without the Bayer data to file
-                    loopstartjpg = time.time()
-                    camera.capture(SUBDIRPATH + "/" + fileName, format='jpeg', bayer=False)
-                    loopendjpg = time.time()
+            if found_ss:
+                i0 = 1
+                loopstart_tot = time.time()
 
-                    # Capture the image, including the Bayer data to stream
-                    loopstartraw = time.time()
-                    camera.capture(stream, format='jpeg', bayer=True)
-                    loopendraw = time.time()
+                loopstartjpg = time.time()
+                ss = state.currentSS
+                # Capture jpg image, without Bayer data to file
+                img1 = self.single_shoot(None,None,ss,None,None)
+                fileName = 'raw_img%s.jpg' % str(i0)
+                cv2.imwrite(SUBDIRPATH + "/" + fileName, img1)
+                loopendjpg = time.time()
 
-                    data = stream.getvalue()[-10270208:]
-                    data = data[32768:4128 * 2480 + 32768]
-                    data = np.fromstring(data, dtype=np.uint8)
-                    data = data.reshape((2480, 4128))[:2464, :4120]
-                    data = data.astype(np.uint16) << 2
-                    for byte in range(4):
-                        data[:, byte::5] |= ((data[:, 4::5] >> ((4 - byte) * 2)) & 0b11)
+                # Capture raw image, including the Bayer data
+                loopstartraw = time.time()
+                dat1 = self.single_shoot_data(None,None,ss,None,None)
+                datafileName = 'data%s.data' % str(i0)
+                with open(SUBDIRPATH + "/" + datafileName, 'wb') as g:
+                    dat1.tofile(g)
+                loopendraw = time.time()
+                loopend_tot = time.time()
 
-                    data = np.delete(data, np.s_[4::5], 1)
+                # camera settings
+                cam_stats = dict(
+                    ss= self.camera.shutter_speed,
+                    iso=self.camera.ISO,
+                    exp=self.camera.exposure_speed,
+                    ag= self.camera.analog_gain,
+                    dg= self.camera.digital_gain,
+                    awb=self.camera.awb_gains,
+                    br= self.camera.brightness,
+                    ct= self.camera.contrast,
+                )
+                t_stats = dict(
+                    t_jpg='{0:.2f}'.format(loopendjpg - loopstartjpg),
+                    t_raw='{0:.2f}'.format(loopendraw - loopstartraw),
+                    t_tot='{0:.2f}'.format(loopend_tot - loopstart_tot),
+                )
 
-                    loopend_tot = time.time()
-                    # camera settings
-                    cam_stats = dict(
-                        ss=camera.shutter_speed,
-                        iso=camera.iso,
-                        exp=camera.exposure_speed,
-                        ag=camera.analog_gain,
-                        dg=camera.digital_gain,
-                        awb=camera.awb_gains,
-                        br=camera.brightness,
-                        ct=camera.contrast,
-                    )
-                    t_stats = dict(
-                        t_jpg='{0:.2f}'.format(loopendjpg - loopstartjpg),
-                        t_raw='{0:.2f}'.format(loopendraw - loopstartraw),
-                        t_tot='{0:.2f}'.format(loopend_tot - loopstart_tot),
-                    )
+                # Write camera settings to log file
+                logdata = '{} Run :'.format(str(i0))
+                logdata = logdata + ' [ss:{ss}, iso:{iso} exp:{exp}, ag:{ag}, dg:{dg}, awb:[{awb}], br:{br}, ct:{ct}]'.format(
+                    **cam_stats)
+                logdata = logdata + ' || timing: [t_jpg:{t_jpg}, t_raw:{t_raw}, t_tot:{t_tot}]'.format(**t_stats)
 
-                    # Write camera settings to log file
-                    logdata = '{} Run :'.format(str(i0))
-                    logdata = logdata + ' [ss:{ss}, iso:{iso} exp:{exp}, ag:{ag}, dg:{dg}, awb:[{awb}], br:{br}, ct:{ct}]'.format(
-                        **cam_stats)
-                    logdata = logdata + ' || timing: [t_jpg:{t_jpg}, t_raw:{t_raw}, t_tot:{t_tot}]'.format(**t_stats)
+                cameralog.info(logdata)
 
-                    cameralog.info(logdata)
-
-                    # Finally save raw (16bit data) having a size 3296 x 2464
-                    datafileName = 'data%d_%s.data' % (i0, str(''))
-
-                    with open(SUBDIRPATH + "/" + datafileName, 'wb') as g:
-                        data.tofile(g)
-
-                s.closeLogHandler()
+            s.closeLogHandler()
+            print('Taking picture: Exp: %d\t SS: %10d\t ISO: %f\t Duration Time: %f' % (self.camera.exposure_speed,self.camera.shutter_speed, self.camera.ISO, (loopend_tot - loopstart_tot)))
 
         except Exception as e:
-            camera.close()
             print('Error in takepicture: ' + str(e))
 
 
@@ -561,7 +656,8 @@ def main():
             raise RuntimeError('WARNING: Not enough free space on SD Card!')
             return
 
-        camera = Camera(cfg)
+        picam = picamera.PiCamera()
+        camera = Camera(picam,Camera_config(cfg))
 
         time_start = '9:00:00'  # Start time of time laps
         time_end   = '15:00:00'  # Stop time of time laps
@@ -572,14 +668,17 @@ def main():
         while (True):
             time_now = datetime.now().replace(microsecond=0)
 
+            camera.takepictures()
+            '''
             if t_start < time_now < t_end:
-                camera.takepicture()
+                camera.takepictures()
 
             elif t_end > time_now or t_start < time_now:
                 sys.exit()
-
+            '''
 
     except Exception as e:
+        picam.close()
         log.error(' MAIN: Error in main: ' + str(e))
 
 if __name__ == "__main__":
