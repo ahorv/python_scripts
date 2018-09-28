@@ -18,7 +18,7 @@ import logging.handlers
 from datetime import datetime, timedelta
 import numpy as np
 from fractions import Fraction
-from math import abs, ceil
+import math 
 import pwd
 import grp
 import stat
@@ -47,6 +47,7 @@ if sys.platform == "linux":
 # ----------------------------------------------------------------------
 #
 # 24.09.2018 : First implemented
+# 28.09.2018 : Bemerkung -> log-File mit Tag versehen ob camera 1 oder 2 !
 #
 ######################################################################
 
@@ -567,12 +568,12 @@ class Camera:
 
     def adjust_ev(self, ss, ev):
         # Falsch! ein +1ev entspricht einer verdopplung!
-        exp = 2 ** abs(ev)
+        exp = 2 ** math.abs(ev)
         new_ss = 0
 
         try:
             if ev < 0:
-                new_ss = ceil(ss **(float(1/exp)))
+                new_ss = math.ceil(ss **(float(1/exp)))
             else:
                 new_ss = ss ** exp
 
