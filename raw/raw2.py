@@ -51,7 +51,9 @@ if sys.platform == "linux":
 global SCRIPTPATH
 global RAWDATAPATH
 global SUBDIRPATH
+global CAMERA
 
+CAMERA = 'camera_1'
 SCRIPTPATH = os.path.join('/home', 'pi', 'python_scripts', 'raw')
 RAWDATAPATH = os.path.join(SCRIPTPATH, 'raw_data')
 
@@ -116,12 +118,13 @@ class Rawcamera:
         try:
 
             global SUBDIRPATH
+            global CAMERA
 
             h = Helpers()
             camLogPath = h.createNewRawFolder()
             s = Logger()
             cameralog = s.getLogger(camLogPath)
-            cameralog.info('Date and Time: {}'.format(datetime.now().strftime('%Y%m%d_%H%M%S')))
+            cameralog.info('{}: {}'.format(CAMERA, datetime.now().strftime('%Y%m%d_%H%M%S')))
 
             stream = io.BytesIO()
             with picamera.PiCamera() as camera:
@@ -315,7 +318,7 @@ def main():
         cam = Rawcamera()
 
         time_start = '9:00:00'  # Start time of time laps
-        time_end = '15:00:00'  # Stop time of time laps
+        time_end = '15:00:00'  # Stop  time of time laps
 
         t_start = helper.str2time(time_start)
         t_end = helper.str2time(time_end)
@@ -336,4 +339,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
