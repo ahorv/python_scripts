@@ -481,7 +481,7 @@ class Camera:
         elif config.camera_ID == 2:
             centre = [1090,1296]  # y,x [1100,1296]
             radius = 1080         # 1100
-            masked_img = self.maske_image(image,[w,h,c],centre,radius,True)
+            masked_img = self.maske_image(image,[w,h,c],centre,radius,False)
 
 
         #masked_img = self.whiten_maske(masked_img)
