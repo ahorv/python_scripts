@@ -258,9 +258,7 @@ def main():
 
         help.runSlideShow(allDirs)
 
-
-
-        print('Postprocess.py done')
+        print('analyze.py done')
 
     except Exception as e:
         print('MAIN: Error in main: ' + str(e))
