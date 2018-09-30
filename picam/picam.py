@@ -48,6 +48,7 @@ if sys.platform == "linux":
 #
 # 24.09.2018 : First implemented
 # 28.09.2018 : Bemerkung -> log-File mit Tag versehen ob camera 1 oder 2 !
+# 30.09.2018 : Added image mask
 #
 ######################################################################
 
@@ -69,7 +70,7 @@ class Logger:
             global SCRIPTPATH
 
             if newLogPath is None:
-                LOGFILEPATH = os.path.join(SCRIPTPATH, 'raw2.log')
+                LOGFILEPATH = os.path.join(SCRIPTPATH, 'picam_log.log')
                 logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
                 fileHandler = logging.FileHandler(LOGFILEPATH)
                 name = 'rootlogger'
@@ -247,6 +248,7 @@ class Camera_config(object):
     `gamma` : determines size of steps to take when adjusting shutterspeed.
   """
   def __init__(self, config_map={}):
+      self.camera_ID = config_map.get('camera_ID', 0)
       self.w = config_map.get('w', 2592)
       self.h = config_map.get('h', 1944)
       self.iso = config_map.get('iso', 100)
@@ -278,6 +280,7 @@ class Camera_config(object):
 
   def to_dict(self):
     return {
+      'camera_ID': self.camera_ID,
       'w': self.w,
       'h': self.h,
       'iso': self.iso,
@@ -385,6 +388,12 @@ class Camera:
         if FR < config.min_fr: FR = Fraction(config.min_fr)
         state.currentFR = FR
 
+    def whiten_maske(self,img):
+        # out = image[np.where((image == [0, 0, 0]).all(axis=2))] = [255, 255, 255]
+        img[np.where((img <= [50, 50, 50]).all(axis=2))] = [255, 255, 255]
+
+        return img
+
     def findinitialparams(self, config=None, state=None):
 
         """
@@ -459,14 +468,30 @@ class Camera:
         image = cv2.imdecode(nparray, 1)
         end_time = time.time()
 
-        # print to console
-        ss = self.camera.shutter_speed
-        exp = self.camera.exposure_speed
-        frmr = round(float(self.camera.framerate), 2)
-        durration = round(end_time - start_timer,2)
-        #print('Single shoot: Exp: %d\t SS: %10d\t Framerate: %f\t Duration Time: %f' % (exp,ss,frmr, durration))
+        w = image.shape[0]
+        h = image.shape[1]
+        c = image.shape[2]
 
-        return image
+        centre = []
+        radius = 0
+        if w == 96 and h == 128:
+            centre = [52,65]  # y,x
+            radius = 54
+            masked_img = self.maske_image(image, [w, h, c], centre, radius,False)
+        elif config.camera_ID == 2:
+            centre = [1090,1296]  # y,x [1100,1296]
+            radius = 1080         # 1100
+            masked_img = self.maske_image(image,[w,h,c],centre,radius,True)
+
+
+        #masked_img = self.whiten_maske(masked_img)
+
+        import matplotlib.pyplot as plt
+        plt.imshow(masked_img)
+        plt.draw()
+        plt.pause(0.2)
+
+        return masked_img
 
     def single_shoot_data(self, resize_width=None, resize_hight = None, shutter_speed=None, config=None, state=None):
         '''
@@ -583,17 +608,84 @@ class Camera:
             print("Error in adjust_ev")
             return ev
 
+    def cmask(self, index, radius, array):
+        """Generates the mask for a given input image.
+        The generated mask is needed to remove occlusions during post-processing steps.
+
+        Args:
+            index (numpy array): Array containing the x- and y- co-ordinate of the center of the circular mask.
+            radius (float): Radius of the circular mask.
+            array (numpy array): Input sky/cloud image for which the mask is generated.
+
+        Returns:
+            numpy array: Generated mask image."""
+
+        a, b = index
+        is_rgb = len(array.shape)
+
+        if is_rgb == 3:
+            ash = array.shape
+            nx = ash[0]
+            ny = ash[1]
+        else:
+            nx, ny = array.shape
+
+        s = (nx, ny)
+        image_mask = np.zeros(s)
+        y, x = np.ogrid[-a:nx - a, -b:ny - b]
+        mask = x * x + y * y <= radius * radius
+        image_mask[mask] = 1
+
+        return (image_mask)
+
+    def maske_image(self, input_image, size=[1944, 2592, 3], centre=[972, 1296], radius=1350, show_mask=False):  # 880,1190, r = 1450
+
+        empty_img = np.zeros(size, dtype=np.uint8)
+        mask = self.cmask(centre, radius, empty_img)
+
+        red = input_image[:, :, 0]
+        green = input_image[:, :, 1]
+        blue = input_image[:, :, 2]
+
+        if show_mask:
+            h = input_image.shape[0]
+            w = input_image.shape[1]
+
+            for y in range(0,h):
+                for x in range(0,w):
+                    if mask[y,x] == 0:
+                        red[y,x] = 225
+            r_img = red
+        else:
+            r_img = red.astype(float) * mask
+
+        #r_img = red.astype(float) * mask
+        g_img = green.astype(float) * mask
+        b_img = blue.astype(float) * mask
+
+        dimension = (input_image.shape[0], input_image.shape[1], 3)
+        output_img = np.zeros(dimension, dtype=np.uint8)
+
+        output_img[..., 0] = r_img[:, :]
+        output_img[..., 1] = g_img[:, :]
+        output_img[..., 2] = b_img[:, :]
+
+        return output_img
+
     def takepictures(self):
         try:
             global SUBDIRPATH
             state = self.current_state
-            found_ss = self.adjust_ss(True,None,None)
+            camera = self.config
+            found_ss = self.adjust_ss(True,None,None)  ## Ist hier das mask - Problem ?
+
+            camera_ID = camera.camera_ID
 
             h = Helpers()
             camLogPath = h.createNewRawFolder()
             s = Logger()
             cameralog = s.getLogger(camLogPath)
-            cameralog.info('Date and Time: {}'.format(datetime.now().strftime('%Y%m%d_%H%M%S')))
+            cameralog.info('camera ID:{} Date and Time: {}'.format(camera_ID,datetime.now().strftime('%Y%m%d_%H%M%S')))
 
             # One stop is an exposure factor of 2 (2x or 1/2). Verdopplung oder halbieren
             # One EV is a step of one stop compensation.
@@ -655,6 +747,7 @@ def main():
     try:
         # set camera parameter
         cfg = {
+            'camera_ID': 2,
             'w': 2592,
             'h': 1944,
             'interval': 15,
