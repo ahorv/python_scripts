@@ -576,7 +576,7 @@ class Camera:
 
     def adjust_ev(self, ss, ev):
         # Falsch! ein +1ev entspricht einer verdopplung!
-        exp = 2 ** math.abs(ev)
+        exp = 2 ** abs(ev)
         new_ss = 0
 
         try:
