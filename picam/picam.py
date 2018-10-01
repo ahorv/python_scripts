@@ -576,6 +576,7 @@ class Camera:
 
     def adjust_ev(self, ss, ev):
         # Falsch! ein +1ev entspricht einer verdopplung!
+        # max shutter time : https://picamera.readthedocs.io/en/release-1.13/fov.html  6.1.3.4
         exp = 2 ** abs(ev)
         new_ss = 0
 
