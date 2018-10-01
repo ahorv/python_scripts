@@ -320,7 +320,7 @@ class Camera:
         self.current_state = Current_State(config)
         self.camera.framerate = self.current_state.currentFR
 
-        print('Finding initial SS....')
+        print('Finding initial Shuter Time....')
         # Give the camera's auto-exposure and auto-white-balance algorithms
         # some time to measure the scene and determine appropriate values
         time.sleep(2)
@@ -419,7 +419,7 @@ class Camera:
 
             # Dynamically adjust ss and iso.
             self.dynamic_adjust(init_config, state)
-            print('Searching init. params{ ss: % 10d\tx: % 6.4f br: % 4d\t}' % (state.currentSS, round(state.xData[-1], 4), round(state.brData[-1], 4)))
+            print('Searching init. params { ss: % 4d\t x: % 6.4f br: % 4d\t}' % (state.currentSS, round(state.xData[-1], 1), round(state.brData[-1], 4)))
             if state.xData[-1] >= 1.0:
                 if killtoken == True:
                     break
@@ -483,13 +483,11 @@ class Camera:
             radius = 1080         # 1100
             masked_img = self.maske_image(image,[w,h,c],centre,radius,False)
 
-
-        #masked_img = self.whiten_maske(masked_img)
-
-        import matplotlib.pyplot as plt
+        '''   
         plt.imshow(masked_img)
         plt.draw()
         plt.pause(0.2)
+        '''
 
         return masked_img
 
@@ -524,8 +522,6 @@ class Camera:
         else:
             self.camera.capture(stream, format='jpeg',bayer=True)
 
-        print("single shoot data: exp_mode: %s, awb_mode: %s", str(self.camera.exposure_mode), str(self.camera.awb_mode))
-
         data = stream.getvalue()[-10270208:]
         data = data[32768:4128 * 2480 + 32768]
         data = np.fromstring(data, dtype=np.uint8)
@@ -536,21 +532,13 @@ class Camera:
 
         data = np.delete(data, np.s_[4::5], 1)
         end_time = time.time()
-
-        # print to console
-        ss = self.camera.shutter_speed
-        exp = self.camera.exposure_speed
-        frmr = round(float(self.camera.framerate), 2)
-        durration = round(start_timer - end_time,2)
-        print('Single shoot data: Exp: %d\t SS: %10d\t Framerate: %f\t Duration Time: %f' % (exp,ss,frmr, durration))
-
         return data
 
     def adjust_ss(self, ss_adjust=True, config=None, state=None):
         try:
             '''
             By default ss_adjust = true.
-            Take and evaluate pictures as long ss is not adjusted
+            Take and evaluate pictures as long shutter time is not adjusted
             '''
             if not ss_adjust: return
             if config is None: config = self.config
@@ -571,19 +559,14 @@ class Camera:
             # Dynamically adjust ss and iso.
             state.avgbr = sum(state.brData) / len(state.brData)
             self.dynamic_adjust(config, state)
-            state.shots_taken += 1
 
             delta = config.targetBrightness - state.lastbr
-            if abs(delta) > config.maxdelta:
-                # Too far from target brightness.
-                state.shots_taken -= 1
-             #   os.remove(filename)
-            else:
+            if abs(delta) < config.maxdelta:
                 found_ss = True
 
             end_time = time.time()
             duration = round(start_time - end_time,2)
-            state.found_ss_dur = duration
+            state.found_ss_dur = abs(duration)
 
             return found_ss
 
@@ -729,15 +712,17 @@ class Camera:
                 )
 
                 # Write camera settings to log file
-                logdata = '{} Run :'.format(str(i0))
-                logdata = logdata + ' [ss:{ss}, iso:{iso} exp:{exp}, ag:{ag}, dg:{dg}, awb:[{awb}], br:{br}, ct:{ct}]'.format(
+                self.current_state.shots_taken += 1
+                logdata = 'Run: {}\n'.format(str(self.current_state.shots_taken))
+                logdata = logdata + 'Adjusting shutter time in: {} seconds\n'.format(str(state.found_ss_dur))
+                logdata = logdata + '[ss:{ss}, iso:{iso} exp:{exp}, ag:{ag}, dg:{dg}, awb:[{awb}], br:{br}, ct:{ct}]'.format(
                     **cam_stats)
                 logdata = logdata + ' || timing: [t_jpg:{t_jpg}, t_raw:{t_raw}, t_tot:{t_tot}]'.format(**t_stats)
 
                 cameralog.info(logdata)
 
             s.closeLogHandler()
-            print('Taking picture: Exp: %d\t SS: %10d\t ISO: %f\t Duration Time: %f' % (self.camera.exposure_speed,self.camera.shutter_speed, self.camera.ISO, (loopend_tot - loopstart_tot)))
+            #print('Taking picture: Exp: %d\t SS: %10d\t ISO: %f\t Duration Time: %f' % (self.camera.exposure_speed,self.camera.shutter_speed, self.camera.ISO, (loopend_tot - loopstart_tot)))
 
         except Exception as e:
             print('Error in takepicture: ' + str(e))
