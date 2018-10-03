@@ -457,8 +457,6 @@ class Camera:
             self.camera.shutter_speed = shutter_speed
         stream = io.BytesIO()
 
-        print('jpg single_shoot ss: {}'.format( self.camera.shutter_speed ))
-
         if (resize_width is not None and resize_hight is not None):
             self.camera.capture(stream, format='jpeg',resize=(resize_width, resize_hight), bayer=False)
         else:
@@ -509,8 +507,6 @@ class Camera:
         else:
             self.camera.shutter_speed = shutter_speed
         stream = io.BytesIO()
-
-        print('dat single_shoot ss: {}'.format(self.camera.shutter_speed))
 
         if (resize_width is not None and resize_hight is not None):
             self.camera.capture(stream, format='jpeg',resize=(resize_width, resize_hight), bayer=True)
@@ -663,8 +659,8 @@ class Camera:
             camLogPath = h.createNewRawFolder()
             s = Logger()
             cameralog = s.getLogger(camLogPath)
-            #cameralog.info('camera ID:{} Date and Time: {}'.format(camera_ID,datetime.now().strftime('%Y%m%d_%H%M%S')))
-            #cameralog.info('Adjusting shutter time in: {} seconds.'.format(state.found_ss_dur))
+            cameralog.info('camera ID:{} Date and Time: {}'.format(camera_ID,datetime.now().strftime('%Y%m%d_%H%M%S')))
+            cameralog.info('Adjusting shutter time in: {} seconds.'.format(state.found_ss_dur))
 
             # one pos F-stop doubles and one neg F-stop halfs the brightnes resp darknes of the image
 
@@ -676,8 +672,6 @@ class Camera:
 
                 for i0 in f_stops:
                     ss_fstop = self.F_Stop2SS(ss,i0)
-
-                    print('i: {}, ss: {}, fstopss: {}'.format(i0, ss,ss_fstop))
 
                     loopstartjpg = time.time()
 
@@ -724,11 +718,7 @@ class Camera:
                     logdata = values.format(**cam_stats)
                     logdata = logdata + timing.format(**t_stats)
 
-                    #cameralog.info(logdata)
-
-                    # reset shutter speed to value before loop
-                    #state.currentSS = ss
-                    print('-----------------------------------------------------------')
+                    cameralog.info(logdata)
 
             s.closeLogHandler()
             #print('Taking picture: Exp: %d\t SS: %10d\t ISO: %f\t Duration Time: %f' % (self.camera.exposure_speed,self.camera.shutter_speed, self.camera.ISO, (loopend_tot - loopstart_tot)))
