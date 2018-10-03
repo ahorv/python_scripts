@@ -49,6 +49,7 @@ if sys.platform == "linux":
 # 24.09.2018 : First implemented
 # 28.09.2018 : Bemerkung -> log-File mit Tag versehen ob camera 1 oder 2 !
 # 30.09.2018 : Added image mask
+# 03.09.2018 : Using a mask für histogram
 #
 ######################################################################
 
@@ -345,22 +346,21 @@ class Camera:
 
         Args:
           im: A opencv image.
-          config: A timelapseConfig object.  Defaults to self.config.
+          config: Camera_config object.  Defaults to self.config.
         Returns:
           Average brightness of the image.
         """
         if config is None: config = self.config
         aa = im.copy()
-        heigth, width, channels = aa.shape
-
-        if width > 128:
-            imRes = cv2.resize(aa, (128, 96), interpolation=cv2.INTER_AREA)
-            aa = cv2.cvtColor(imRes, cv2.COLOR_BGR2GRAY)
-        else:
-            aa = cv2.cvtColor(aa, cv2.COLOR_BGR2GRAY)
+        imRes = cv2.resize(aa, (128, 96), interpolation=cv2.INTER_AREA)
+        mask = imRes.copy()
+        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        mask[np.where((mask != [0]).all(axis=1))] = [255]
+        mask = mask.astype(np.uint8)
+        aa = cv2.cvtColor(imRes, cv2.COLOR_BGR2GRAY)
 
         pixels = (aa.shape[0] * aa.shape[1])
-        h = cv2.calcHist([aa], [0], None, [256], [0, 256])
+        h = cv2.calcHist([aa], [0], mask, [256], [0, 256])
         mu0 = 1.0 * sum([i * h[i] for i in range(len(h))]) / pixels
         return round(mu0[0], 2)
 
@@ -443,8 +443,6 @@ class Camera:
         :return: image as opencv image
         '''
 
-        start_timer = time.time()
-
         if config is None: config = self.config
         if state is None: state = self.current_state
 
@@ -459,6 +457,8 @@ class Camera:
             self.camera.shutter_speed = shutter_speed
         stream = io.BytesIO()
 
+        print('jpg single_shoot ss: {}'.format( self.camera.shutter_speed ))
+
         if (resize_width is not None and resize_hight is not None):
             self.camera.capture(stream, format='jpeg',resize=(resize_width, resize_hight), bayer=False)
         else:
@@ -466,7 +466,6 @@ class Camera:
 
         nparray = np.fromstring(stream.getvalue(), dtype=np.uint8)
         image = cv2.imdecode(nparray, 1)
-        end_time = time.time()
 
         w = image.shape[0]
         h = image.shape[1]
@@ -482,12 +481,6 @@ class Camera:
             centre = [1090,1296]  # y,x [1100,1296]
             radius = 1080         # 1100
             masked_img = self.maske_image(image,[w,h,c],centre,radius,False)
-
-        '''   
-        plt.imshow(masked_img)
-        plt.draw()
-        plt.pause(0.2)
-        '''
 
         return masked_img
 
@@ -516,6 +509,8 @@ class Camera:
         else:
             self.camera.shutter_speed = shutter_speed
         stream = io.BytesIO()
+
+        print('dat single_shoot ss: {}'.format(self.camera.shutter_speed))
 
         if (resize_width is not None and resize_hight is not None):
             self.camera.capture(stream, format='jpeg',resize=(resize_width, resize_hight), bayer=True)
@@ -574,23 +569,22 @@ class Camera:
             print('Error in adjust_ss: ' + str(e))
             return found_ss
 
-    def adjust_ev(self, ss, ev):
-        # Falsch! ein +1ev entspricht einer verdopplung!
-        # max shutter time : https://picamera.readthedocs.io/en/release-1.13/fov.html  6.1.3.4
-        exp = 2 ** abs(ev)
+    def F_Stop2SS(self, ss, fstop):
+        fac = 2 ** abs(fstop)
         new_ss = 0
 
         try:
-            if ev < 0:
-                new_ss = math.ceil(ss **(float(1/exp)))
+            if fstop < 0:
+                fac = float(1 / fac)
+                new_ss = math.ceil(ss * fac)
             else:
-                new_ss = ss ** exp
+                new_ss = ss * fac
 
             return new_ss
 
         except Exception as e:
-            print("Error in adjust_ev")
-            return ev
+            print("Error in F_Stop2SS")
+            return new_ss
 
     def cmask(self, index, radius, array):
         """Generates the mask for a given input image.
@@ -661,7 +655,7 @@ class Camera:
             global SUBDIRPATH
             state = self.current_state
             camera = self.config
-            found_ss = self.adjust_ss(True,None,None)  ## Ist hier das mask - Problem ?
+            found_ss = self.adjust_ss(True,None,None)
 
             camera_ID = camera.camera_ID
 
@@ -669,58 +663,72 @@ class Camera:
             camLogPath = h.createNewRawFolder()
             s = Logger()
             cameralog = s.getLogger(camLogPath)
-            cameralog.info('camera ID:{} Date and Time: {}'.format(camera_ID,datetime.now().strftime('%Y%m%d_%H%M%S')))
+            #cameralog.info('camera ID:{} Date and Time: {}'.format(camera_ID,datetime.now().strftime('%Y%m%d_%H%M%S')))
+            #cameralog.info('Adjusting shutter time in: {} seconds.'.format(state.found_ss_dur))
 
-            # One stop is an exposure factor of 2 (2x or 1/2). Verdopplung oder halbieren
-            # One EV is a step of one stop compensation.
+            # one pos F-stop doubles and one neg F-stop halfs the brightnes resp darknes of the image
 
             if found_ss:
-                i0 = 1
+                ss = state.currentSS
+                f_stops = [0,-2,-4]
+
                 loopstart_tot = time.time()
 
-                loopstartjpg = time.time()
-                ss = state.currentSS
-                # Capture jpg image, without Bayer data to file
-                img1 = self.single_shoot(None,None,ss,None,None)
-                fileName = 'raw_img%s.jpg' % str(i0)
-                cv2.imwrite(SUBDIRPATH + "/" + fileName, img1)
-                loopendjpg = time.time()
+                for i0 in f_stops:
+                    ss_fstop = self.F_Stop2SS(ss,i0)
 
-                # Capture raw image, including the Bayer data
-                loopstartraw = time.time()
-                dat1 = self.single_shoot_data(None,None,ss,None,None)
-                datafileName = 'data%s.data' % str(i0)
-                with open(SUBDIRPATH + "/" + datafileName, 'wb') as g:
-                    dat1.tofile(g)
-                loopendraw = time.time()
-                loopend_tot = time.time()
+                    print('i: {}, ss: {}, fstopss: {}'.format(i0, ss,ss_fstop))
 
-                # camera settings
-                cam_stats = dict(
-                    ss= self.camera.shutter_speed,
-                    iso=self.camera.ISO,
-                    exp=self.camera.exposure_speed,
-                    ag= self.camera.analog_gain,
-                    dg= self.camera.digital_gain,
-                    awb=self.camera.awb_gains,
-                    br= self.camera.brightness,
-                    ct= self.camera.contrast,
-                )
-                t_stats = dict(
-                    t_jpg='{0:.2f}'.format(loopendjpg - loopstartjpg),
-                    t_raw='{0:.2f}'.format(loopendraw - loopstartraw),
-                    t_tot='{0:.2f}'.format(loopend_tot - loopstart_tot),
-                )
+                    loopstartjpg = time.time()
 
-                # Write camera settings to log file
-                self.current_state.shots_taken += 1
-                logdata = 'Run: {}\n'.format(str(self.current_state.shots_taken))
-                logdata = logdata + 'Adjusting shutter time in: {} seconds\n'.format(str(state.found_ss_dur))
-                logdata = logdata + '[ss:{ss}, iso:{iso} exp:{exp}, ag:{ag}, dg:{dg}, awb:[{awb}], br:{br}, ct:{ct}]'.format(
-                    **cam_stats)
-                logdata = logdata + ' || timing: [t_jpg:{t_jpg}, t_raw:{t_raw}, t_tot:{t_tot}]'.format(**t_stats)
+                    # Capture jpg image, without Bayer data to file
+                    img1 = self.single_shoot(None,None,ss_fstop,None,None)
+                    fileName = 'raw_img%s.jpg' % str(i0)
+                    cv2.imwrite(SUBDIRPATH + "/" + fileName, img1)
+                    loopendjpg = time.time()
 
-                cameralog.info(logdata)
+                    # Capture raw image, including the Bayer data
+                    loopstartraw = time.time()
+                    dat1 = self.single_shoot_data(None,None,ss_fstop,None,None)
+                    datafileName = 'data%s.data' % str(i0)
+                    with open(SUBDIRPATH + "/" + datafileName, 'wb') as g:
+                        dat1.tofile(g)
+
+                    loopendraw = time.time()
+                    loopend_tot = time.time()
+
+                    self.current_state.shots_taken += 1
+                    # camera settings
+                    cam_stats = dict(
+                        ic= self.current_state.shots_taken,
+                        fS= i0,
+                        ss= self.camera.shutter_speed,
+                        iso=self.camera.ISO,
+                        exp=self.camera.exposure_speed,
+                        ag= self.camera.analog_gain,
+                        dg= self.camera.digital_gain,
+                        awb=self.camera.awb_gains,
+                        br= self.camera.brightness,
+                        ct= self.camera.contrast,
+                    )
+                    t_stats = dict(
+                        t_jpg='{0:.2f}'.format(loopendjpg - loopstartjpg),
+                        t_raw='{0:.2f}'.format(loopendraw - loopstartraw),
+                        t_tot='{0:.2f}'.format(loopend_tot - loopstart_tot),
+                    )
+
+                    # Write camera settings to log file
+                    values = '[img count:{ic}, F Stop:{fS}, ss:{ss}, iso:{iso} exp:{exp}, ag:{ag}, dg:{dg}, awb:[{awb}], br:{br}, ct:{ct}]'
+                    timing = ' || timing: [t_jpg:{t_jpg}, t_raw:{t_raw}, t_tot:{t_tot}]'
+
+                    logdata = values.format(**cam_stats)
+                    logdata = logdata + timing.format(**t_stats)
+
+                    #cameralog.info(logdata)
+
+                    # reset shutter speed to value before loop
+                    #state.currentSS = ss
+                    print('-----------------------------------------------------------')
 
             s.closeLogHandler()
             #print('Taking picture: Exp: %d\t SS: %10d\t ISO: %f\t Duration Time: %f' % (self.camera.exposure_speed,self.camera.shutter_speed, self.camera.ISO, (loopend_tot - loopstart_tot)))
