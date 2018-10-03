@@ -203,6 +203,8 @@ class Current_State(object):
         self.currentAWB_Gains = state_map.get('currentAWB_Gains', 0)
         # List of average brightness of recent images.
         self.brData = state_map.get('brData', [])
+        # Image time and date
+        self.timeAndDate = state_map.get('dateAndTime','?')
         # List of shutter speeds of recent images.
         self.xData = state_map.get('xData', [])
         # Number of pictures taken
@@ -432,6 +434,23 @@ class Camera:
                     killtoken = True
         return True
 
+    def writh_EXIF(self, config=None, state=None):
+        try:
+            if config is None: config = self.config
+            if state is None: state = self.current_state
+
+            self.camera.exif_tags['IFD0.Artist'] = 'HorvathA'
+            self.camera.exif_tags['IFD0.Copyright'] = 'Copyright (c) 2018 HorvathA'
+            self.camera.exif_tags['IFD0.ImageDescription'] = 'Sky Camera ID: {}'.format(self.config.camera_ID)
+
+            #self.camera.exif_tags['EXIF.BrightnessValue']   = self.camera.brightness
+            #self.camera.exif_tags['EXIF.DateTimeOriginal']  = self.current_state.timeAndDate
+            #self.camera.exif_tags['EXIF.ExposureTime']      = self.camera.exposure_speed
+            #self.camera.exif_tags['EXIF.ISOSpeedRatings']   = self.camera.ISO
+            #self.camera.exif_tags['EXIF.ShutterSpeedValue'] = self.camera.shutter_speed
+        except Exception as e:
+            print('Error in writh_EXIF: ' + str(e))
+
     def single_shoot(self, resize_width=None, resize_hight = None, shutter_speed=None, config=None, state=None):
         '''
         Takes a single image as jpeg and returns it as opencv image.
@@ -459,8 +478,10 @@ class Camera:
 
         if (resize_width is not None and resize_hight is not None):
             self.camera.capture(stream, format='jpeg',resize=(resize_width, resize_hight), bayer=False)
+            self.writh_EXIF(config, state)
         else:
             self.camera.capture(stream, format='jpeg',bayer=False)
+            self.writh_EXIF(config, state)
 
         nparray = np.fromstring(stream.getvalue(), dtype=np.uint8)
         image = cv2.imdecode(nparray, 1)
@@ -658,10 +679,11 @@ class Camera:
             h = Helpers()
             camLogPath = h.createNewRawFolder()
             s = Logger()
+            dateAndTime = datetime.now().strftime('%Y%m%d_%H%M%S')
             cameralog = s.getLogger(camLogPath)
-            cameralog.info('camera ID:{} Date and Time: {}'.format(camera_ID,datetime.now().strftime('%Y%m%d_%H%M%S')))
+            cameralog.info('camera ID:{} Date and Time: {}'.format(camera_ID,dateAndTime))
             cameralog.info('Adjusting shutter time in: {} seconds.'.format(state.found_ss_dur))
-
+            self.current_state.timeAndDate = dateAndTime
             # one pos F-stop doubles and one neg F-stop halfs the brightnes resp darknes of the image
 
             if found_ss:
@@ -740,7 +762,6 @@ def main():
             'targetBrightness': 128,
             'maxdelta': 100,
             'iso': 100,
-            # Add more configuration options here, if desired.
         }
 
         helper = Helpers()
