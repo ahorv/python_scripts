@@ -31,6 +31,7 @@ print('Version opencv: ' + cv2.__version__)
 # ----------------------------------------------------------------------
 #
 # 29.09.2018 : first implemented
+# 03.10.2018 : using a mask for histogram
 #
 ######################################################################
 global Path_to_raw
@@ -40,7 +41,8 @@ global mask_images
 global listOfAvgBrightness
 
 Avoid_This_Directories = ['imgs5','hdr','rest']
-Path_to_raw = r'I:\SkyCam\picam_data'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
+#Path_to_raw = r'I:\SkyCam\picam_data'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
+Path_to_raw = r'G:\Thesis_ausgelagerte_Dateien\test'  # test' picam_pictures
 Path_to_copy_img5s = os.path.join(Path_to_raw, 'imgs5')
 
 mask_images = False
@@ -99,6 +101,35 @@ class Helpers:
 
         return output_img
 
+    def find_centre(self,image,mask):
+        # find biggest cont
+        contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        # find largest contour in mask, use to compute minEnCircle
+        c = max(contours, key=cv2.contourArea)
+        cv2.drawContours(image, c, -1, (255, 255, 255), 3)
+
+        # get center of detected circle
+        moments = cv2.moments(c)
+        cx = int(moments['m10'] / moments['m00'])
+        cy = int(moments['m01'] / moments['m00'])
+
+        return [cx,cy]
+
+    def draw_radius(selfself,image,mask, cx=0,cy=0):
+
+        localIndex = 0
+        ##move from the center until we hit white
+
+        while (mask[cx, cy + localIndex] == 0):
+            cv2.line(img=image, pt1=(cx, cy), pt2=(cx, cy + localIndex), color=(0, 255, 255),thickness=3)
+            localIndex = localIndex + 1
+            print(mask[cx, cy + localIndex])
+
+        cv2.imshow("linedImage", image)
+        cv2.waitKey(0)
+
+        return image
+
     def getDirectories(self,pathToDirectories):
         try:
             global Avoid_This_Directories
@@ -141,6 +172,7 @@ class Helpers:
 
                 new_img = cv2.resize(img_rgb, None, fx=0.25, fy=0.25)
                 list_images.append(new_img)
+
                 cnt += 1
 
             t_end = time.time()
@@ -167,7 +199,6 @@ class Helpers:
             plt.xlim([0, 256])
 
         return ax2,text
-
 
     def runSlideShow(self, allDirs, run = True):
         if run:
@@ -199,7 +230,7 @@ class Helpers:
                 ax2,text = self.plotHystogram(next_img,fig_outer,avgb)
 
                 plt.draw()
-                plt.pause(0.5)
+                plt.pause(1.5)
                 text.remove()
                 counter += 1
                 ax2.clear()
@@ -219,12 +250,21 @@ class Helpers:
 
         if width > 128:
             imRes = cv2.resize(aa, (128, 96), interpolation=cv2.INTER_AREA)
+            mask = imRes.copy()
+            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+            mask[np.where((mask != [0]).all(axis=1))] = [255]
+            mask = mask.astype(np.uint8)
             aa = cv2.cvtColor(imRes, cv2.COLOR_BGR2GRAY)
         else:
+            mask = aa.copy()
+            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+            mask[np.where((mask != [0]).all(axis=1))] = [255]
+            mask = mask.astype(np.uint8)
             aa = cv2.cvtColor(aa, cv2.COLOR_BGR2GRAY)
 
+
         pixels = (aa.shape[0] * aa.shape[1])
-        h = cv2.calcHist([aa], [0], None, [256], [0, 256])
+        h = cv2.calcHist([aa], [0], mask, [256], [0, 256])
         mu0 = 1.0 * sum([i * h[i] for i in range(len(h))]) / pixels
         return round(mu0[0], 2)
 
@@ -255,10 +295,9 @@ def main():
         allDirs = help.getDirectories(Path_to_raw)
         listOfImages = help.readAllImages(allDirs)
         listOfAvgBrightness = help.calcAllAvgBrightness(listOfImages)
-
         help.runSlideShow(allDirs)
 
-        print('analyze.py done')
+        print('Postprocess.py done')
 
     except Exception as e:
         print('MAIN: Error in main: ' + str(e))
