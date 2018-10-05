@@ -36,14 +36,15 @@ print('Version opencv: ' + cv2.__version__)
 ######################################################################
 global Path_to_raw
 global Avoid_This_Directories
-global Path_to_copy_img5s
+global Path_to_copy_imgs
 global mask_images
 global listOfAvgBrightness
 
-Avoid_This_Directories = ['imgs5','hdr','rest']
+Avoid_This_Directories = ['imgs5','hdr']
 #Path_to_raw = r'I:\SkyCam\picam_data'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
-Path_to_raw = r'G:\Thesis_ausgelagerte_Dateien\test'  # test' picam_pictures
-Path_to_copy_img5s = os.path.join(Path_to_raw, 'imgs5')
+# Path_to_raw = r'G:\Thesis_ausgelagerte_Dateien\test'  # test' picam_pictures
+Path_to_raw = r'C:\Users\ati\Desktop\camera_1'
+Path_to_copy_imgs = os.path.join(Path_to_raw, 'wellExp')
 
 mask_images = False
 
@@ -150,6 +151,22 @@ class Helpers:
         except Exception as e:
             print('getDirectories: Error: ' + str(e))
 
+    def loadImages(self, mypath):
+        try:
+            onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
+            image_stack = np.empty(len(onlyfiles), dtype=object)
+            pos = 0
+            for n in range(0, len(onlyfiles)):
+                image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
+                pos += 1
+
+            print('Found {} images'.format(str(pos)))
+
+            return image_stack
+
+        except Exception as e:
+            print('Error in loadImages: ' + str(e))
+
     def readAllImages(self,allDirs):
         try:
             global Path_to_raw
@@ -200,7 +217,7 @@ class Helpers:
 
         return ax2,text
 
-    def runSlideShow(self, allDirs, run = True):
+    def runSlideShow(self, image_list = None, run = True):
         if run:
 
             font_outer = {'family': 'serif',
@@ -216,13 +233,16 @@ class Helpers:
             ax_outer.set_xlabel('[pixel]')
             ax_outer.set_ylabel('[pixel]')
 
-            list_images = self.readAllImages(allDirs)
-            cur_window = ax_outer.imshow(list_images[0])
+            if not image_list:
+                print('Error in runSlideShow: Image list is empty !')
+                return
 
 
-            while counter < len(list_images):
+            cur_window = ax_outer.imshow(image_list[0])
 
-                next_img = list_images[counter]
+            while counter < len(image_list):
+
+                next_img = image_list[counter]
                 avgb = listOfAvgBrightness[counter]
                 ax_outer.set_title('Image: {}'.format(counter))
                 #text = ax_outer.text(-10, -20, r'avgbrg: '+str(avgb), fontsize=12,color='black')
@@ -286,16 +306,23 @@ def main():
     try:
         global Path_to_raw
         global listOfAvgBrightness
+        preprocess = False  # Collect images from subdirectories
 
         if not os.path.isdir(Path_to_raw):
             print('\nError: Image directory does not exist! -> Aborting.')
             return;
 
         help = Helpers()
-        allDirs = help.getDirectories(Path_to_raw)
-        listOfImages = help.readAllImages(allDirs)
+
+        if preprocess:
+            allDirs = help.getDirectories(Path_to_raw)
+            listOfImages = help.readAllImages(allDirs)
+        else:
+            # All images are allready in one folder
+            listOfImages = help.loadImages(join(Path_to_raw,'wellExp'))
+
         listOfAvgBrightness = help.calcAllAvgBrightness(listOfImages)
-        help.runSlideShow(allDirs)
+        help.runSlideShow(listOfImages)
 
         print('Postprocess.py done')
 
