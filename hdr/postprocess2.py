@@ -48,7 +48,7 @@ global CAM
 global LogFileName
 global SELECTION
 global NameWellExpImg
-Path_to_raw = r'C:\Users\tahorvat\Desktop\camera_1'
+Path_to_raw = r'C:\Users\ati\Desktop\camera_1'
 #Path_to_raw = r'G:\SkyCam\camera_1\20180429_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 Path_to_copy_wellExp = os.path.join(Path_to_raw, 'wellExp')
 Path_to_copy_HDR = os.path.join(Path_to_raw,'hdr')
@@ -232,20 +232,23 @@ class HDR:
             '''
             returns shutter_time in microseconds as np.float32 type
             '''
-            listOfSS = []
+            listOfSS = np.empty(3, dtype=np.float32)
 
             f = open(join(file_path, file_name), 'r')
             logfile = f.readlines()
-            print(logfile.pop(0)) # remove non relevant lines
-            print(logfile.pop(0)) # remove non relevant lines
+            logfile.pop(0) # remove non relevant lines
+            logfile.pop(0) # remove non relevant lines
 
+            pos = 0
             for line in logfile:
                 value = line.split("ss:", 1)[1]
                 value = value.split(',', 1)[0]
                 value = value.strip()
+                print('new ss: {}'.format(value))
                 value += '/1000000'
                 val_float = np.float32(Fraction(str(value)))
-                listOfSS.append(val_float)
+                listOfSS[pos] = val_float
+                pos +=1
 
             return listOfSS
 
@@ -307,7 +310,7 @@ class HDR:
         try:
             onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
             image_stack = np.empty(len(piclist), dtype=object)       # Achtung len = onlyfiles für alle bilder
-            #HIER ist der FEHLER  expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
+            #expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
             expos_stack = self.getShutterTimes(mypath)
 
             for n in range(0, len(onlyfiles)):
