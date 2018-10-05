@@ -31,7 +31,7 @@ print('Version opencv: ' + cv2.__version__)
 #
 # Remarks:
 # - images taken by picam are already masked
-# - je nach cam1/2 den Mittelpkt der maske setzen -> var cam = cam1 oder cam2
+# - Shuterspeed in microseconds (picamera)
 #
 # New /Changes:
 # -----------------------------------------------------------------------------
@@ -225,10 +225,23 @@ class Helpers:
 
 class HDR:
     def getShutterTimes(self, file_path, file_name = logFileName):
-        f = open('file_name.ext', 'r')
-        x = f.readlines()
+        try:
+            listOfSS = []
 
-        return None
+            f = open(join(file_path, file_name), 'r')
+            logfile = f.readlines()
+            print(logfile.pop(0)) # remove non relevant lines
+            print(logfile.pop(0)) # remove non relevant lines
+
+            for line in logfile:
+                value = line.split("ss:", 1)[1]
+                value = value.split(',', 1)[0]
+                listOfSS.append(value.strip())
+
+            return listOfSS
+
+        except Exception as e:
+            print('Error in getShutterTimes: ' + str(e))
 
     def getEXIF_TAG(self, file_path, field):
         try:
@@ -295,7 +308,7 @@ class HDR:
     def readImagesAndExpos(self, mypath, piclist=[0,5,9]):
         postproc = IMGPROC()
         try:
-            logfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.log')]
+            self.getShutterTimes(mypath)
             onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
             image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
             expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
@@ -312,7 +325,7 @@ class HDR:
             return image_stack, expos_stack
 
         except Exception as e:
-            print('readImagesAndExpos: Could not read images ' + str(e))
+            print('Error in readImagesAndExpos: ' + str(e))
 
     def composeOneHDRimgJpg(self, oneDirsPath, piclist = [0, 5, 9]):
         try:
@@ -530,7 +543,7 @@ class IMGPROC(object):
 def main():
     try:
         global Path_to_raw
-        unzipall          = True
+        unzipall          = False
         delallzip         = False
         runslideshow      = False
         copyAndTag        = True
