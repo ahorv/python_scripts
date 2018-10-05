@@ -233,7 +233,7 @@ class Helpers:
             ax_outer.set_xlabel('[pixel]')
             ax_outer.set_ylabel('[pixel]')
 
-            if not image_list:
+            if len(image_list) == 0:
                 print('Error in runSlideShow: Image list is empty !')
                 return
 
@@ -250,7 +250,7 @@ class Helpers:
                 ax2,text = self.plotHystogram(next_img,fig_outer,avgb)
 
                 plt.draw()
-                plt.pause(1.5)
+                plt.pause(0.7)
                 text.remove()
                 counter += 1
                 ax2.clear()
