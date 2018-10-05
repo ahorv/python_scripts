@@ -211,7 +211,7 @@ class Helpers:
 
         color = ('b', 'g', 'r')
         for i, col in enumerate(color):
-            histr = cv2.calcHist([img], [i], None, [256], [0, 256])
+            histr = cv2.calcHist([img], [i], None, [256], [1, 255])
             plt.plot(histr, color=col)
             plt.xlim([0, 256])
 
