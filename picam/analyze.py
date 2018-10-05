@@ -237,7 +237,6 @@ class Helpers:
                 print('Error in runSlideShow: Image list is empty !')
                 return
 
-
             cur_window = ax_outer.imshow(image_list[0])
 
             while counter < len(image_list):
@@ -281,7 +280,6 @@ class Helpers:
             mask[np.where((mask != [0]).all(axis=1))] = [255]
             mask = mask.astype(np.uint8)
             aa = cv2.cvtColor(aa, cv2.COLOR_BGR2GRAY)
-
 
         pixels = (aa.shape[0] * aa.shape[1])
         h = cv2.calcHist([aa], [0], mask, [256], [0, 256])
