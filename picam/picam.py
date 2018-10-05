@@ -18,6 +18,7 @@ import logging.handlers
 from datetime import datetime, timedelta
 import numpy as np
 from fractions import Fraction
+
 import math 
 import pwd
 import grp
@@ -31,7 +32,7 @@ if sys.platform == "linux":
 
 
 ######################################################################
-## Hoa: 24.09.2018 Version 1 : picam.py
+## Hoa: 05.10.2018 Version 1 : picam.py
 ######################################################################
 # This class takes 3 consecutive images with increasing shutter times.
 # Pictures are in raw bayer format. In addition a jpg as reference
@@ -47,10 +48,8 @@ if sys.platform == "linux":
 # ----------------------------------------------------------------------
 #
 # 24.09.2018 : First implemented
-# 28.09.2018 : Bemerkung -> log-File mit Tag versehen ob camera 1 oder 2 !
 # 30.09.2018 : Added image mask
-# 03.09.2018 : Using a mask für histogram
-#
+# 03.09.2018 : Using a mask for histogram
 ######################################################################
 
 global SCRIPTPATH
@@ -116,6 +115,35 @@ class Logger:
             print('Error logger:' + str(e))
 
 class Helpers:
+
+    def ensure_single_instance_of_app(self):
+        app_name = 'raw2'  # app name to be monitored
+
+        if sys.platform == "linux":
+
+            # Establish lock file settings
+            lf_name = '.{}.lock'.format(app_name)
+            lf_path = os.path.join(tempfile.gettempdir(), lf_name)
+            lf_flags = os.O_WRONLY | os.O_CREAT
+            lf_mode = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH  # This is 0o222, i.e. 146
+
+            # Create lock file
+            # Regarding umask, see https://stackoverflow.com/a/15015748/832230
+            umask_original = os.umask(0)
+            try:
+                lf_fd = os.open(lf_path, lf_flags, lf_mode)
+            finally:
+                os.umask(umask_original)
+
+            # Try locking the file
+            try:
+                fcntl.lockf(lf_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except IOError as e:
+                msg = ('{} may already be running. Only one instance of it '
+                       'allowed.'
+                       ).format('raw2')
+                print(' LOCK: ' + str(msg))
+                exit()
 
     def createNewFolder(self, thispath):
         try:
@@ -434,23 +462,6 @@ class Camera:
                     killtoken = True
         return True
 
-    def writh_EXIF(self, config=None, state=None):
-        try:
-            if config is None: config = self.config
-            if state is None: state = self.current_state
-
-            self.camera.exif_tags['IFD0.Artist'] = 'HorvathA'
-            self.camera.exif_tags['IFD0.Copyright'] = 'Copyright (c) 2018 HorvathA'
-            self.camera.exif_tags['IFD0.ImageDescription'] = 'Sky Camera ID: {}'.format(self.config.camera_ID)
-
-            #self.camera.exif_tags['EXIF.BrightnessValue']   = self.camera.brightness
-            #self.camera.exif_tags['EXIF.DateTimeOriginal']  = self.current_state.timeAndDate
-            #self.camera.exif_tags['EXIF.ExposureTime']      = self.camera.exposure_speed
-            #self.camera.exif_tags['EXIF.ISOSpeedRatings']   = self.camera.ISO
-            #self.camera.exif_tags['EXIF.ShutterSpeedValue'] = self.camera.shutter_speed
-        except Exception as e:
-            print('Error in writh_EXIF: ' + str(e))
-
     def single_shoot(self, resize_width=None, resize_hight = None, shutter_speed=None, config=None, state=None):
         '''
         Takes a single image as jpeg and returns it as opencv image.
@@ -465,6 +476,10 @@ class Camera:
         if config is None: config = self.config
         if state is None: state = self.current_state
 
+        if not self.camera:
+            print("No Camera instance!")
+            return
+
         # update camera parameters
         self.camera.ISO = config.iso
         self.camera.framerate = state.currentFR
@@ -477,11 +492,13 @@ class Camera:
         stream = io.BytesIO()
 
         if (resize_width is not None and resize_hight is not None):
+            #self.writh_EXIF(config, state)
             self.camera.capture(stream, format='jpeg',resize=(resize_width, resize_hight), bayer=False)
-            self.writh_EXIF(config, state)
+
         else:
+            #self.writh_EXIF(config, state)
             self.camera.capture(stream, format='jpeg',bayer=False)
-            self.writh_EXIF(config, state)
+
 
         nparray = np.fromstring(stream.getvalue(), dtype=np.uint8)
         image = cv2.imdecode(nparray, 1)
@@ -711,6 +728,7 @@ class Camera:
                         dat1.tofile(g)
 
                     loopendraw = time.time()
+
                     loopend_tot = time.time()
 
                     self.current_state.shots_taken += 1
@@ -765,13 +783,16 @@ def main():
         }
 
         helper = Helpers()
-        usedspace = helper.disk_stat()
+        #usedspace = helper.disk_stat()
+        #helper.ensure_single_instance_of_app()
         s = Logger()
         log = s.getLogger()
 
+        '''
         if usedspace > 80:
             raise RuntimeError('WARNING: Not enough free space on SD Card!')
             return
+        '''
 
         picam = picamera.PiCamera()
         camera = Camera(picam,Camera_config(cfg))
