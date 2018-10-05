@@ -40,11 +40,11 @@ global Path_to_copy_imgs
 global mask_images
 global listOfAvgBrightness
 
-Avoid_This_Directories = ['imgs5','hdr']
+Avoid_This_Directories = ['wellExp','hdr','img2analyze']
 #Path_to_raw = r'I:\SkyCam\picam_data'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 # Path_to_raw = r'G:\Thesis_ausgelagerte_Dateien\test'  # test' picam_pictures
 Path_to_raw = r'C:\Users\ati\Desktop\camera_1'
-Path_to_copy_imgs = os.path.join(Path_to_raw, 'wellExp')
+Path_to_copy_imgs = os.path.join(Path_to_raw, 'img2analyze')
 
 mask_images = False
 
@@ -178,7 +178,7 @@ class Helpers:
 
             t_start = time.time()
             for next_dir in allDirs:
-                next_dir += 'raw_img1.jpg'
+                next_dir += 'raw_img0.jpg'
                 img = cv2.imread(next_dir, 1)
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -249,7 +249,7 @@ class Helpers:
                 ax2,text = self.plotHystogram(next_img,fig_outer,avgb)
 
                 plt.draw()
-                plt.pause(0.7)
+                plt.pause(1)
                 text.remove()
                 counter += 1
                 ax2.clear()
@@ -304,7 +304,7 @@ def main():
     try:
         global Path_to_raw
         global listOfAvgBrightness
-        preprocess = False  # Collect images from subdirectories
+        preprocess = True  # Collect images from subdirectories
 
         if not os.path.isdir(Path_to_raw):
             print('\nError: Image directory does not exist! -> Aborting.')
@@ -317,7 +317,7 @@ def main():
             listOfImages = help.readAllImages(allDirs)
         else:
             # All images are allready in one folder
-            listOfImages = help.loadImages(join(Path_to_raw,'wellExp'))
+            listOfImages = help.loadImages(join(Path_to_raw,'hdr'))
 
         listOfAvgBrightness = help.calcAllAvgBrightness(listOfImages)
         help.runSlideShow(listOfImages)
