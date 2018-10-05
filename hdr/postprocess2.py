@@ -6,6 +6,7 @@ import os
 import cv2
 import sys
 import time
+import re
 import shutil
 import exifread
 from shutil import copy2
@@ -24,13 +25,13 @@ print('Version opencv: ' + cv2.__version__)
 ## Hoa: 03.10.2018 Version 1 : postprocess2.py
 ###############################################################################
 # Collects *.jpg and .data images and creates HDR pictures. In addition:
-# - reads shutter time from exif
+#
 # - creates video from pictures
 # - shows pictures as slideshow
 #
 # Remarks:
-# - je nach cam1/2 den Mittelpkt der maske setzen -> var cam = cam1 oder
-#   cam2
+# - images taken by picam are already masked
+# - je nach cam1/2 den Mittelpkt der maske setzen -> var cam = cam1 oder cam2
 #
 # New /Changes:
 # -----------------------------------------------------------------------------
@@ -44,12 +45,16 @@ global Path_to_copy_img5s
 global Path_to_ffmpeg
 global Avoid_This_Directories
 global CAM
-Path_to_raw = r'G:\SkyCam\camera_1\20180429_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
+global logFileName
+Path_to_raw = r'C:\Users\tahorvat\Desktop\camera_1'
+#Path_to_raw = r'G:\SkyCam\camera_1\20180429_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 Path_to_copy_img5s = os.path.join(Path_to_raw, 'imgs5')
 Path_to_copy_HDR = os.path.join(Path_to_raw,'hdr')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Avoid_This_Directories = ['imgs5','hdr','rest']
 CAM = Path_to_raw.rstrip('\\').rpartition('\\')[-1][-1]  # determin if cam1 or cam2
+logFileName = 'camstats.log'
+
 
 
 class Helpers:
@@ -138,7 +143,7 @@ class Helpers:
         except Exception as e:
             print('readAllImages: Error: ' + str(e))
 
-    def copyAndMaskAll_img5(self, list_alldirs):
+    def copyAndTagAll_img5(self, list_alldirs):
 
         try:
             imgproc = IMGPROC()
@@ -151,7 +156,7 @@ class Helpers:
 
             for next_dir in list_alldirs:
                 newimg = join(next_dir,'raw_img5.jpg')
-                masked_img = imgproc.maske_jpg_Image(cv2.imread(newimg))
+                next_img = cv2.imread(newimg)
                 dateAndTime = (next_dir.rstrip('\\').rpartition('\\')[-1]).replace('_',' ')
                 prefix = '{0:04d}'.format(cnt)
                 year  = dateAndTime[:4]
@@ -161,13 +166,13 @@ class Helpers:
                 min   = dateAndTime[11:13]
                 sec   = dateAndTime[13:15]
 
-                img_txt = imgproc.write2img(masked_img, 'cam ' + CAM, (30, 70))
-                img_txt = imgproc.write2img(masked_img,year+" "+month+" "+day,(30,1720))
-                img_txt = imgproc.write2img(masked_img, '#: ' + str(cnt), (30,1800))
-                img_txt = imgproc.write2img(masked_img, hour+":"+min+":"+sec, (30, 1880))
+                img_txt = imgproc.write2img(next_img, 'cam ' + CAM, (30, 70))
+                img_txt = imgproc.write2img(next_img,year+" "+month+" "+day,(30,1720))
+                img_txt = imgproc.write2img(next_img, '#: ' + str(cnt), (30,1800))
+                img_txt = imgproc.write2img(next_img, hour+":"+min+":"+sec, (30, 1880))
                 new_img_path = join(Path_to_copy_img5s, '{}.jpg'.format(prefix))
 
-                cv2.imwrite(new_img_path,masked_img)
+                cv2.imwrite(new_img_path,next_img)
                 cnt += 1
 
             print('Masked {} images and copyied to imgs5.'.format(cnt))
@@ -219,6 +224,12 @@ class Helpers:
             print('unzipall: Error: ' + str(e))
 
 class HDR:
+    def getShutterTimes(self, file_path, file_name = logFileName):
+        f = open('file_name.ext', 'r')
+        x = f.readlines()
+
+        return None
+
     def getEXIF_TAG(self, file_path, field):
         try:
             foundvalue = '0'
@@ -284,6 +295,7 @@ class HDR:
     def readImagesAndExpos(self, mypath, piclist=[0,5,9]):
         postproc = IMGPROC()
         try:
+            logfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.log')]
             onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
             image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
             expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
@@ -521,9 +533,9 @@ def main():
         unzipall          = True
         delallzip         = False
         runslideshow      = False
-        copyAndMask       = True
+        copyAndTag        = True
         hdr_pics_from_jpg = True
-        creat_HDR_Video   = True
+        creat_HDR_Video   = False
         hdr_from_data     = False
 
         if not os.path.isdir(Path_to_raw):
@@ -540,8 +552,8 @@ def main():
         if delallzip:
             help.delAllZIP(Path_to_raw)
 
-        if copyAndMask:
-            help.copyAndMaskAll_img5(allDirs)
+        if copyAndTag:
+            help.copyAndTagAll_img5(allDirs)
             help.createVideo()
 
         if hdr_pics_from_jpg:
