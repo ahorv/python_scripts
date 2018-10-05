@@ -41,33 +41,36 @@ print('Version opencv: ' + cv2.__version__)
 ###############################################################################
 
 global Path_to_raw
-global Path_to_copy_img5s
+global Path_to_copy_wellExp
 global Path_to_ffmpeg
 global Avoid_This_Directories
 global CAM
-global logFileName
+global LogFileName
+global SELECTION
+global NameWellExpImg
 Path_to_raw = r'C:\Users\tahorvat\Desktop\camera_1'
 #Path_to_raw = r'G:\SkyCam\camera_1\20180429_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
-Path_to_copy_img5s = os.path.join(Path_to_raw, 'imgs5')
+Path_to_copy_wellExp = os.path.join(Path_to_raw, 'wellExp')
 Path_to_copy_HDR = os.path.join(Path_to_raw,'hdr')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
-Avoid_This_Directories = ['imgs5','hdr','rest']
+Avoid_This_Directories = ['wellExp','hdr','rest']
 CAM = Path_to_raw.rstrip('\\').rpartition('\\')[-1][-1]  # determin if cam1 or cam2
-logFileName = 'camstats.log'
-
+LogFileName = 'camstats.log'
+SELECTION = [0, -2, -4]
+NameWellExpImg = 'raw_img0'
 
 
 class Helpers:
     def createVideo(self):
         try:
 
-            global Path_to_copy_img5s                                   # path to images
+            global Path_to_copy_wellExp                                   # path to images
             global Path_to_ffmpeg                                       # path to ffmpeg executable
             fsp = ' -r 10 '                                             # frame per sec images taken
             stnb = '-start_number 0001 '                   # what image to start at
-            imgpath = '-i ' + join(Path_to_copy_img5s,'%4d.jpg')+' '  # path to images
+            imgpath = '-i ' + join(Path_to_copy_wellExp, '%4d.jpg') + ' '  # path to images
             res = '-s 2592x1944 '                                       # output resolution
-            outpath = Path_to_copy_img5s + '\sky_video.mp4 '            # output file name
+            outpath = Path_to_copy_wellExp + '\sky_video.mp4 '            # output file name
             codec = '-vcodec libx264'                                   # codec to use
 
             command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
@@ -126,7 +129,7 @@ class Helpers:
 
             t_start = time.time()
             for next_dir in allDirs:
-                next_dir += 'raw_img5.jpg'
+                next_dir += NameWellExpImg
                 img = cv2.imread(next_dir, 1)
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 new_img = cv2.resize(img_rgb, None, fx=0.25, fy=0.25)
@@ -143,19 +146,19 @@ class Helpers:
         except Exception as e:
             print('readAllImages: Error: ' + str(e))
 
-    def copyAndTagAll_img5(self, list_alldirs):
+    def copyAndTagAllWellExposed(self, list_alldirs):
 
         try:
             imgproc = IMGPROC()
-            global Path_to_copy_img5s
+            global Path_to_copy_wellExp
             global CAM
             cnt = 1
 
-            if not os.path.exists(Path_to_copy_img5s):
-                os.makedirs(Path_to_copy_img5s)
+            if not os.path.exists(Path_to_copy_wellExp):
+                os.makedirs(Path_to_copy_wellExp)
 
             for next_dir in list_alldirs:
-                newimg = join(next_dir,'raw_img5.jpg')
+                newimg = join(next_dir, NameWellExpImg + '.jpg')
                 next_img = cv2.imread(newimg)
                 dateAndTime = (next_dir.rstrip('\\').rpartition('\\')[-1]).replace('_',' ')
                 prefix = '{0:04d}'.format(cnt)
@@ -170,12 +173,12 @@ class Helpers:
                 img_txt = imgproc.write2img(next_img,year+" "+month+" "+day,(30,1720))
                 img_txt = imgproc.write2img(next_img, '#: ' + str(cnt), (30,1800))
                 img_txt = imgproc.write2img(next_img, hour+":"+min+":"+sec, (30, 1880))
-                new_img_path = join(Path_to_copy_img5s, '{}.jpg'.format(prefix))
+                new_img_path = join(Path_to_copy_wellExp, '{}.jpg'.format(prefix))
 
                 cv2.imwrite(new_img_path,next_img)
                 cnt += 1
 
-            print('Masked {} images and copyied to imgs5.'.format(cnt))
+            print(' {} images copyied to wellExp.'.format(cnt))
 
         except Exception as e:
             print('Error in copyAndMaskAll_img5: {}'.format(e))
@@ -224,8 +227,11 @@ class Helpers:
             print('unzipall: Error: ' + str(e))
 
 class HDR:
-    def getShutterTimes(self, file_path, file_name = logFileName):
+    def getShutterTimes(self, file_path, file_name = LogFileName):
         try:
+            '''
+            returns shutter_time in microseconds as np.float32 type
+            '''
             listOfSS = []
 
             f = open(join(file_path, file_name), 'r')
@@ -236,7 +242,10 @@ class HDR:
             for line in logfile:
                 value = line.split("ss:", 1)[1]
                 value = value.split(',', 1)[0]
-                listOfSS.append(value.strip())
+                value = value.strip()
+                value += '/1000000'
+                val_float = np.float32(Fraction(str(value)))
+                listOfSS.append(val_float)
 
             return listOfSS
 
@@ -261,13 +270,11 @@ class HDR:
         except Exception as e:
             print('EXIF: Could not read exif data ' + str(e))
 
-    def readRawImages(self,mypath, piclist = [0,-2,-4]):
+    def readRawImages(self, mypath, piclist = SELECTION):
         try:
             onlyfiles_data = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.data')]
-            onlyfiles = [s.replace('.', '') for s in onlyfiles]
-            onlyfiles_jpg  = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
             image_stack = np.empty(len(piclist), dtype=object)
-            expos_stack = np.empty(len(piclist), dtype=np.float32)
+            expos_stack = self.getShutterTimes(mypath)
 
             imrows = 2464
             imcols = 3296
@@ -276,7 +283,7 @@ class HDR:
 
             # Importing and debayering raw images
             for n in range(0, len(onlyfiles_data)):
-                picnumber = [str(s) for s in re.findall(r'-?\d+\.?\d*', onlyfiles[n])]
+                picnumber = [str(s.replace('.', '')) for s in re.findall(r'-?\d+\.?\d*', onlyfiles_data[n])]
                 pos = 0
                 for pic in piclist:
                     if str(picnumber[0]) == str(pic):
@@ -287,17 +294,8 @@ class HDR:
                             img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BAYER_BG2BGR)
 
                         image_stack[pos] = img_rgb
-                        print('Pic {}, reading data : {}'.format(str(picnumber), onlyfiles_data[n]))
-                    pos +=1
-
-            #Importing exif data from jpg images
-            for n in range(0, len(onlyfiles_jpg)):
-                picnumber = ''.join(filter(str.isdigit, onlyfiles_jpg[n]))
-                pos = 0
-                for pic in piclist:
-                    if str(picnumber) == str(pic):
-                        expos_stack[pos] = self.getEXIF_TAG(join(mypath, onlyfiles_jpg[n]), "EXIF ExposureTime")
-                        print('Pic {}, reading exif: {}'.format(str(picnumber), expos_stack[n]))
+                        values = [str(picnumber), onlyfiles_data[n], str(round(expos_stack[n],5))]
+                        print('Pic {}, reading data: {}, shutter time: {}'.format(values))
                     pos +=1
 
             return image_stack, expos_stack
@@ -305,20 +303,19 @@ class HDR:
         except Exception as e:
             print('readRawImages: Could not read *.data files ' + str(e))
 
-    def readImagesAndExpos(self, mypath, piclist=[0,5,9]):
-        postproc = IMGPROC()
+    def readImagesAndExpos(self, mypath, piclist = SELECTION):
         try:
-            self.getShutterTimes(mypath)
             onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
-            image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
-            expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
+            image_stack = np.empty(len(piclist), dtype=object)       # Achtung len = onlyfiles für alle bilder
+            #HIER ist der FEHLER  expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
+            expos_stack = self.getShutterTimes(mypath)
+
             for n in range(0, len(onlyfiles)):
-                picnumber = ''.join(filter(str.isdigit, onlyfiles[n]))
+                picnumber = [str(s.replace('.', '')) for s in re.findall(r'-?\d+\.?\d*', onlyfiles[n])]
                 pos = 0
                 for pic in piclist:
-                    if str(picnumber) == str(pic):
-                        expos_stack[pos] = self.getEXIF_TAG(join(mypath, onlyfiles[n]), "EXIF ExposureTime")
-                        image_stack[pos] = postproc.maske_jpg_Image(cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR))
+                    if str(picnumber[0]) == str(pic):
+                        image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
                         print('Pic {}, reading data from : {}, exif: {}'.format(str(picnumber), onlyfiles[n], expos_stack[n]))
                     pos +=1
 
@@ -327,7 +324,7 @@ class HDR:
         except Exception as e:
             print('Error in readImagesAndExpos: ' + str(e))
 
-    def composeOneHDRimgJpg(self, oneDirsPath, piclist = [0, 5, 9]):
+    def composeOneHDRimgJpg(self, oneDirsPath, piclist = SELECTION):
         try:
 
             images, times = self.readImagesAndExpos(oneDirsPath, piclist)
@@ -355,7 +352,7 @@ class HDR:
         except Exception as e:
             print('composeOneHDRimg: Error: ' + str(e))
 
-    def composeOneHDRimgData(self,oneDirsPath, piclist = [0,5,9]):
+    def composeOneHDRimgData(self, oneDirsPath, piclist = SELECTION):
         try:
 
             images, times = self.readRawImages(oneDirsPath, piclist)
@@ -546,7 +543,7 @@ def main():
         unzipall          = False
         delallzip         = False
         runslideshow      = False
-        copyAndTag        = True
+        copyAndTag        = False
         hdr_pics_from_jpg = True
         creat_HDR_Video   = False
         hdr_from_data     = False
@@ -566,7 +563,7 @@ def main():
             help.delAllZIP(Path_to_raw)
 
         if copyAndTag:
-            help.copyAndTagAll_img5(allDirs)
+            help.copyAndTagAllWellExposed(allDirs)
             help.createVideo()
 
         if hdr_pics_from_jpg:
