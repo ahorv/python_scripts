@@ -11,6 +11,7 @@ import io
 import os
 import time
 import shutil
+import tempfile
 import cv2
 import picamera
 import logging
@@ -18,11 +19,7 @@ import logging.handlers
 from datetime import datetime, timedelta
 import numpy as np
 from fractions import Fraction
-
-import math 
-import pwd
-import grp
-import stat
+import math
 
 if sys.platform == "linux":
     import pwd
@@ -32,7 +29,7 @@ if sys.platform == "linux":
 
 
 ######################################################################
-## Hoa: 05.10.2018 Version 1 : picam.py
+## Hoa: 06.10.2018 Version 1 : picam.py
 ######################################################################
 # This class takes 3 consecutive images with increasing shutter times.
 # Pictures are in raw bayer format. In addition a jpg as reference
@@ -50,6 +47,7 @@ if sys.platform == "linux":
 # 24.09.2018 : First implemented
 # 30.09.2018 : Added image mask
 # 03.09.2018 : Using a mask for histogram
+# 06.10.2018 : Adjusted to run on raspberry pi
 ######################################################################
 
 global SCRIPTPATH
@@ -783,16 +781,14 @@ def main():
         }
 
         helper = Helpers()
-        #usedspace = helper.disk_stat()
-        #helper.ensure_single_instance_of_app()
+        usedspace = helper.disk_stat()
+        helper.ensure_single_instance_of_app()
         s = Logger()
         log = s.getLogger()
 
-        '''
         if usedspace > 80:
             raise RuntimeError('WARNING: Not enough free space on SD Card!')
             return
-        '''
 
         picam = picamera.PiCamera()
         camera = Camera(picam,Camera_config(cfg))
@@ -806,14 +802,11 @@ def main():
         while (True):
             time_now = datetime.now().replace(microsecond=0)
 
-            camera.takepictures()
-            '''
             if t_start < time_now < t_end:
                 camera.takepictures()
 
             elif t_end > time_now or t_start < time_now:
                 sys.exit()
-            '''
 
     except Exception as e:
         picam.close()
