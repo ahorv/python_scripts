@@ -209,9 +209,18 @@ class Helpers:
 
         text = ax2.text(80, 15000, r'avgbrg: ' + str(avgb), fontsize=12, color='black')
 
+        '''
+        # The same when bin - interval set to [1,255] ignoring zero values and extreme exposure
+        aa = img.copy()
+        mask = aa.copy()
+        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        mask[np.where((mask != [0]).all(axis=1))] = [255]
+        mask = mask.astype(np.uint8)
+        '''
+
         color = ('b', 'g', 'r')
         for i, col in enumerate(color):
-            histr = cv2.calcHist([img], [i], None, [256], [1, 255])
+            histr = cv2.calcHist([img], [i], None, [254], [1, 255])
             plt.plot(histr, color=col)
             plt.xlim([0, 256])
 
