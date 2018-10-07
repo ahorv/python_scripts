@@ -41,17 +41,17 @@ print('Version opencv: ' + cv2.__version__)
 #
 ######################################################################
 
-global Path_to_raw
+global Path_to_sourceDir
 global Path_to_copy_img5s
 global Path_to_ffmpeg
 global Avoid_This_Directories
 global CAM
-Path_to_raw = r'I:\SkY_CAM_IMGS\picam\camera_1\20181005'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
-Path_to_copy_img5s = os.path.join(Path_to_raw, 'imgs5')
-Path_to_copy_HDR = os.path.join(Path_to_raw,'hdr')
+Path_to_sourceDir = r'I:\SkY_CAM_IMGS\picam\camera_1\20181005'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
+Path_to_copy_img5s = os.path.join(Path_to_sourceDir, 'imgs5')
+Path_to_copy_HDR = os.path.join(Path_to_sourceDir, 'hdr')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Avoid_This_Directories = ['imgs5','hdr','rest']
-CAM = Path_to_raw.rstrip('\\').rpartition('\\')[-1][-1]  # determin if cam1 or cam2
+CAM = Path_to_sourceDir.rstrip('\\').rpartition('\\')[-1][-1]  # determin if cam1 or cam2
 
 
 class Helpers:
@@ -115,7 +115,7 @@ class Helpers:
 
     def readAllImages(self,allDirs):
         try:
-            global Path_to_raw
+            global Path_to_sourceDir
             list_names = []
             list_images = []
             cnt = 1
@@ -412,7 +412,7 @@ class HDR:
             print('composeOneHDRimgData: Error: ' + str(e))
 
     def makeHDR_from_jpg(self, ListofAllDirs):
-        global Path_to_raw
+        global Path_to_sourceDir
         global CAM
         imgproc = IMGPROC()
         try:
@@ -448,7 +448,7 @@ class HDR:
             print('createAllHDR: Error: ' + str(e))
 
     def makeHDR_from_data(self, ListofAllDirs):
-        global Path_to_raw
+        global Path_to_sourceDir
         try:
             cnt = 0
             if not os.path.exists(join(Path_to_raw,'raw_hdr')):
@@ -466,7 +466,7 @@ class HDR:
 
     def createHDRVideo(self):
         try:
-            global Path_to_raw
+            global Path_to_sourceDir
             hdrpath = join(Path_to_raw, 'hdr')
             global Path_to_ffmpeg                                 # path to ffmpeg executable
             fsp = ' -r 10 '                                       # frame per sec images taken
@@ -570,7 +570,7 @@ class IMGPROC(object):
 
 def main():
     try:
-        global Path_to_raw
+        global Path_to_sourceDir
         unzipall          = False
         delallzip         = False
         runslideshow      = False
@@ -579,19 +579,19 @@ def main():
         creat_HDR_Video   = False
         hdr_from_data     = True
 
-        if not os.path.isdir(Path_to_raw):
+        if not os.path.isdir(Path_to_sourceDir):
             print('\nError: Image directory does not exist! -> Aborting.')
             return;
 
         help = Helpers()
         hdr = HDR()
-        allDirs = help.getDirectories(Path_to_raw)
+        allDirs = help.getDirectories(Path_to_sourceDir)
 
         if unzipall:
-            help.unzipall(Path_to_raw)
+            help.unzipall(Path_to_sourceDir)
 
         if delallzip:
-            help.delAllZIP(Path_to_raw)
+            help.delAllZIP(Path_to_sourceDir)
 
         if copyAndMask:
             help.copyAndMaskAll_img5(allDirs)
