@@ -135,7 +135,6 @@ class Rawcamera:
                 camera.awb_mode = 'auto'
                 camera.iso = 0
                 shutter_speed = 100
-                loopstart = time.time()
                 # for i0 in range(10):
                 for i0 in [0, 5, 9]:
                     # set shutter speed
