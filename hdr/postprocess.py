@@ -23,8 +23,9 @@ print('Version opencv: ' + cv2.__version__)
 ######################################################################
 ## Hoa: 26.03.2018 Version 1 : postprocess.py
 ######################################################################
-# Grabs from a image collection all raw_img5.jpg 's and shows them as
-# Slideshow
+# This version runs on images created with raw2.py
+# Creates HDR images and tone mapped versions.
+# Collection all raw_img5.jpg 's and shows them as slideshow
 #
 # Remarks:
 # - je nach cam1/2 den Mittelpkt der maske setzen -> var cam = cam1 oder cam2
@@ -36,6 +37,7 @@ print('Version opencv: ' + cv2.__version__)
 # 30.03.2018 : added copy img to new folder
 # 30.03.2018 : added video creation by ffmpeg
 # 15.18.2018 : added info text to images
+# 07.10.2018 : creates HDR image from *.data files
 #
 ######################################################################
 
@@ -44,7 +46,7 @@ global Path_to_copy_img5s
 global Path_to_ffmpeg
 global Avoid_This_Directories
 global CAM
-Path_to_raw = r'G:\SkyCam\camera_1\20180429_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
+Path_to_raw = r'I:\SkY_CAM_IMGS\picam\camera_1\20181005'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 Path_to_copy_img5s = os.path.join(Path_to_raw, 'imgs5')
 Path_to_copy_HDR = os.path.join(Path_to_raw,'hdr')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
@@ -237,6 +239,69 @@ class HDR:
         except Exception as e:
             print('EXIF: Could not read exif data ' + str(e))
 
+    def data2rgb(self, path_to_img):
+        try:
+            imgproc = IMGPROC()
+            data = np.fromfile(path_to_img, dtype='uint16')
+            data = data.reshape([2464, 3296])
+
+            p1 = data[0::2, 1::2]  # Blue
+            p2 = data[0::2, 0::2]  # Green
+            p3 = data[1::2, 1::2]  # Green
+            p4 = data[1::2, 0::2]  # Red
+
+            blue = p1
+            green = ((p2 + p3)) / 2
+            red = p4
+
+            gamma = 1.6  # gamma correction           # neu : 1.55
+            # b, g and r gain;  wurden rausgelesen aus den picam Aufnahmedaten
+            vb = 1.3  # 87 / 64.  = 1.359375           # neu : 0.56
+            vg = 1.80  # 1.                             # neu : 1
+            vr = 1.8  # 235 / 128.  = 1.8359375        # neu : 0.95
+
+            # color conversion matrix (from raspi_dng/dcraw)
+            # R        g        b
+            cvm = np.array(
+                [[1.20, -0.30, 0.00],
+                 [-0.05, 0.80, 0.14],
+                 [0.20, 0.20, 0.7]])
+
+            s = (1232, 1648, 3)
+            rgb = np.zeros(s)
+
+            rgb[:, :, 0] = vr * 1023 * (red / 1023.) ** gamma
+            rgb[:, :, 1] = vg * 1023 * (green / 1023.) ** gamma
+            rgb[:, :, 2] = vb * 1023 * (blue / 1023.) ** gamma
+
+            # rgb = rgb.dot(cvm)
+
+            rgb = (rgb - np.min(rgb)) / (np.max(rgb) - np.min(rgb))
+
+            height, width = rgb.shape[:2]
+
+            img = cv2.resize(rgb, (width, height), interpolation=cv2.INTER_CUBIC)
+            # img = img.astype(np.float32)
+
+            # ormalizeImage
+            out = np.zeros(img.shape, dtype=np.float)
+            min = img.min()
+            out = img - min
+
+            # get the max from out after normalizing to 0
+            max = out.max()
+            out *= (255 / max)
+
+            out = np.uint8(out)
+
+            #out = imgproc.maske_image(np.uint8(out), [1232, 1648, 3], (616, 824), 1000)
+
+            return out
+
+
+        except Exception as e:
+            print('data2rgb: Could not convert data to rgb: ' + str(e))
+
     def readRawImages(self,mypath, piclist = [0,5,9]):
         try:
             onlyfiles_data = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.data')]
@@ -244,24 +309,13 @@ class HDR:
             image_stack = np.empty(len(piclist), dtype=object)
             expos_stack = np.empty(len(piclist), dtype=np.float32)
 
-            imrows = 2464
-            imcols = 3296
-
-            imsize = imrows * imcols
-
             # Importing and debayering raw images
             for n in range(0, len(onlyfiles_data)):
                 picnumber = ''.join(filter(str.isdigit, onlyfiles_data[n]))
                 pos = 0
                 for pic in piclist:
                     if str(picnumber) == str(pic):
-
-                        with open(join(mypath, onlyfiles_data[n]), "rb") as rawimage:
-                            # images[image_idx] = cv2.imread(path)
-                            img_np = np.fromfile(rawimage, np.dtype('u2'), imsize).reshape([imrows,imcols])
-                            img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BAYER_BG2BGR)
-
-                        image_stack[pos] = img_rgb
+                        image_stack[pos] = self.data2rgb(join(mypath, onlyfiles_data[n]))
                         print('Pic {}, reading data : {}'.format(str(picnumber), onlyfiles_data[n]))
                     pos +=1
 
@@ -517,13 +571,13 @@ class IMGPROC(object):
 def main():
     try:
         global Path_to_raw
-        unzipall          = True
+        unzipall          = False
         delallzip         = False
         runslideshow      = False
-        copyAndMask       = True
-        hdr_pics_from_jpg = True
-        creat_HDR_Video   = True
-        hdr_from_data     = False
+        copyAndMask       = False
+        hdr_pics_from_jpg = False
+        creat_HDR_Video   = False
+        hdr_from_data     = True
 
         if not os.path.isdir(Path_to_raw):
             print('\nError: Image directory does not exist! -> Aborting.')
