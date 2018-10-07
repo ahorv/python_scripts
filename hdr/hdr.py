@@ -33,8 +33,8 @@ print('Version opencv: ' + cv2.__version__)
 
 global input_path
 global output_path
-input_path  = r'F:\SkyCam\camera_1\20180429_raw_cam1\Test\kopie_20180904_100917'
-output_path = r'F:\SkyCam\camera_1\20180429_raw_cam1\Test\kopie_20180904_100917\_output'
+input_path  = r'I:\SkY_CAM_IMGS\picam\camera_3\20181007\20181007_120426'
+output_path = r'I:I:\SkY_CAM_IMGS\picam\camera_3\20181007\20181007_120426\_output'
 
 global set_equal_size
 set_equal_size = True
@@ -199,7 +199,7 @@ def data2rgb (path_to_img):
         img = cv2.resize(rgb, (width, height), interpolation=cv2.INTER_CUBIC)
         #img = img.astype(np.float32)
 
-        #ormalizeImage
+        #normalizeImage
         out = np.zeros(img.shape, dtype=np.float)
         min = img.min()
         out = img - min
@@ -349,7 +349,8 @@ def main():
         global set_equal_size
         piclist = ['0','5','9']
 
-        img_path = r'F:\SkyCam\camera_1\20180429_raw_cam1\Test\kopie_20180904_100917\_output\ldr-Drago.jpg'
+        # Show mask
+        #img_path = r'F:\SkyCam\camera_1\20180429_raw_cam1\Test\kopie_20180904_100917\_output\ldr-Drago.jpg'
         #img = white_balance(cv2.imread(img_path))
         #show(img,"HDR image white balanced")
 
@@ -357,12 +358,9 @@ def main():
         images, times = readDataAndExpos(input_path, piclist)  # data
         createHDR(images, times, prefix="")
 
-        img = whiten_maske(cv2.imread(img_path))
-        show(img,"HDR image white balanced")
-
         return
 
-        images, times = readImagesAndExpos(input_path, piclist)  # orginal
+        images, times = readImagesAndExpos(input_path, piclist)  # jpg
         createHDR(images, times)
 
 

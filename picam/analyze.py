@@ -43,7 +43,7 @@ global intervall # sets slide show speed
 
 Avoid_This_Directories = ['wellExp','hdr','img2analyze']
 #Path_to_raw = r'I:\SkyCam\picam_data'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
-Path_to_raw = r'G:\Thesis_ausgelagerte_Dateien\SKY_CAM_BILDER\camera_1\20181006'  # test' picam_pictures
+Path_to_raw = r'I:\SkY_CAM_IMGS\picam\camera_3\20181007'  # test' picam_pictures
 #Path_to_raw = r'C:\Users\ati\Desktop\camera_1'
 Path_to_copy_imgs = os.path.join(Path_to_raw, 'img2analyze')
 intervall = 0.5
@@ -321,7 +321,7 @@ def main():
         global Path_to_raw
         global listOfAvgBrightness
         global intervall
-        intervall = 0.2
+        intervall = 0.3
         preprocess = False  # Collect images from subdirectories
 
         if not os.path.isdir(Path_to_raw):

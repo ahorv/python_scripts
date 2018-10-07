@@ -22,8 +22,9 @@ from fractions import Fraction
 print('Version opencv: ' + cv2.__version__)
 
 ###############################################################################
-## Hoa: 03.10.2018 Version 1 : postprocess2.py
+## Hoa: 07.10.2018 Version 1 : postprocess2.py
 ###############################################################################
+# This version runs on images created with picam.py
 # Collects *.jpg and .data images and creates HDR pictures. In addition:
 #
 # - creates video from pictures
@@ -37,6 +38,7 @@ print('Version opencv: ' + cv2.__version__)
 # -----------------------------------------------------------------------------
 #
 # 03.10.2018 : New version of postprocess adapted for pictures taken by picam
+# 07.10.2018 : Creates HDR images from *.data files
 #
 ###############################################################################
 
@@ -97,10 +99,9 @@ class Helpers:
                 if os.path.isdir(dirs):
                     if dirs.rstrip('\\').rpartition('\\')[-1] not in Avoid_This_Directories:
                         allDirs.append(dirs)
-                        #print('{}'.format(str(dirs)))
                         img_cnt +=1
 
-            print('All images loaded! - Found {} images.'.format(img_cnt-1))
+            print('All images loaded! - Found {} images.'.format(img_cnt - 2))
 
             return allDirs
 
@@ -272,16 +273,78 @@ class HDR:
         except Exception as e:
             print('EXIF: Could not read exif data ' + str(e))
 
+    def data2rgb(self, path_to_img):
+        try:
+            imgproc = IMGPROC()
+            data = np.fromfile(path_to_img, dtype='uint16')
+            data = data.reshape([2464, 3296])
+
+            p1 = data[0::2, 1::2]  # Blue
+            p2 = data[0::2, 0::2]  # Green
+            p3 = data[1::2, 1::2]  # Green
+            p4 = data[1::2, 0::2]  # Red
+
+            blue = p1
+            green = ((p2 + p3)) / 2
+            red = p4
+
+            gamma = 1.6  # gamma correction           # neu : 1.55
+            # b, g and r gain;  wurden rausgelesen aus den picam Aufnahmedaten
+            vb = 1.3  # 87 / 64.  = 1.359375           # neu : 0.56
+            vg = 1.80  # 1.                             # neu : 1
+            vr = 1.8  # 235 / 128.  = 1.8359375        # neu : 0.95
+
+            # color conversion matrix (from raspi_dng/dcraw)
+            # R        g        b
+            cvm = np.array(
+                [[1.20, -0.30, 0.00],
+                 [-0.05, 0.80, 0.14],
+                 [0.20, 0.20, 0.7]])
+
+            s = (1232, 1648, 3)
+            rgb = np.zeros(s)
+
+            rgb[:, :, 0] = vr * 1023 * (red / 1023.) ** gamma
+            rgb[:, :, 1] = vg * 1023 * (green / 1023.) ** gamma
+            rgb[:, :, 2] = vb * 1023 * (blue / 1023.) ** gamma
+
+            # rgb = rgb.dot(cvm)
+
+            rgb = (rgb - np.min(rgb)) / (np.max(rgb) - np.min(rgb))
+
+            height, width = rgb.shape[:2]
+
+            img = cv2.resize(rgb, (width, height), interpolation=cv2.INTER_CUBIC)
+            # img = img.astype(np.float32)
+
+            # ormalizeImage
+            out = np.zeros(img.shape, dtype=np.float)
+            min = img.min()
+            out = img - min
+
+            # get the max from out after normalizing to 0
+            max = out.max()
+            out *= (255 / max)
+
+            out = np.uint8(out)
+
+            #out = imgproc.maske_image(np.uint8(out), [1232, 1648, 3], (616, 824), 1000)
+
+            return out
+
+
+        except Exception as e:
+            print('data2rgb: Could not convert data to rgb: ' + str(e))
+
     def readRawImages(self, mypath, piclist = SELECTION):
         try:
             onlyfiles_data = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.data')]
             image_stack = np.empty(len(piclist), dtype=object)
             expos_stack = self.getShutterTimes(mypath)
 
-            imrows = 2464
-            imcols = 3296
-
-            imsize = imrows * imcols
+            #imrows = 2464
+            #imcols = 3296
+            #imsize = imrows * imcols
 
             # Importing and debayering raw images
             for n in range(0, len(onlyfiles_data)):
@@ -289,16 +352,17 @@ class HDR:
                 pos = 0
                 for pic in piclist:
                     if str(picnumber[0]) == str(pic):
-
+                        '''
                         with open(join(mypath, onlyfiles_data[n]), "rb") as rawimage:
-                            # images[image_idx] = cv2.imread(path)
-                            img_np = np.fromfile(rawimage, np.dtype('u2'), imsize).reshape([imrows,imcols])
-                            img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BAYER_BG2BGR)
+                            mysplit = mypath.split('\\')
+                            print('Current directory: {}; cur dat: {}'.format(mysplit[-2], onlyfiles_data[n]))
+                            #img_np = np.fromfile(rawimage, np.dtype('u2'), imsize).reshape([imrows,imcols])
+                            #img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BAYER_BG2BGR)
+                        '''
 
-                        image_stack[pos] = img_rgb
-                        values = [str(picnumber), onlyfiles_data[n], str(round(expos_stack[n],5))]
-                        #print('Pic {}, reading data: {}, shutter time: {}'.format(values))
-                        print('data {} from {}'.format(pos, len(onlyfiles_data)))
+                        image_stack[pos] = self.data2rgb(join(mypath, onlyfiles_data[n]))
+                        #v = [str(picnumber[0]), onlyfiles_data[n], str(round(expos_stack[n],5))]
+                        #print('Pic {}, reading data: {}, shutter time: {}'.format(v[0],v[1],v[2]))
 
                     pos +=1
 
@@ -311,7 +375,6 @@ class HDR:
         try:
             onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
             image_stack = np.empty(len(piclist), dtype=object)       # Achtung len = onlyfiles für alle bilder
-            #expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
             expos_stack = self.getShutterTimes(mypath)
 
             for n in range(0, len(onlyfiles)):
@@ -506,7 +569,7 @@ class IMGPROC(object):
 
         return (image_mask)
 
-    def maske_jpg_Image(self, input_image):
+    def maske_Image(self, input_image):
 
         red   = input_image[:, :, 0]
         green = input_image[:, :, 1]
@@ -548,11 +611,11 @@ def main():
         unzipall          = False
         delallzip         = False
         runslideshow      = False
-        copyAndTag        = True
+        copyAndTag        = False
         createJPGvideo    = False
-        hdr_pics_from_jpg = True
+        hdr_pics_from_jpg = False
         creat_HDR_Video   = False
-        hdr_from_data     = False
+        hdr_from_data     = True
 
         if not os.path.isdir(Path_to_raw):
             print('\nError: Image directory does not exist! -> Aborting.')
