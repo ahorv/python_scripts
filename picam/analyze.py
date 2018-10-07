@@ -158,7 +158,8 @@ class Helpers:
             image_stack = np.empty(len(onlyfiles), dtype=object)
             pos = 0
             for n in range(0, len(onlyfiles)):
-                image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.COLOR_BGR2RGB)
+                img = cv2.imread(join(mypath, onlyfiles[n]), 1)
+                image_stack[pos] = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # convert to show in matplotlib
                 pos += 1
 
             print('Found {} images'.format(str(pos)))
@@ -181,7 +182,7 @@ class Helpers:
             for next_dir in allDirs:
                 next_dir += 'raw_img0.jpg'
                 img = cv2.imread(next_dir, 1)
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # convert to show in matplotlib
 
                 if mask_images:
                     width,hight,color = img_rgb.shape
@@ -330,11 +331,12 @@ def main():
         help = Helpers()
 
         if preprocess:
+            # OK korrekte Farben
             allDirs = help.getDirectories(Path_to_raw)
             listOfImages = help.readAllImages(allDirs)
         else:
             # All images are allready in one folder
-            listOfImages = help.loadImages(join(Path_to_raw,'wellExp'))
+            listOfImages = help.loadImages(join(Path_to_raw,'hdr'))
 
         listOfAvgBrightness = help.calcAllAvgBrightness(listOfImages)
         help.runSlideShow(listOfImages)
