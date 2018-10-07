@@ -34,7 +34,7 @@ print('Version opencv: ' + cv2.__version__)
 # 03.10.2018 : using a mask for histogram
 #
 ######################################################################
-global Path_to_raw
+global Path_to_sourceDir
 global Avoid_This_Directories
 global Path_to_copy_imgs
 global mask_images
@@ -42,10 +42,8 @@ global listOfAvgBrightness
 global intervall # sets slide show speed
 
 Avoid_This_Directories = ['wellExp','hdr','img2analyze']
-#Path_to_raw = r'I:\SkyCam\picam_data'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
-Path_to_raw = r'I:\SkY_CAM_IMGS\picam\camera_3\20181007'  # test' picam_pictures
-#Path_to_raw = r'C:\Users\ati\Desktop\camera_1'
-Path_to_copy_imgs = os.path.join(Path_to_raw, 'img2analyze')
+Path_to_sourceDir = r'I:\SkY_CAM_IMGS\picam\camera_3\20181007'  # test' picam_pictures
+Path_to_copy_imgs = os.path.join(Path_to_sourceDir, 'img2analyze')
 intervall = 0.5
 mask_images = False
 
@@ -171,7 +169,7 @@ class Helpers:
 
     def readAllImages(self,allDirs):
         try:
-            global Path_to_raw
+            global Path_to_sourceDir
             global mask_images
             list_names = []
             list_images = []
@@ -318,13 +316,13 @@ class Helpers:
 
 def main():
     try:
-        global Path_to_raw
+        global Path_to_sourceDir
         global listOfAvgBrightness
         global intervall
         intervall = 0.3
         preprocess = False  # Collect images from subdirectories
 
-        if not os.path.isdir(Path_to_raw):
+        if not os.path.isdir(Path_to_sourceDir):
             print('\nError: Image directory does not exist! -> Aborting.')
             return;
 
@@ -332,11 +330,11 @@ def main():
 
         if preprocess:
             # OK korrekte Farben
-            allDirs = help.getDirectories(Path_to_raw)
+            allDirs = help.getDirectories(Path_to_sourceDir)
             listOfImages = help.readAllImages(allDirs)
         else:
             # All images are allready in one folder
-            listOfImages = help.loadImages(join(Path_to_raw,'hdr'))
+            listOfImages = help.loadImages(join(Path_to_sourceDir,'hdr'))
 
         listOfAvgBrightness = help.calcAllAvgBrightness(listOfImages)
         help.runSlideShow(listOfImages)
