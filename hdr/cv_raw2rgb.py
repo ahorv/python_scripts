@@ -22,8 +22,8 @@ import matplotlib.cm as cm
 #
 ######################################################################
 
-global Path_to_raw
-Path_to_raw = r'C:\Users\tahorvat\Desktop\20180409_090414'
+global Path_to_sourceDir
+Path_to_sourceDir = r'C:\Users\tahorvat\Desktop\20180409_090414'
 
 def data2rgb(path_to_raw):
 
@@ -49,7 +49,7 @@ def data2rgb(path_to_raw):
 
 def main():
     try:
-        global Path_to_raw
+        global Path_to_sourceDir
         raw_img_path = Path_to_raw + '/data5_.data'
 
         show_img = False
