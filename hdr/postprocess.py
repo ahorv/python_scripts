@@ -56,11 +56,11 @@ class Helpers:
     def createVideo(self):
         try:
 
-            global Path_to_copy_img5s                                   # path to images
+            global Path_to_copy_img5s                                    # path to images
             global Path_to_ffmpeg                                       # path to ffmpeg executable
             fsp = ' -r 10 '                                             # frame per sec images taken
-            stnb = '-start_number 0001 '                   # what image to start at
-            imgpath = '-i ' + join(Path_to_copy_img5s,'%4d.jpg')+' '  # path to images
+            stnb = '-start_number 0001 '                                # what image to start at
+            imgpath = '-i ' + join(Path_to_copy_img5s,'%4d.jpg')+' '    # path to images
             res = '-s 2592x1944 '                                       # output resolution
             outpath = Path_to_copy_img5s + '\sky_video.mp4 '            # output file name
             codec = '-vcodec libx264'                                   # codec to use
