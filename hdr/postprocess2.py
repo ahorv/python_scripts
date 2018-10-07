@@ -42,7 +42,7 @@ print('Version opencv: ' + cv2.__version__)
 #
 ###############################################################################
 
-global Path_to_raw
+global Path_to_sourceDir
 global Path_to_copy_wellExp
 global Path_to_ffmpeg
 global Avoid_This_Directories
@@ -50,13 +50,13 @@ global CAM
 global LogFileName
 global SELECTION
 global NameWellExpImg
-Path_to_raw = r'I:\SkY_CAM_IMGS\picam\camera_3\20181007'
+Path_to_sourceDir = r'I:\SkY_CAM_IMGS\picam\camera_3\test'
 #Path_to_raw = r'G:\SkyCam\camera_1\20180429_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
-Path_to_copy_wellExp = os.path.join(Path_to_raw, 'wellExp')
-Path_to_copy_HDR = os.path.join(Path_to_raw,'hdr')
+Path_to_copy_wellExp = os.path.join(Path_to_sourceDir, 'wellExp')
+Path_to_copy_jpgHDR = os.path.join(Path_to_sourceDir, 'jpg_hdr')
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Avoid_This_Directories = ['wellExp','hdr','rest']
-CAM = Path_to_raw.rstrip('\\').rpartition('\\')[-1][-1]  # determin if cam1 or cam2
+CAM = Path_to_sourceDir.rstrip('\\').rpartition('\\')[-1][-1]  # determin if cam1 or cam2
 LogFileName = 'camstats.log'
 SELECTION = [0, -2, -4]
 NameWellExpImg = 'raw_img0'
@@ -122,7 +122,7 @@ class Helpers:
 
     def readAllImages(self,allDirs):
         try:
-            global Path_to_raw
+            global Path_to_sourceDir
             list_names = []
             list_images = []
             cnt = 1
@@ -255,6 +255,35 @@ class HDR:
         except Exception as e:
             print('Error in getShutterTimes: ' + str(e))
 
+    def getAWB_Gains(self, file_path, file_name=LogFileName):
+        try:
+            '''
+            returns shutter_time in microseconds as np.float32 type
+            '''
+            awb_gains = np.empty([3, 2], dtype=np.float32)
+
+            f = open(join(file_path, file_name), 'r')
+            logfile = f.readlines()
+            logfile.pop(0)  # remove non relevant lines
+            logfile.pop(0)  # remove non relevant lines
+
+            pos = 0
+            for line in logfile:
+                value = line.split("awb:[", 1)[1]
+                value = value.split('],', 1)[0].replace('Fraction', '').replace('(', '', 1).replace('))', ')').replace(
+                    " ", "")
+                red_gain = value.split('),', 1)[0].strip('(').replace(',', '/')
+                blue_gain = value.split(',(', 1)[1].strip(')').replace(',', '/')
+                red_gain = np.float32(Fraction(str(red_gain)))
+                blue_gain = np.float32(Fraction(str(blue_gain)))
+                awb_gains[pos] = [red_gain, blue_gain]
+                pos += 1
+
+            return awb_gains
+
+        except Exception as e:
+            print('Error in getAWB_Gains: ' + str(e))
+
     def getEXIF_TAG(self, file_path, field):
         try:
             foundvalue = '0'
@@ -273,7 +302,7 @@ class HDR:
         except Exception as e:
             print('EXIF: Could not read exif data ' + str(e))
 
-    def data2rgb(self, path_to_img):
+    def data2rgb(self, path_to_img, awb_gains):
         try:
             imgproc = IMGPROC()
             data = np.fromfile(path_to_img, dtype='uint16')
@@ -290,9 +319,9 @@ class HDR:
 
             gamma = 1.6  # gamma correction           # neu : 1.55
             # b, g and r gain;  wurden rausgelesen aus den picam Aufnahmedaten
-            vb = 1.3  # 87 / 64.  = 1.359375           # neu : 0.56
-            vg = 1.80  # 1.                             # neu : 1
-            vr = 1.8  # 235 / 128.  = 1.8359375        # neu : 0.95
+            vb = awb_gains[1]  #  1.3  # 87 / 64.  = 1.359375           # neu : 0.56
+            vg = 1             # 1.80  # 1.                             # neu : 1
+            vr = awb_gains[0]  # 1.8   # 235 / 128.  = 1.8359375        # neu : 0.95
 
             # color conversion matrix (from raspi_dng/dcraw)
             # R        g        b
@@ -341,10 +370,7 @@ class HDR:
             onlyfiles_data = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.data')]
             image_stack = np.empty(len(piclist), dtype=object)
             expos_stack = self.getShutterTimes(mypath)
-
-            #imrows = 2464
-            #imcols = 3296
-            #imsize = imrows * imcols
+            awb_stack = self.getAWB_Gains(mypath)
 
             # Importing and debayering raw images
             for n in range(0, len(onlyfiles_data)):
@@ -352,18 +378,7 @@ class HDR:
                 pos = 0
                 for pic in piclist:
                     if str(picnumber[0]) == str(pic):
-                        '''
-                        with open(join(mypath, onlyfiles_data[n]), "rb") as rawimage:
-                            mysplit = mypath.split('\\')
-                            print('Current directory: {}; cur dat: {}'.format(mysplit[-2], onlyfiles_data[n]))
-                            #img_np = np.fromfile(rawimage, np.dtype('u2'), imsize).reshape([imrows,imcols])
-                            #img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BAYER_BG2BGR)
-                        '''
-
-                        image_stack[pos] = self.data2rgb(join(mypath, onlyfiles_data[n]))
-                        #v = [str(picnumber[0]), onlyfiles_data[n], str(round(expos_stack[n],5))]
-                        #print('Pic {}, reading data: {}, shutter time: {}'.format(v[0],v[1],v[2]))
-
+                        image_stack[pos] = self.data2rgb(join(mypath, onlyfiles_data[n]),awb_stack[pos])
                     pos +=1
 
             return image_stack, expos_stack
@@ -442,19 +457,19 @@ class HDR:
 
             _ldrReinhard = ldrReinhard * 255
 
-            return _ldrReinhard
+            return _ldrReinhard, hdrDebevec
 
         except Exception as e:
             print('composeOneHDRimgData: Error: ' + str(e))
 
     def makeHDR_from_jpg(self, ListofAllDirs):
-        global Path_to_raw
+        global Path_to_sourceDir
         global CAM
         imgproc = IMGPROC()
         try:
             cnt = 0
-            if not os.path.exists(join(Path_to_raw,'hdr')):
-                os.makedirs(join(Path_to_raw,'hdr'))
+            if not os.path.exists(join(Path_to_sourceDir, 'hdr')):
+                os.makedirs(join(Path_to_sourceDir, 'hdr'))
 
             for next_dir in ListofAllDirs:
                 cnt += 1
@@ -477,7 +492,7 @@ class HDR:
                 ldrReinhard_txt = imgproc.write2img(remasked_img, '#: ' + str(cnt), (30,1800))
                 ldrReinhard_txt = imgproc.write2img(remasked_img, hour+":"+min+":"+sec, (30, 1880))
 
-                cv2.imwrite(join(Path_to_raw, 'hdr', "{}.jpg".format(prefix)), ldrReinhard_txt)
+                cv2.imwrite(join(Path_to_sourceDir, 'hdr', "{}.jpg".format(prefix)), ldrReinhard_txt)
 
             print("Done creating all HDR images")
 
@@ -485,16 +500,20 @@ class HDR:
             print('createAllHDR: Error: ' + str(e))
 
     def makeHDR_from_data(self, ListofAllDirs):
-        global Path_to_raw
+        global Path_to_sourceDir
         try:
             cnt = 0
-            if not os.path.exists(join(Path_to_raw,'raw_hdr')):
-                os.makedirs(join(Path_to_raw,'raw_hdr'))
+            if not os.path.exists(join(Path_to_sourceDir, 'tonemapped_hdr')):
+                os.makedirs(join(Path_to_sourceDir, 'tonemapped_hdr'))
+
+            if not os.path.exists(join(Path_to_sourceDir, 'hdr')):
+                os.makedirs(join(Path_to_sourceDir, 'hdr'))
 
             for oneDir in ListofAllDirs:
                 cnt += 1
-                ldrReinhard = self.composeOneHDRimgData(oneDir)
-                cv2.imwrite(join(Path_to_raw,'raw_hdr',str(cnt) + "_ldr-Reinhard.jpg"), ldrReinhard)
+                ldrReinhard, hdr = self.composeOneHDRimgData(oneDir)
+                cv2.imwrite(join(Path_to_sourceDir, 'tonemapped_hdr', str(cnt) + "_ldr-Reinhard.jpg"), ldrReinhard)
+                cv2.imwrite(join(Path_to_sourceDir, 'hdr', str(cnt) + "_hdr.hdr"), hdr)
 
             print("Done creating all HDR images")
 
@@ -503,14 +522,14 @@ class HDR:
 
     def createHDRVideo(self):
         try:
-            global Path_to_raw
-            hdrpath = join(Path_to_raw, 'hdr')
+            global Path_to_sourceDir
+            hdrpath = join(Path_to_sourceDir, 'hdr')
             global Path_to_ffmpeg                                 # path to ffmpeg executable
             fsp = ' -r 10 '                                       # frame per sec images taken
             stnb = '-start_number 0001 '                          # what image to start at
             imgpath = '-i ' + join(hdrpath ,'%4d.jpg ')           # path to images
             res = '-s 2592x1944 '                                 # output resolution
-            outpath = Path_to_copy_HDR+'\sky_HDR_video.mp4 '      # output file name
+            outpath = Path_to_copy_jpgHDR + '\sky_HDR_video.mp4 '      # output file name
             codec = '-vcodec libx264'                             # codec to use
 
             command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
@@ -607,7 +626,7 @@ class IMGPROC(object):
 
 def main():
     try:
-        global Path_to_raw
+        global Path_to_sourceDir
         unzipall          = False
         delallzip         = False
         runslideshow      = False
@@ -617,19 +636,19 @@ def main():
         creat_HDR_Video   = False
         hdr_from_data     = True
 
-        if not os.path.isdir(Path_to_raw):
+        if not os.path.isdir(Path_to_sourceDir):
             print('\nError: Image directory does not exist! -> Aborting.')
             return;
 
         help = Helpers()
         hdr = HDR()
-        allDirs = help.getDirectories(Path_to_raw)
+        allDirs = help.getDirectories(Path_to_sourceDir)
 
         if unzipall:
-            help.unzipall(Path_to_raw)
+            help.unzipall(Path_to_sourceDir)
 
         if delallzip:
-            help.delAllZIP(Path_to_raw)
+            help.delAllZIP(Path_to_sourceDir)
 
         if copyAndTag:
             help.copyAndTagAllWellExposed(allDirs)
