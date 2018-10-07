@@ -749,7 +749,7 @@ class Camera:
                     )
 
                     # Write camera settings to log file
-                    values = '[img count:{ic}, F Stop:{fS}, ss:{ss}, iso:{iso} exp:{exp}, ag:{ag}, dg:{dg}, awb:[{awb}], br:{br}, ct:{ct}]'
+                    values = '[img Nr:{ic}, F Stop:{fS}, ss:{ss}, iso:{iso} exp:{exp}, ag:{ag}, dg:{dg}, awb:[{awb}], br:{br}, ct:{ct}]'
                     timing = ' || timing: [t_jpg:{t_jpg}, t_raw:{t_raw}, t_tot:{t_tot}]'
 
                     logdata = values.format(**cam_stats)
