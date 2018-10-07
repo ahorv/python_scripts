@@ -39,13 +39,14 @@ global Avoid_This_Directories
 global Path_to_copy_imgs
 global mask_images
 global listOfAvgBrightness
+global intervall # sets slide show speed
 
 Avoid_This_Directories = ['wellExp','hdr','img2analyze']
 #Path_to_raw = r'I:\SkyCam\picam_data'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
-# Path_to_raw = r'G:\Thesis_ausgelagerte_Dateien\test'  # test' picam_pictures
-Path_to_raw = r'C:\Users\ati\Desktop\camera_1'
+Path_to_raw = r'G:\Thesis_ausgelagerte_Dateien\SKY_CAM_BILDER\camera_1\20181006'  # test' picam_pictures
+#Path_to_raw = r'C:\Users\ati\Desktop\camera_1'
 Path_to_copy_imgs = os.path.join(Path_to_raw, 'img2analyze')
-
+intervall = 0.5
 mask_images = False
 
 
@@ -157,7 +158,7 @@ class Helpers:
             image_stack = np.empty(len(onlyfiles), dtype=object)
             pos = 0
             for n in range(0, len(onlyfiles)):
-                image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
+                image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.COLOR_BGR2RGB)
                 pos += 1
 
             print('Found {} images'.format(str(pos)))
@@ -204,7 +205,7 @@ class Helpers:
             return list_images
 
         except Exception as e:
-            print('Last directory to read: {}'.format(next_dir2))
+            print('Last directory to read: {}'.format(next_dir))
             print('readAllImages: Error: ' + str(e))
 
     def plotHystogram(self,img,fig,avgb):
@@ -263,7 +264,7 @@ class Helpers:
                 ax2,text = self.plotHystogram(next_img,fig_outer,avgb)
 
                 plt.draw()
-                plt.pause(0.05)
+                plt.pause(intervall)
                 text.remove()
                 counter += 1
                 ax2.clear()
@@ -318,6 +319,8 @@ def main():
     try:
         global Path_to_raw
         global listOfAvgBrightness
+        global intervall
+        intervall = 0.2
         preprocess = False  # Collect images from subdirectories
 
         if not os.path.isdir(Path_to_raw):
@@ -331,7 +334,7 @@ def main():
             listOfImages = help.readAllImages(allDirs)
         else:
             # All images are allready in one folder
-            listOfImages = help.loadImages(join(Path_to_raw,'hdr'))
+            listOfImages = help.loadImages(join(Path_to_raw,'wellExp'))
 
         listOfAvgBrightness = help.calcAllAvgBrightness(listOfImages)
         help.runSlideShow(listOfImages)
