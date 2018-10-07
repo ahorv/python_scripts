@@ -100,7 +100,7 @@ class Helpers:
                         #print('{}'.format(str(dirs)))
                         img_cnt +=1
 
-            print('All images loaded! - Found {} images.'.format(img_cnt))
+            print('All images loaded! - Found {} images.'.format(img_cnt-1))
 
             return allDirs
 
