@@ -705,9 +705,8 @@ class Camera:
                 ss = state.currentSS
                 f_stops = [0,-2,-4]
 
-                loopstart_tot = time.time()
-
                 for i0 in f_stops:
+                    loopstart_tot = time.time()
                     ss_fstop = self.F_Stop2SS(ss,i0)
 
                     loopstartjpg = time.time()
