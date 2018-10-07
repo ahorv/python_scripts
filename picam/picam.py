@@ -139,7 +139,7 @@ class Helpers:
             except IOError as e:
                 msg = ('{} may already be running. Only one instance of it '
                        'allowed.'
-                       ).format('raw2')
+                       ).format('picam')
                 print(' LOCK: ' + str(msg))
                 exit()
 
