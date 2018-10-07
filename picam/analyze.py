@@ -21,7 +21,7 @@ from fractions import Fraction
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 29.09.2018 Version 1 : postprocess.py
+## Hoa: 07.10.2018 Version 1 : postprocess.py
 ######################################################################
 # Reads pictures and plots their histograms
 #
@@ -187,8 +187,12 @@ class Helpers:
                     masked_img = self.maske_image(np.uint8(img_rgb), [width, hight, color], (616, 824), 1000)
                     img_rgb = masked_img
 
+                list_images.append(img_rgb)
+
+                '''
                 new_img = cv2.resize(img_rgb, None, fx=0.25, fy=0.25)
                 list_images.append(new_img)
+                '''
 
                 cnt += 1
 
@@ -200,6 +204,7 @@ class Helpers:
             return list_images
 
         except Exception as e:
+            print('Last directory to read: {}'.format(next_dir2))
             print('readAllImages: Error: ' + str(e))
 
     def plotHystogram(self,img,fig,avgb):
@@ -258,7 +263,7 @@ class Helpers:
                 ax2,text = self.plotHystogram(next_img,fig_outer,avgb)
 
                 plt.draw()
-                plt.pause(1)
+                plt.pause(0.05)
                 text.remove()
                 counter += 1
                 ax2.clear()
@@ -313,7 +318,7 @@ def main():
     try:
         global Path_to_raw
         global listOfAvgBrightness
-        preprocess = True  # Collect images from subdirectories
+        preprocess = False  # Collect images from subdirectories
 
         if not os.path.isdir(Path_to_raw):
             print('\nError: Image directory does not exist! -> Aborting.')

@@ -244,7 +244,6 @@ class HDR:
                 value = line.split("ss:", 1)[1]
                 value = value.split(',', 1)[0]
                 value = value.strip()
-                print('new ss: {}'.format(value))
                 value += '/1000000'
                 val_float = np.float32(Fraction(str(value)))
                 listOfSS[pos] = val_float
@@ -298,7 +297,9 @@ class HDR:
 
                         image_stack[pos] = img_rgb
                         values = [str(picnumber), onlyfiles_data[n], str(round(expos_stack[n],5))]
-                        print('Pic {}, reading data: {}, shutter time: {}'.format(values))
+                        #print('Pic {}, reading data: {}, shutter time: {}'.format(values))
+                        print('data {} from {}'.format(pos, len(onlyfiles_data)))
+
                     pos +=1
 
             return image_stack, expos_stack
@@ -319,7 +320,8 @@ class HDR:
                 for pic in piclist:
                     if str(picnumber[0]) == str(pic):
                         image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
-                        print('Pic {}, reading data from : {}, exif: {}'.format(str(picnumber), onlyfiles[n], expos_stack[n]))
+                        #print('Pic {}, reading data from : {}, exif: {}'.format(str(picnumber), onlyfiles[n], expos_stack[n]))
+                        print('jpg image {} from {}'.format(pos,len(onlyfiles)))
                     pos +=1
 
             return image_stack, expos_stack
@@ -397,7 +399,8 @@ class HDR:
                 prefix = '{0:04d}'.format(cnt)
                 ldrReinhard = self.composeOneHDRimgJpg(next_dir)
 
-                remasked_img = imgproc.maske_jpg_Image(ldrReinhard)
+                #remasked_img = imgproc.maske_jpg_Image(ldrReinhard)
+                remasked_img = ldrReinhard
 
                 dateAndTime = (next_dir.rstrip('\\').rpartition('\\')[-1]).replace('_',' ')
                 year  = dateAndTime[:4]
@@ -546,7 +549,7 @@ def main():
         unzipall          = False
         delallzip         = False
         runslideshow      = False
-        copyAndTag        = False
+        copyAndTag        = True
         hdr_pics_from_jpg = True
         creat_HDR_Video   = False
         hdr_from_data     = False
