@@ -321,7 +321,6 @@ class HDR:
                     if str(picnumber[0]) == str(pic):
                         image_stack[pos] = cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR)
                         #print('Pic {}, reading data from : {}, exif: {}'.format(str(picnumber), onlyfiles[n], expos_stack[n]))
-                        print('jpg image {} from {}'.format(pos,len(onlyfiles)))
                     pos +=1
 
             return image_stack, expos_stack
