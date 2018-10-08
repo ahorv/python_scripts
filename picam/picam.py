@@ -115,7 +115,7 @@ class Logger:
 class Helpers:
 
     def ensure_single_instance_of_app(self):
-        app_name = 'raw2'  # app name to be monitored
+        app_name = 'picam'  # app name to be monitored
 
         if sys.platform == "linux":
 
