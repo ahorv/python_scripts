@@ -355,7 +355,7 @@ class Camera:
             ct = self.camera.contrast,
         )
         logdata = '[ss:{ss}, iso:{iso} exp:{exp}, ag:{ag}, dg:{dg}, awb:[{awb}], br:{br}, ct:{ct}]'.format(**cam_stats)
-        logger.Info(logdata)
+        logger.info(logdata)
 
         return data
 
@@ -442,7 +442,7 @@ class Camera:
                 df_var  = '{0:.2f}'.format(np.var(df)),
             )
             print(legend.format(**stats))
-            logger.Info
+            logger.info(legend.format(**stats))
 
         average_5ms /=len(files_5ms)
 
