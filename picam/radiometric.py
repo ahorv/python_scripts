@@ -123,7 +123,74 @@ class Helpers:
             print('PERM : Could not set permissions for file: ' + str(e))
 
 class Imgproc:
-    def data2rgb(self, data, awb_gains = None):
+
+    def deraw1(self, mosaic, awb_gains = None):
+        try:
+            black = mosaic.min()
+            saturation = mosaic.max()
+
+            uint14_max = 2 ** 14 - 1
+            mosaic -= black  # black subtraction
+            mosaic *= int(uint14_max / (saturation - black))
+            mosaic = np.clip(mosaic, 0, uint14_max)  # clip to range
+
+
+            if awb_gains is None:
+                vb_gain = 37 / 32
+                vg_gain = 1.0  # raspi raw has already gain = 1 of green channel
+                vr_gain = 63 / 32
+            else:
+                vb_gain = awb_gains[1]
+                vg_gain = 1.0  # raspi raw has already gain = 1 of green channel
+                vr_gain = awb_gains[0]
+
+            mosaic = mosaic.reshape([2464, 3296])
+            mosaic = mosaic.astype('float')
+            print('dtype: {}'.format(mosaic.dtype))
+            mosaic[0::2, 1::2] *= vb_gain  # Blue
+            mosaic[1::2, 0::2] *= vr_gain  # Red
+            mosaic = np.clip(mosaic, 0, uint14_max)  # clip to range
+            mosaic *= 2 ** 2
+
+            # demosaic
+            p1 = mosaic[0::2, 1::2]  # Blue
+            p2 = mosaic[0::2, 0::2]  # Green
+            p3 = mosaic[1::2, 1::2]  # Green
+            p4 = mosaic[1::2, 0::2]  # Red
+
+            blue = p1
+            green = np.clip((p2 // 2 + p3 // 2), 0, 2 ** 16 - 1)
+            red = p4
+
+            image = np.dstack([red, green, blue])  # 16 - bit 'image'
+
+            # down sample to RGB 8 bit image
+            # self.deraw2rgb1(image)
+
+            return image
+
+        except Exception as e:
+            print('Error in deraw: {}'.format(e))
+
+    def deraw2rgb1(self, data):
+        image = data // 256  # reduce dynamic range to 8 bpp
+        image = np.clip(image, 0, 255).astype(np.uint8)
+
+        return image
+
+    def deraw2rgb2(self, data):
+        image = np.zeros(data.shape, dtype=np.float)
+        min = data.min()
+        image = data - min
+
+        # get the max from out after normalizing to 0
+        max = image.max()
+        image *= (255 / max)
+        image = np.uint8(image)
+
+        return image
+
+    def deraw2(self, data, awb_gains = None):
         try:
             p1 = data[0::2, 1::2]  # Blue
             p2 = data[0::2, 0::2]  # Green
@@ -166,12 +233,9 @@ class Imgproc:
 
             height, width = rgb.shape[:2]
 
-            img = cv2.resize(rgb, (width, height), interpolation=cv2.INTER_CUBIC)
+            img = cv2.resize(rgb, (width, height), interpolation=cv2.INTER_CUBIC) # 16 - bit 'image'
 
-
-            # img = img.astype(np.float32)
-
-            # normalizeImage
+            # down sample to RGB 8 bit image
             out = np.zeros(img.shape, dtype=np.float)
             min = img.min()
             out = img - min
@@ -382,7 +446,8 @@ class Camera:
 
         average_5ms /=len(files_5ms)
 
-        avrg_5ms = imprc.data2rgb(average_5ms.astype('uint16'))
+        img = imprc.deraw1(average_5ms.astype('uint16'))
+        avrg_5ms = imprc.deraw2rgb1(img)
         cv2.imwrite(join(RADIOMETRICALIB ,"df_avg5ms.jpg"),avrg_5ms)
 
         with open(RADIOMETRICALIB + "/" + 'df_avg5ms.data', 'wb') as g:
@@ -413,7 +478,8 @@ class Camera:
 
         average_50ms /= len(files_5ms)
 
-        avrg_50ms = imprc.data2rgb(average_50ms.astype('uint16'))
+        img = imprc.deraw1(average_50ms.astype('uint16'))
+        avrg_50ms = imprc.deraw2rgb1(img)
         cv2.imwrite(join(RADIOMETRICALIB,"df_avg50ms.jpg"),avrg_50ms)
 
         with open(RADIOMETRICALIB + "/" + 'df_avg50ms.data', 'wb') as g:
@@ -424,6 +490,7 @@ class Camera:
         print('Done avreaging darkframes.')
 
     def flatfielding(self, data):
+        #Flat fielding for each demosaiced rgb channel
         flatfielded_data = []
 
         return flatfielded_data

@@ -34,7 +34,7 @@ def deraw(path):
     try:
         mosaic = np.fromfile(path, dtype='uint16')
 
-        black = mosaic.min()  # proc.imgdata.color.black
+        black = mosaic.min()
         saturation = mosaic.max()
 
         uint14_max = 2 ** 14 - 1
@@ -67,7 +67,7 @@ def deraw(path):
         image = np.dstack([red, green, blue])  # 16 - bit 'image'
 
         # down sample to RGB 8 bit image
-        image = image // 2 ** 8  # reduce dynamic range to 8bpp
+        image = image // 256  # reduce dynamic range to 8 bpp
         image = np.clip(image, 0, 255).astype(np.uint8)
 
         cv2.imwrite(join(Path_to_Dir, 'deraw_2.jpg'), image)
