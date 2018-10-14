@@ -21,7 +21,7 @@ from fractions import Fraction
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 07.10.2018 Version 1 : postprocess.py
+## Hoa: 07.10.2018 Version 1 : analyze.py
 ######################################################################
 # Reads pictures and plots their histograms
 #
