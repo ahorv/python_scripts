@@ -41,11 +41,17 @@ print('Version opencv: ' + cv2.__version__)
 
 global SCRIPTPATH
 global RADIOMETRICALIB
+global DARKFRAMES_5MS
+global DARKFRAMES_50MS
+global DF_AVG5MS
+global DF_AVG50MS
 
 SCRIPTPATH = join('/home', 'pi', 'python_scripts', 'picam')
 RADIOMETRICALIB = join(SCRIPTPATH, 'radiometric')
 DARKFRAMES_5MS = join(RADIOMETRICALIB, 'df5')
 DARKFRAMES_50MS = join(RADIOMETRICALIB, 'df50')
+DF_AVG5MS  = join(RADIOMETRICALIB, 'df_avg5ms.data')
+DF_AVG50MS = join(RADIOMETRICALIB, 'df_avg50ms.data')
 
 
 class Logger:
@@ -489,6 +495,11 @@ class Camera:
         logger.info('Created avreged darkframes for 5ms and 50 ms exposure.')
         print('Done avreaging darkframes.')
 
+    def  substract_darkframes(self):
+        df_avg5ms = np.fromfile(files_5ms[0], dtype='uint16')
+
+
+
     def flatfielding(self, data):
         #Flat fielding for each demosaiced rgb channel
         flatfielded_data = []
@@ -515,6 +526,7 @@ def main():
         #camera.warm_up()
         #camera.take_darkframe_pictures()
         camera.average_darkframes()
+        camera.substract_darkframes()
 
     except Exception as e:
         picam.close()
