@@ -22,7 +22,7 @@ if sys.platform == "linux":
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 11.10.2018 Version 1 : radiometric.py
+## Hoa: 15.10.2018 Version 2 : radiometric.py
 ######################################################################
 # According to 'Laying foundation to use Raspberry Pi 3 V2 camera'.
 # Purpos: Absolute Radiometric Calibration of Raspberry pi 3 V2 camera
@@ -46,12 +46,16 @@ global DARKFRAMES_50MS
 global DF_AVG5MS
 global DF_AVG50MS
 
-SCRIPTPATH = join('/home', 'pi', 'python_scripts', 'picam')
-RADIOMETRICALIB = join(SCRIPTPATH, 'radiometric')
+#SCRIPTPATH = join('/home', 'pi', 'python_scripts', 'picam')
+SCRIPTPATH = r'C:\Users\ati\Desktop'
+#RADIOMETRICALIB = join(SCRIPTPATH, 'radiometric')
+RADIOMETRICALIB = join(SCRIPTPATH, 'test')
 DARKFRAMES_5MS = join(RADIOMETRICALIB, 'df5')
 DARKFRAMES_50MS = join(RADIOMETRICALIB, 'df50')
 DF_AVG5MS  = join(RADIOMETRICALIB, 'df_avg5ms.data')
 DF_AVG50MS = join(RADIOMETRICALIB, 'df_avg50ms.data')
+DATAPATH = join(RADIOMETRICALIB, 'data0.data')
+print(DATAPATH)
 
 
 class Logger:
@@ -92,7 +96,8 @@ class Logger:
                 self.logger.addHandler(consoleHandler)
 
             helper = Helpers()
-            helper.setOwnerAndPermission(LOGFILEPATH)
+            if sys.platform == "linux":
+                helper.setOwnerAndPermission(LOGFILEPATH)
             return self.logger
 
         except IOError as e:
@@ -152,7 +157,6 @@ class Imgproc:
 
             mosaic = mosaic.reshape([2464, 3296])
             mosaic = mosaic.astype('float')
-            print('dtype: {}'.format(mosaic.dtype))
             mosaic[0::2, 1::2] *= vb_gain  # Blue
             mosaic[1::2, 0::2] *= vr_gain  # Red
             mosaic = np.clip(mosaic, 0, uint14_max)  # clip to range
@@ -247,6 +251,145 @@ class Imgproc:
         except Exception as e:
             print('data2rgb: Could not convert data to rgb: ' + str(e))
 
+    def average_darkframes(self):
+        print('Running averaging.')
+        helper = Helpers()
+        s = Logger()
+        logger = s.getLogger()
+        imprc = Imgproc()
+
+        files_5ms = []
+        files_50ms = []
+
+        for file in sorted(glob(os.path.join(DARKFRAMES_5MS, "*.data"))):
+            if os.path.isfile(file):
+                files_5ms.append(file)
+
+        for file in sorted(glob(os.path.join(DARKFRAMES_50MS, "*.data"))):
+            if os.path.isfile(file):
+                files_50ms.append(file)
+
+        average_5ms = np.fromfile(files_5ms[0], dtype='uint16') # load first image
+        average_5ms = average_5ms.reshape([2464, 3296])
+        average_5ms = average_5ms.astype('float')
+        legend = 'DF 5ms: {df_name}: mean: {df_mean}, median: {df_medi}, std: {df_stdv}, var: {df_var}'
+
+        for file in files_5ms[1:]:
+            data = np.fromfile(file, dtype='uint16')
+            df = data.reshape([2464, 3296])
+            df = df.astype('float')                     # sonst Überlauf
+            average_5ms += df
+
+            stats = dict(
+                df_name = '{}'.format(file.strip('.data').split('/')[-1]),
+                df_mean = '{0:.2f}'.format(np.mean(df)),
+                df_medi = '{0:.2f}'.format(np.median(df)),
+                df_stdv = '{0:.2f}'.format(np.std(df)),
+                df_var  = '{0:.2f}'.format(np.var(df)),
+            )
+            print(legend.format(**stats))
+            logger.info(legend.format(**stats))
+
+        average_5ms /=len(files_5ms)
+
+        img = imprc.deraw1(average_5ms.astype('uint16'))
+        avrg_5ms = imprc.deraw2rgb1(img)
+        cv2.imwrite(join(RADIOMETRICALIB ,"df_avg5ms.jpg"),avrg_5ms)
+
+        with open(RADIOMETRICALIB + "/" + 'df_avg5ms.data', 'wb') as g:
+            data = average_5ms.astype('uint16')
+            data.tofile(g)
+        #-------------------------------------------
+        # do the same with 50ms exposure dark frames
+        average_50ms = np.fromfile(files_50ms[0], dtype='uint16') # load first image
+        average_50ms = average_50ms.reshape([2464, 3296])
+        average_50ms = average_50ms.astype('float')
+        legend = 'DF 50ms: {df_name}: mean: {df_mean}, median: {df_medi}, std: {df_stdv}, var: {df_var}'
+
+        for file in files_50ms[1:]:
+            data = np.fromfile(file, dtype='uint16')
+            df = data.reshape([2464, 3296])
+            df = df.astype('float')                     # sonst Überlauf
+            average_50ms += df
+
+            stats = dict(
+                df_name = '{}'.format(file.strip('.data').split('/')[-1]),
+                df_mean = '{0:.2f}'.format(np.mean(df)),
+                df_medi = '{0:.2f}'.format(np.median(df)),
+                df_stdv = '{0:.2f}'.format(np.std(df)),
+                df_var  = '{0:.2f}'.format(np.var(df)),
+            )
+            print(legend.format(**stats))
+
+        average_50ms /= len(files_5ms)
+
+        img = imprc.deraw1(average_50ms.astype('uint16'))
+        avrg_50ms = imprc.deraw2rgb1(img)
+        cv2.imwrite(join(RADIOMETRICALIB,"df_avg50ms.jpg"),avrg_50ms)
+
+        with open(RADIOMETRICALIB + "/" + 'df_avg50ms.data', 'wb') as g:
+            data = average_50ms.astype('uint16')
+            data.tofile(g)
+
+        logger.info('Created avreged darkframes for 5ms and 50 ms exposure.')
+        print('Done avreaging darkframes.')
+
+    def  substract_darkframes(self, data):
+        df_avg5ms  = np.fromfile(join(RADIOMETRICALIB,'df_avg5ms.data'),  dtype='uint16')
+        df_avg50ms = np.fromfile(join(RADIOMETRICALIB,'df_avg50ms.data'), dtype='uint16')
+        df_avg = (np.array(df_avg5ms) + np.array(df_avg50ms)) / 2
+        df_substracted = data - df_avg
+        return df_substracted.clip(0)
+
+    def flatfielding(self, data):
+        #Flat fielding for each demosaiced rgb channel
+
+        data = data.astype('float')
+        # numpy functions on arrays:
+        # https://jakevdp.github.io/PythonDataScienceHandbook/02.03-computation-on-arrays-ufuncs.html
+        # https://stackoverflow.com/questions/24580993/calling-functions-with-parameters-using-a-dictionary-in-python
+
+        # coefs for the red channel:
+        a0_r = -1.234; a1_r = 1.962;  b1_r = -1.751; a2_r = 0.2604;  b2_r = 0.07941; w_r = -0.0007905
+        # coefs for the green channel:
+        a0_g = 0.4900; a1_g = 0.4123; b1_g = 0.1851; a2_g = 0.09083; b2_g = -0.05701; w_g = 0.001312
+        # coefs for the green channel:
+        a0_b = 0.4935; a1_b = 0.4216; b1_b = 0.1736; a2_b = 0.08101; b2_b = -0.06155; w_b = 0.001284
+
+        f_r = lambda x: a0_r + a1_r*np.cos(w_r*x) + b1_r*np.sin(w_r*x) + a2_r*np.cos(2*w_r*x) + b2_r*np.sin(2*w_r*x)
+        f_g = lambda x: a0_g + a1_g*np.cos(w_g*x) + b1_g*np.sin(w_g*x) + a2_g*np.cos(2*w_g*x) + b2_g*np.sin(2*w_g*x)
+        f_b = lambda x: a0_b + a1_b*np.cos(w_b*x) + b1_g*np.sin(w_b*x) + a2_b*np.cos(2*w_b*x) + b2_b*np.sin(2*w_b*x)
+
+        red   = data[:, :, 0]
+        green = data[:, :, 1]
+        blue  = data[:, :, 2]
+
+        r_f = f_r(red)
+        r_g = f_g(green)
+        r_b = f_b(blue)
+
+        image = np.dstack([r_f, r_g, r_b])
+
+        return image.astype('uint16')          # 16 bit image
+
+    def plot_data_histogram(self,path_to_image):
+
+        '''
+        Plots histogram of one *.data 'image'.
+
+        :param path_to_image: the path to a single *.data image.
+        :return: nil
+        '''
+
+        print('Plotting data histogram, may take a while !')
+        if path_to_image:
+            data = np.fromfile(path_to_image, dtype='uint16')
+            plt.hist(data, bins= (65536 - 1)) # 65536 -1
+            plt.xlim([0, 100])
+            plt.title('Histogram for data')
+            plt.show()
+
+
 class Camera_config(object):
 
   def __init__(self, config_map={}):
@@ -266,6 +409,7 @@ class Camera_config(object):
       'framerate_max': self.framerate_max,
       'framerate_min': self.framerate_min,
     }
+
 
 class Camera:
 
@@ -290,23 +434,6 @@ class Camera:
         print("Set up picam with: ")
         print("\tAWB gains:\t", awb_gains)
         print("\tPicture size   :\t", config.w, 'x', config.h)
-
-    def plot_data_histogram(self,path_to_image):
-
-        '''
-        Plots histogram of one *.data 'image'.
-
-        :param path_to_image: the path to a single *.data image.
-        :return: nil
-        '''
-
-        print('Plotting data histogram, may take a while !')
-        if path_to_image:
-            data = np.fromfile(path_to_image, dtype='uint16')
-            plt.hist(data, bins= (65536 - 1)) # 65536 -1
-            plt.xlim([0, 100])
-            plt.title('Histogram for data')
-            plt.show()
 
     def single_shoot_data(self, iso = None, shutter_speed=None):
         '''
@@ -401,127 +528,6 @@ class Camera:
         logger.info('All dark frame pictures taken.')
         print('All dark frame pictures taken')
 
-    def average_darkframes(self):
-        print('Running averaging.')
-        helper = Helpers()
-        s = Logger()
-        logger = s.getLogger()
-        imprc = Imgproc()
-
-        files_5ms = []
-        files_50ms = []
-
-        for file in sorted(glob(os.path.join(DARKFRAMES_5MS, "*.data"))):
-            if os.path.isfile(file):
-                files_5ms.append(file)
-
-        for file in sorted(glob(os.path.join(DARKFRAMES_50MS, "*.data"))):
-            if os.path.isfile(file):
-                files_50ms.append(file)
-
-        average_5ms = np.fromfile(files_5ms[0], dtype='uint16') # load first image
-        average_5ms = average_5ms.reshape([2464, 3296])
-        average_5ms = average_5ms.astype('float')
-        legend = 'DF 5ms: {df_name}: mean: {df_mean}, median: {df_medi}, std: {df_stdv}, var: {df_var}'
-
-        for file in files_5ms[1:]:
-            data = np.fromfile(file, dtype='uint16')
-            df = data.reshape([2464, 3296])
-            df = df.astype('float')                     # sonst Überlauf
-            average_5ms += df
-
-            stats = dict(
-                df_name = '{}'.format(file.strip('.data').split('/')[-1]),
-                df_mean = '{0:.2f}'.format(np.mean(df)),
-                df_medi = '{0:.2f}'.format(np.median(df)),
-                df_stdv = '{0:.2f}'.format(np.std(df)),
-                df_var  = '{0:.2f}'.format(np.var(df)),
-            )
-            print(legend.format(**stats))
-            logger.info(legend.format(**stats))
-
-        average_5ms /=len(files_5ms)
-
-        img = imprc.deraw1(average_5ms.astype('uint16'))
-        avrg_5ms = imprc.deraw2rgb1(img)
-        cv2.imwrite(join(RADIOMETRICALIB ,"df_avg5ms.jpg"),avrg_5ms)
-
-        with open(RADIOMETRICALIB + "/" + 'df_avg5ms.data', 'wb') as g:
-            data = average_5ms.astype('uint16')
-            data.tofile(g)
-        #-------------------------------------------
-        # do the same with 50ms exposure dark frames
-        average_50ms = np.fromfile(files_50ms[0], dtype='uint16') # load first image
-        average_50ms = average_50ms.reshape([2464, 3296])
-        average_50ms = average_50ms.astype('float')
-        legend = 'DF 50ms: {df_name}: mean: {df_mean}, median: {df_medi}, std: {df_stdv}, var: {df_var}'
-
-        for file in files_50ms[1:]:
-            data = np.fromfile(file, dtype='uint16')
-            df = data.reshape([2464, 3296])
-            df = df.astype('float')                     # sonst Überlauf
-            average_50ms += df
-
-            stats = dict(
-                df_name = '{}'.format(file.strip('.data').split('/')[-1]),
-                df_mean = '{0:.2f}'.format(np.mean(df)),
-                df_medi = '{0:.2f}'.format(np.median(df)),
-                df_stdv = '{0:.2f}'.format(np.std(df)),
-                df_var  = '{0:.2f}'.format(np.var(df)),
-            )
-            print(legend.format(**stats))
-
-        average_50ms /= len(files_5ms)
-
-        img = imprc.deraw1(average_50ms.astype('uint16'))
-        avrg_50ms = imprc.deraw2rgb1(img)
-        cv2.imwrite(join(RADIOMETRICALIB,"df_avg50ms.jpg"),avrg_50ms)
-
-        with open(RADIOMETRICALIB + "/" + 'df_avg50ms.data', 'wb') as g:
-            data = average_50ms.astype('uint16')
-            data.tofile(g)
-
-        logger.info('Created avreged darkframes for 5ms and 50 ms exposure.')
-        print('Done avreaging darkframes.')
-
-    def  substract_darkframes(self, data):
-        df_avg5ms  = np.fromfile(join(RADIOMETRICALIB,'df_avg5ms.data'), dtype='uint16')
-        df_avg50ms = np.fromfile(join(RADIOMETRICALIB,'df_avg50ms.data'), dtype='uint16')
-        df_avg = (np.array(df_avg5ms) + np.array(df_avg50ms)) / 2
-        df_substracted = data - df_avg
-        return df_substracted
-
-    def flatfielding(self, data):
-        #Flat fielding for each demosaiced rgb channel
-
-        data = data.astype('float')
-        # numpy functions on arrays:
-        # https://jakevdp.github.io/PythonDataScienceHandbook/02.03-computation-on-arrays-ufuncs.html
-        # https://stackoverflow.com/questions/24580993/calling-functions-with-parameters-using-a-dictionary-in-python
-
-        # coefs for the red channel:
-        a0_r = -1.234; a1_r = 1.962;  b1_r = -1.751; a2_r = 0.2604;  b2_r = 0.07941; w_r = -0.0007905
-        # coefs for the green channel:
-        a0_g = 0.4900; a1_g = 0.4123; b1_g = 0.1851; a2_g = 0.09083; b2_g = -0.05701; w_g = 0.001312
-        # coefs for the green channel:
-        a0_b = 0.4935; a1_b = 0.4216; b1_b = 0.1736; a2_b = 0.08101; b2_b = -0.06155; w_b = 0.001284
-
-        f_r = lambda x: a0_r + a1_r*np.cos(w_r*x) + b1_r*np.sin(w_r*x) + a2_r*np.cos(2*w_r*x) + b2_r*np.sin(2*w_r*x)
-        f_g = lambda x: a0_g + a1_g*np.cos(w_g*x) + b1_g*np.sin(w_g*x) + a2_g*np.cos(2*w_g*x) + b2_g*np.sin(2*w_g*x)
-        f_b = lambda x: a0_b + a1_b*np.cos(w_b*x) + b1_g*np.sin(w_b*x) + a2_b*np.cos(2*w_b*x) + b2_b*np.sin(2*w_b*x)
-
-        red   = data[:, :, 0]
-        green = data[:, :, 1]
-        blue  = data[:, :, 2]
-
-        r_f = f_r(red)
-        r_g = f_g(green)
-        r_b = f_b(blue)
-
-        image = np.dstack([r_f, r_g, r_b])
-
-        return image.astype('uint16')          # 16 bit image
-
 
 def main():
     try:
@@ -536,16 +542,24 @@ def main():
         log = s.getLogger()
         helper = Helpers()
         helper.createNewFolder(RADIOMETRICALIB)
-        picam = picamera.PiCamera()
-        camera = Camera(picam,Camera_config(cfg))
+        imprc = Imgproc()
 
-        # camera.warm_up()
-        # camera.take_darkframe_pictures()
-        # camera.average_darkframes()
-        camera.substract_darkframes()
+        if sys.platform == "linux":
+            picam = picamera.PiCamera()
+            camera = Camera(picam,Camera_config(cfg))
+            camera.warm_up()
+            camera.take_darkframe_pictures()
+
+        data = np.fromfile(DATAPATH, dtype='uint16')  # load first image
+
+
+        #imprc.average_darkframes()
+        img = imprc.substract_darkframes(data)
+        image = imprc.deraw2rgb1(img)
+        cv2.imwrite(join(RADIOMETRICALIB,"calibrated.jpg"),image)
 
     except Exception as e:
-        picam.close()
+        if sys.platform == "linux": picam.close()
         log.error(' MAIN: Error in main: ' + str(e))
 
 
