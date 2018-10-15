@@ -563,11 +563,18 @@ def main():
         data = np.fromfile(DATAPATH, dtype='uint16')  # load first image
 
         #imprc.average_darkframes()
-        data  = imprc.substract_darkframes(data)
-        img   = imprc.demosaic1(data)
-        img   = imprc.flatfielding(img)
-        image = imprc.toRGB_1(img)
-        cv2.imwrite(join(RADIOMETRICALIB,"calibrated.jpg"),image)
+        df_avg5ms = np.fromfile(DF_AVG5MS, dtype='uint16')
+        flatfield = imprc.demosaic1(df_avg5ms)
+        flatfield  = imprc.flatfielding(flatfield)
+        image = imprc.toRGB_1(flatfield)
+        cv2.imwrite(join(RADIOMETRICALIB, "flatfield.jpg"), image)
+
+
+        df_subtracted  = imprc.substract_darkframes(data)
+
+
+
+
 
     except Exception as e:
         if sys.platform == "linux": picam.close()
