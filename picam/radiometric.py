@@ -182,12 +182,22 @@ class Imgproc:
             print('Error in deraw: {}'.format(e))
 
     def deraw2rgb1(self, data):
+        '''
+        Belongs to deraw1
+        :param data:
+        :return:
+        '''
         image = data // 256  # reduce dynamic range to 8 bpp
         image = np.clip(image, 0, 255).astype(np.uint8)
 
         return image
 
     def deraw2rgb2(self, data):
+        '''
+        Belongs to deraw2
+        :param data:
+        :return:
+        '''
         image = np.zeros(data.shape, dtype=np.float)
         min = data.min()
         image = data - min
