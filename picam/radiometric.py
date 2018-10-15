@@ -563,9 +563,9 @@ def main():
         data = np.fromfile(DATAPATH, dtype='uint16')  # load first image
 
         #imprc.average_darkframes()
-        data = imprc.substract_darkframes(data)
-        data = imprc.flatfielding(data)
-        img = imprc.demosaic1(data)
+        data  = imprc.substract_darkframes(data)
+        img   = imprc.demosaic1(data)
+        img   = imprc.flatfielding(img)
         image = imprc.toRGB_1(img)
         cv2.imwrite(join(RADIOMETRICALIB,"calibrated.jpg"),image)
 
