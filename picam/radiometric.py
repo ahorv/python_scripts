@@ -502,6 +502,10 @@ class Camera:
 
     def flatfielding(self, data):
         #Flat fielding for each demosaiced rgb channel
+
+        # numpy functions on arrays:
+        # https://jakevdp.github.io/PythonDataScienceHandbook/02.03-computation-on-arrays-ufuncs.html
+
         flatfielded_data = []
 
         return flatfielded_data
