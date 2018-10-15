@@ -485,7 +485,8 @@ class Camera:
         print('Done avreaging darkframes.')
 
     def  substract_darkframes(self):
-        df_avg5ms = np.fromfile(files_5ms[0], dtype='uint16')
+        df_avg5ms  = np.fromfile(join(RADIOMETRICALIB,'df_avg5ms.data'), dtype='uint16')
+        df_avg50ms = np.fromfile(join(RADIOMETRICALIB,'df_avg50ms.data'), dtype='uint16')
 
 
 
