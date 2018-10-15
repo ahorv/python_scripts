@@ -491,7 +491,8 @@ class Camera:
 
     def flatfielding(self, data):
         #Flat fielding for each demosaiced rgb channel
-        flatfielded_data = []
+
+        data = data.astype('float')
         # numpy functions on arrays:
         # https://jakevdp.github.io/PythonDataScienceHandbook/02.03-computation-on-arrays-ufuncs.html
         # https://stackoverflow.com/questions/24580993/calling-functions-with-parameters-using-a-dictionary-in-python
@@ -507,8 +508,17 @@ class Camera:
         f_g = lambda x: a0_g + a1_g*np.cos(w_g*x) + b1_g*np.sin(w_g*x) + a2_g*np.cos(2*w_g*x) + b2_g*np.sin(2*w_g*x)
         f_b = lambda x: a0_b + a1_b*np.cos(w_b*x) + b1_g*np.sin(w_b*x) + a2_b*np.cos(2*w_b*x) + b2_b*np.sin(2*w_b*x)
 
+        red   = data[:, :, 0]
+        green = data[:, :, 1]
+        blue  = data[:, :, 2]
 
-        return flatfielded_data
+        r_f = f_r(red)
+        r_g = f_g(green)
+        r_b = f_b(blue)
+
+        image = np.dstack([r_f, r_g, r_b])
+
+        return image
 
 
 def main():
