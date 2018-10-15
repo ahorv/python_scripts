@@ -368,7 +368,7 @@ class Imgproc:
 
         f_r = lambda x: a0_r + a1_r*np.cos(w_r*x) + b1_r*np.sin(w_r*x) + a2_r*np.cos(2*w_r*x) + b2_r*np.sin(2*w_r*x)
         f_g = lambda x: a0_g + a1_g*np.cos(w_g*x) + b1_g*np.sin(w_g*x) + a2_g*np.cos(2*w_g*x) + b2_g*np.sin(2*w_g*x)
-        f_b = lambda x: a0_b + a1_b*np.cos(w_b*x) + b1_g*np.sin(w_b*x) + a2_b*np.cos(2*w_b*x) + b2_b*np.sin(2*w_b*x)
+        f_b = lambda x: a0_b + a1_b*np.cos(w_b*x) + b1_b*np.sin(w_b*x) + a2_b*np.cos(2*w_b*x) + b2_b*np.sin(2*w_b*x)
 
         red   = data[:, :, 0]
         green = data[:, :, 1]
@@ -562,9 +562,10 @@ def main():
 
         data = np.fromfile(DATAPATH, dtype='uint16')  # load first image
 
-
         #imprc.average_darkframes()
-        img = imprc.substract_darkframes(data)
+        data = imprc.substract_darkframes(data)
+        data = imprc.flatfielding(data)
+        img = imprc.deraw1(data)
         image = imprc.deraw2rgb1(img)
         cv2.imwrite(join(RADIOMETRICALIB,"calibrated.jpg"),image)
 
