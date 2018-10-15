@@ -518,7 +518,7 @@ class Camera:
 
         image = np.dstack([r_f, r_g, r_b])
 
-        return image
+        return image.astype('uint16')          # 16 bit image
 
 
 def main():
