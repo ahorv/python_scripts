@@ -484,12 +484,12 @@ class Camera:
         logger.info('Created avreged darkframes for 5ms and 50 ms exposure.')
         print('Done avreaging darkframes.')
 
-    def  substract_darkframes(self):
+    def  substract_darkframes(self, data):
         df_avg5ms  = np.fromfile(join(RADIOMETRICALIB,'df_avg5ms.data'), dtype='uint16')
         df_avg50ms = np.fromfile(join(RADIOMETRICALIB,'df_avg50ms.data'), dtype='uint16')
         df_avg = (np.array(df_avg5ms) + np.array(df_avg50ms)) / 2
-
-
+        df_substracted = data - df_avg
+        return df_substracted
 
     def flatfielding(self, data):
         #Flat fielding for each demosaiced rgb channel
@@ -539,9 +539,9 @@ def main():
         picam = picamera.PiCamera()
         camera = Camera(picam,Camera_config(cfg))
 
-        #camera.warm_up()
-        #camera.take_darkframe_pictures()
-        camera.average_darkframes()
+        # camera.warm_up()
+        # camera.take_darkframe_pictures()
+        # camera.average_darkframes()
         camera.substract_darkframes()
 
     except Exception as e:
