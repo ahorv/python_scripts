@@ -135,7 +135,7 @@ class Helpers:
 
 class Imgproc:
 
-    def deraw1(self, mosaic, awb_gains = None):
+    def demosaic1(self, mosaic, awb_gains = None):
         try:
             black = mosaic.min()
             saturation = mosaic.max()
@@ -181,35 +181,7 @@ class Imgproc:
         except Exception as e:
             print('Error in deraw: {}'.format(e))
 
-    def deraw2rgb1(self, data):
-        '''
-        Belongs to deraw1
-        :param data:
-        :return:
-        '''
-        image = data // 256  # reduce dynamic range to 8 bpp
-        image = np.clip(image, 0, 255).astype(np.uint8)
-
-        return image
-
-    def deraw2rgb2(self, data):
-        '''
-        Belongs to deraw2
-        :param data:
-        :return:
-        '''
-        image = np.zeros(data.shape, dtype=np.float)
-        min = data.min()
-        image = data - min
-
-        # get the max from out after normalizing to 0
-        max = image.max()
-        image *= (255 / max)
-        image = np.uint8(image)
-
-        return image
-
-    def deraw2(self, data, awb_gains = None):
+    def demosiac2(self, data, awb_gains = None):
         try:
             p1 = data[0::2, 1::2]  # Blue
             p2 = data[0::2, 0::2]  # Green
@@ -261,6 +233,34 @@ class Imgproc:
         except Exception as e:
             print('data2rgb: Could not convert data to rgb: ' + str(e))
 
+    def toRGB_1(self, data):
+        '''
+        Belongs to deraw1
+        :param data:
+        :return:
+        '''
+        image = data // 256  # reduce dynamic range to 8 bpp
+        image = np.clip(image, 0, 255).astype(np.uint8)
+
+        return image
+
+    def toRGB_2(self, data):
+        '''
+        Belongs to deraw2
+        :param data:
+        :return:
+        '''
+        image = np.zeros(data.shape, dtype=np.float)
+        min = data.min()
+        image = data - min
+
+        # get the max from out after normalizing to 0
+        max = image.max()
+        image *= (255 / max)
+        image = np.uint8(image)
+
+        return image
+
     def average_darkframes(self):
         print('Running averaging.')
         helper = Helpers()
@@ -302,8 +302,8 @@ class Imgproc:
 
         average_5ms /=len(files_5ms)
 
-        img = imprc.deraw1(average_5ms.astype('uint16'))
-        avrg_5ms = imprc.deraw2rgb1(img)
+        img = imprc.demosaic1(average_5ms.astype('uint16'))
+        avrg_5ms = imprc.toRGB_1(img)
         cv2.imwrite(join(RADIOMETRICALIB ,"df_avg5ms.jpg"),avrg_5ms)
 
         with open(RADIOMETRICALIB + "/" + 'df_avg5ms.data', 'wb') as g:
@@ -333,8 +333,8 @@ class Imgproc:
 
         average_50ms /= len(files_5ms)
 
-        img = imprc.deraw1(average_50ms.astype('uint16'))
-        avrg_50ms = imprc.deraw2rgb1(img)
+        img = imprc.demosaic1(average_50ms.astype('uint16'))
+        avrg_50ms = imprc.toRGB_1(img)
         cv2.imwrite(join(RADIOMETRICALIB,"df_avg50ms.jpg"),avrg_50ms)
 
         with open(RADIOMETRICALIB + "/" + 'df_avg50ms.data', 'wb') as g:
@@ -354,7 +354,7 @@ class Imgproc:
     def flatfielding(self, data):
         #Flat fielding for each demosaiced rgb channel
 
-        data = data.astype('float')
+        #data = data.astype('float')
         # numpy functions on arrays:
         # https://jakevdp.github.io/PythonDataScienceHandbook/02.03-computation-on-arrays-ufuncs.html
         # https://stackoverflow.com/questions/24580993/calling-functions-with-parameters-using-a-dictionary-in-python
@@ -565,8 +565,8 @@ def main():
         #imprc.average_darkframes()
         data = imprc.substract_darkframes(data)
         data = imprc.flatfielding(data)
-        img = imprc.deraw1(data)
-        image = imprc.deraw2rgb1(img)
+        img = imprc.demosaic1(data)
+        image = imprc.toRGB_1(img)
         cv2.imwrite(join(RADIOMETRICALIB,"calibrated.jpg"),image)
 
     except Exception as e:
