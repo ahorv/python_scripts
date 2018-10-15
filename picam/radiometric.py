@@ -467,7 +467,6 @@ class Camera:
         legend = 'DF 50ms: {df_name}: mean: {df_mean}, median: {df_medi}, std: {df_stdv}, var: {df_var}'
 
         for file in files_50ms[1:]:
-            df_name = file.strip('.data').split('/')[-1]
             data = np.fromfile(file, dtype='uint16')
             df = data.reshape([2464, 3296])
             df = df.astype('float')                     # sonst Überlauf
@@ -502,11 +501,22 @@ class Camera:
 
     def flatfielding(self, data):
         #Flat fielding for each demosaiced rgb channel
-
+        flatfielded_data = []
         # numpy functions on arrays:
         # https://jakevdp.github.io/PythonDataScienceHandbook/02.03-computation-on-arrays-ufuncs.html
+        # https://stackoverflow.com/questions/24580993/calling-functions-with-parameters-using-a-dictionary-in-python
 
-        flatfielded_data = []
+        # coefs for the red channel:
+        a0_r = -1.234; a1_r = 1.962;  b1_r = -1.751; a2_r = 0.2604;  b2_r = 0.07941; w_r = -0.0007905
+        # coefs for the green channel:
+        a0_g = 0.4900; a1_g = 0.4123; b1_g = 0.1851; a2_g = 0.09083; b2_g = -0.05701; w_g = 0.001312
+        # coefs for the green channel:
+        a0_b = 0.4935; a1_b = 0.4216; b1_b = 0.1736; a2_b = 0.08101; b2_b = -0.06155; w_b = 0.001284
+
+        f_r = lambda x: a0_r + a1_r*np.cos(w_r*x) + b1_r*np.sin(w_r*x) + a2_r*np.cos(2*w_r*x) + b2_r*np.sin(2*w_r*x)
+        f_g = lambda x: a0_g + a1_g*np.cos(w_g*x) + b1_g*np.sin(w_g*x) + a2_g*np.cos(2*w_g*x) + b2_g*np.sin(2*w_g*x)
+        f_b = lambda x: a0_b + a1_b*np.cos(w_b*x) + b1_g*np.sin(w_b*x) + a2_b*np.cos(2*w_b*x) + b2_b*np.sin(2*w_b*x)
+
 
         return flatfielded_data
 
