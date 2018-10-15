@@ -170,8 +170,7 @@ class Imgproc:
 
             image = np.dstack([red, green, blue])  # 16 - bit 'image'
 
-            # down sample to RGB 8 bit image
-            # self.deraw2rgb1(image)
+            # down sample to RGB 8 bit image use: self.deraw2rgb1(image)
 
             return image
 
@@ -241,18 +240,9 @@ class Imgproc:
 
             img = cv2.resize(rgb, (width, height), interpolation=cv2.INTER_CUBIC) # 16 - bit 'image'
 
-            # down sample to RGB 8 bit image
-            out = np.zeros(img.shape, dtype=np.float)
-            min = img.min()
-            out = img - min
+            # down sample to RGB 8 bit image, use: self.deraw2rgb2(data)
 
-            # get the max from out after normalizing to 0
-            max = out.max()
-            out *= (255 / max)
-
-            out = np.uint8(out)
-
-            return out
+            return img
 
         except Exception as e:
             print('data2rgb: Could not convert data to rgb: ' + str(e))
