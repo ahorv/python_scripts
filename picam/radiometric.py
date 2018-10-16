@@ -47,7 +47,8 @@ global DF_AVG5MS
 global DF_AVG50MS
 
 #SCRIPTPATH = join('/home', 'pi', 'python_scripts', 'picam')
-SCRIPTPATH = r'C:\Users\ati\Desktop'
+SCRIPTPATH = r'C:\Users\tahorvat\Desktop'
+
 #RADIOMETRICALIB = join(SCRIPTPATH, 'radiometric')
 RADIOMETRICALIB = join(SCRIPTPATH, 'test')
 DARKFRAMES_5MS = join(RADIOMETRICALIB, 'df5')
@@ -344,12 +345,72 @@ class Imgproc:
         logger.info('Created avreged darkframes for 5ms and 50 ms exposure.')
         print('Done avreaging darkframes.')
 
-    def  substract_darkframes(self, data):
+    def substract_darkframes(self, data):
         df_avg5ms  = np.fromfile(join(RADIOMETRICALIB,'df_avg5ms.data'),  dtype='uint16')
         df_avg50ms = np.fromfile(join(RADIOMETRICALIB,'df_avg50ms.data'), dtype='uint16')
         df_avg = (np.array(df_avg5ms) + np.array(df_avg50ms)) / 2
         df_substracted = data - df_avg
         return df_substracted.clip(0)
+
+    def create_flatfield(self):
+        # Normalize prob:
+        # https://stackoverflow.com/questions/40645985/opencv-python-normalize-image
+
+        s = (1232, 1648, 3)
+        # white_frame =  np.zeros(s,np.float)  # empty (white) frame
+        white_frame = np.ones(s, np.float)
+        # coefs for the red channel:
+        a0_r = -1.234; a1_r = 1.962;  b1_r = -1.751; a2_r = 0.2604;  b2_r = 0.07941;  w_r = -0.0007905
+        # coefs for the green channel:
+        a0_g = 0.4900; a1_g = 0.4123; b1_g = 0.1851; a2_g = 0.09083; b2_g = -0.05701; w_g = 0.001312
+        # coefs for the green channel:
+        a0_b = 0.4935; a1_b = 0.4216; b1_b = 0.1736; a2_b = 0.08101; b2_b = -0.06155; w_b = 0.001284
+
+        #f_r = lambda x: a0_r + a1_r*np.cos(w_r*x) + b1_r*np.sin(w_r*x) + a2_r*np.cos(2*w_r*x) + b2_r*np.sin(2*w_r*x)
+        #f_g = lambda x: a0_g + a1_g*np.cos(w_g*x) + b1_g*np.sin(w_g*x) + a2_g*np.cos(2*w_g*x) + b2_g*np.sin(2*w_g*x)
+        #f_b = lambda x: a0_b + a1_b*np.cos(w_b*x) + b1_b*np.sin(w_b*x) + a2_b*np.cos(2*w_b*x) + b2_b*np.sin(2*w_b*x)
+
+        red   = white_frame[:, :, 0]
+        green = white_frame[:, :, 1]
+        blue  = white_frame[:, :, 2]
+
+        # normalize pixel values to [0,1]
+        #norm_red   = cv2.normalize(red,   None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        #norm_green = cv2.normalize(green, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        #norm_blue  = cv2.normalize(blue,  None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+        #r_f = f_r(red)
+        #g_f = f_g(green)
+        #b_f = f_b(blue)
+
+        f_r = a0_r + a1_r*np.cos(w_r*red)   + b1_r*np.sin(w_r*red)  + a2_r*np.cos(2*w_r*red)  + b2_r*np.sin(2*w_r*red)
+        f_g = a0_g + a1_g*np.cos(w_g*green) + b1_g*np.sin(w_g*green)+ a2_g*np.cos(2*w_g*green)+ b2_g*np.sin(2*w_g*green)
+        f_b = a0_b + a1_b*np.cos(w_b*blue)  + b1_b*np.sin(w_b*blue) + a2_b*np.cos(2*w_b*blue) + b2_b*np.sin(2*w_b*blue)
+
+        print('min: {} | max: {} | max-min={}'.format(f_r.min(), f_r.max(),f_r.max()-f_r.min()))
+        print('min: {} | max: {} | max-min={}'.format(f_g.min(), f_g.max(),f_g.max()-f_g.min()))
+        print('min: {} | max: {} | max-min={}'.format(f_b.min(), f_b.max(),f_b.max()-f_b.min()))
+
+        print('f_r test: {}'.format(f_r.dtype))
+        np.set_printoptions(formatter={'float': '{: 0.10f}'.format})
+        print(f_r)
+
+        # remap to (2^16) - 1 pixel values
+        upper_limit = (2**16) - 1        # 16 bit
+        red   = cv2.normalize(f_r, f_r, alpha=0, beta=65535, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        green = cv2.normalize(f_g, f_g, alpha=0, beta=65535, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        blue  = cv2.normalize(f_b, f_b, alpha=0, beta=65535, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+        #a = numpy.array([1.0, 2.0, 3.0], dtype=numpy.float32)
+
+
+        test = np.array([0.81638017, 0.81638017,0.81638017, 0.81638017, 0.81638017, 0.81638017])
+        print('Type test: {}'.format(test.dtype))
+        norm_image = cv2.normalize(test, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+        image = np.dstack([red, green, blue])
+
+        return image          # 16 bit image
 
     def flatfielding(self, data):
         #Flat fielding for each demosaiced rgb channel
@@ -374,13 +435,24 @@ class Imgproc:
         green = data[:, :, 1]
         blue  = data[:, :, 2]
 
-        r_f = f_r(red)
-        r_g = f_g(green)
-        r_b = f_b(blue)
+        # normalize pixel values to [0,1]
+        norm_red   = cv2.normalize(red,   None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        norm_green = cv2.normalize(green, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        norm_blue  = cv2.normalize(blue,  None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
-        image = np.dstack([r_f, r_g, r_b])
+        r_f = f_r(norm_red)
+        r_g = f_g(norm_green)
+        r_b = f_b(norm_blue)
 
-        return image.astype('uint16')          # 16 bit image
+        # remap to (2^16) - 1 pixel values
+        upper_limit = (2**16) - 1        # 16 bit
+        red   = cv2.normalize(red,   None, alpha=0, beta=upper_limit, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_16U)
+        green = cv2.normalize(green, None, alpha=0, beta=upper_limit, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_16U)
+        blue  = cv2.normalize(blue,  None, alpha=0, beta=upper_limit, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_16U)
+
+        image = np.dstack([red, green, blue])
+
+        return image          # 16 bit image
 
     def plot_data_histogram(self,path_to_image):
 
@@ -563,17 +635,16 @@ def main():
         data = np.fromfile(DATAPATH, dtype='uint16')  # load first image
 
         #imprc.average_darkframes()
-        df_avg5ms = np.fromfile(DF_AVG5MS, dtype='uint16')
-        flatfield = imprc.demosaic1(df_avg5ms)
-        flatfield  = imprc.flatfielding(flatfield)
+        #df_avg5ms = np.fromfile(DF_AVG5MS, dtype='uint16')
+        #flatfield = imprc.demosaic1(df_avg5ms)
+        flatfield  = imprc.create_flatfield()
         image = imprc.toRGB_1(flatfield)
         cv2.imwrite(join(RADIOMETRICALIB, "flatfield.jpg"), image)
 
-
-        df_subtracted  = imprc.substract_darkframes(data)
-
+        print('Flat Field image: {}'.format(join(RADIOMETRICALIB, "flatfield.jpg")))
 
 
+        #df_subtracted  = imprc.substract_darkframes(data)
 
 
     except Exception as e:
