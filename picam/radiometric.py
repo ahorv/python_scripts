@@ -50,11 +50,11 @@ global WHITEFRAMES_50MS
 global WF_AVG5MS
 global WF_AVG50MS
 
-#SCRIPTPATH = join('/home', 'pi', 'python_scripts', 'picam')
-SCRIPTPATH = r'C:\Users\tahorvat\Desktop'
+SCRIPTPATH = join('/home', 'pi', 'python_scripts', 'picam')
+#SCRIPTPATH = r'C:\Users\tahorvat\Desktop'
 
-#RADIOMETRICALIB = join(SCRIPTPATH, 'radiometric')
-RADIOMETRICALIB = join(SCRIPTPATH, 'test')
+RADIOMETRICALIB = join(SCRIPTPATH, 'radiometric')
+#RADIOMETRICALIB = join(SCRIPTPATH, 'test')
 DARKFRAMES_5MS = join(RADIOMETRICALIB, 'df5')
 DARKFRAMES_50MS = join(RADIOMETRICALIB, 'df50')
 DF_AVG5MS  = join(RADIOMETRICALIB, 'df_avg5ms.data')
@@ -700,10 +700,11 @@ class Camera:
         logger.info('All dark frames taken.')
         print('All dark frame pictures taken')
 
-    def take_whiteframe_pictures(self):
+    def take_whiteframe_pictures(self, with_jpg):
         helper = Helpers()
         s = Logger()
         logger = s.getLogger()
+        imprc = Imgproc()
 
         five_ms =  5 * 1000  # shutterspeed is in units of microseconds
         fity_ms = 50 * 1000
@@ -711,18 +712,50 @@ class Camera:
 
         helper.createNewFolder(WHITEFRAMES_5MS)
         helper.createNewFolder(WHITEFRAMES_50MS)
+        legend = 'WF 5ms: {df_name}: mean: {df_mean}, median: {df_medi}, std: {df_stdv}, var: {df_var}'
 
         for i0 in range(2):  # 250 -1
             dat = self.single_shoot_data(iso, five_ms)
-            #data = improc.data2rgb(dat)
             datafileName = '%s_wf.data' % str(i0 + 1)
+
+            stats = dict(
+                df_name = '{}'.format(datafileName.strip('.data').split('/')[-1]),
+                df_mean = '{0:.2f}'.format(np.mean(dat)),
+                df_medi = '{0:.2f}'.format(np.median(dat)),
+                df_stdv = '{0:.2f}'.format(np.std(dat)),
+                df_var  = '{0:.2f}'.format(np.var(dat)),
+            )
+            print(legend.format(**stats))
+
+            if with_jpg:
+                wf_name = '{}_wf5ms.jpg'.format(i0)
+                img = imprc.demosaic1(dat.astype('uint16'))
+                wf = imprc.toRGB_1(img)
+                cv2.imwrite(join(WHITEFRAMES_5MS, wf_name), wf)
+
             with open(WHITEFRAMES_5MS + "/" + datafileName, 'wb') as g:
                 dat.tofile(g)
 
+        legend = 'WF 50ms: {df_name}: mean: {df_mean}, median: {df_medi}, std: {df_stdv}, var: {df_var}'
         for i0 in range(2): # 250 -1
             dat = self.single_shoot_data(iso,fity_ms)
-            #data = improc.data2rgb(dat)
             datafileName = '%s_wf.data' % str(i0 + 1)
+
+            stats = dict(
+                df_name = '{}'.format(datafileName.strip('.data').split('/')[-1]),
+                df_mean = '{0:.2f}'.format(np.mean(dat)),
+                df_medi = '{0:.2f}'.format(np.median(dat)),
+                df_stdv = '{0:.2f}'.format(np.std(dat)),
+                df_var  = '{0:.2f}'.format(np.var(dat)),
+            )
+            print(legend.format(**stats))
+
+            if with_jpg:
+                wf_name = '{}_wf50ms.jpg'.format(i0)
+                img = imprc.demosaic1(dat.astype('uint16'))
+                wf = imprc.toRGB_1(img)
+                cv2.imwrite(join(WHITEFRAMES_50MS, wf_name), wf)
+
             with open(WHITEFRAMES_50MS+ "/" + datafileName, 'wb') as g:
                 dat.tofile(g)
 
@@ -744,7 +777,7 @@ def main():
         helper.createNewFolder(RADIOMETRICALIB)
         imprc = Imgproc()
 
-        take_whiteframes = False
+        take_whiteframes = True
         take_darkframes  = False
 
         if sys.platform == "linux":
@@ -756,18 +789,16 @@ def main():
                 camera.take_darkframe_pictures()
 
             if take_whiteframes:
-                camera.take_whiteframe_pictures()
+                camera.take_whiteframe_pictures(True)
 
-        data = np.fromfile(DATAPATH, dtype='uint16')  # load first image
-
+        #data = np.fromfile(DATAPATH, dtype='uint16')
         #imprc.average_darkframes()
         #df_avg5ms = np.fromfile(DF_AVG5MS, dtype='uint16')
         #flatfield = imprc.demosaic1(df_avg5ms)
         #flatfield  = imprc.create_flatfield()
         #image = imprc.toRGB_1(flatfield)
         #cv2.imwrite(join(RADIOMETRICALIB, "flatfield.jpg"), image)
-
-        print('Flat Field image: {}'.format(join(RADIOMETRICALIB, "flatfield.jpg")))
+        #print('Flat Field image: {}'.format(join(RADIOMETRICALIB, "flatfield.jpg")))
 
 
         #df_subtracted  = imprc.substract_darkframes(data)
