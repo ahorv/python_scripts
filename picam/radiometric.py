@@ -45,6 +45,10 @@ global DARKFRAMES_5MS
 global DARKFRAMES_50MS
 global DF_AVG5MS
 global DF_AVG50MS
+global WHITEFRAMES_5MS
+global WHITEFRAMES_50MS
+global WF_AVG5MS
+global WF_AVG50MS
 
 #SCRIPTPATH = join('/home', 'pi', 'python_scripts', 'picam')
 SCRIPTPATH = r'C:\Users\tahorvat\Desktop'
@@ -55,6 +59,10 @@ DARKFRAMES_5MS = join(RADIOMETRICALIB, 'df5')
 DARKFRAMES_50MS = join(RADIOMETRICALIB, 'df50')
 DF_AVG5MS  = join(RADIOMETRICALIB, 'df_avg5ms.data')
 DF_AVG50MS = join(RADIOMETRICALIB, 'df_avg50ms.data')
+WHITEFRAMES_5MS = join(RADIOMETRICALIB, 'wf5')
+WHITEFRAMES_50MS = join(RADIOMETRICALIB, 'wf50')
+WF_AVG5MS  = join(RADIOMETRICALIB, 'wf_avg5ms.data')
+WF_AVG50MS = join(RADIOMETRICALIB, 'wf_avg50ms.data')
 DATAPATH = join(RADIOMETRICALIB, 'data0.data')
 print(DATAPATH)
 
@@ -263,7 +271,7 @@ class Imgproc:
         return image
 
     def average_darkframes(self):
-        print('Running averaging.')
+        print('Running df averaging.')
         helper = Helpers()
         s = Logger()
         logger = s.getLogger()
@@ -344,6 +352,89 @@ class Imgproc:
 
         logger.info('Created avreged darkframes for 5ms and 50 ms exposure.')
         print('Done avreaging darkframes.')
+
+    def average_whiteframes(self):
+        print('Running wf averaging.')
+        helper = Helpers()
+        s = Logger()
+        logger = s.getLogger()
+        imprc = Imgproc()
+
+        files_5ms = []
+        files_50ms = []
+
+        for file in sorted(glob(os.path.join(WHITEFRAMES_5MS, "*.data"))):
+            if os.path.isfile(file):
+                files_5ms.append(file)
+
+        for file in sorted(glob(os.path.join(WHITEFRAMES_50MS, "*.data"))):
+            if os.path.isfile(file):
+                files_50ms.append(file)
+
+        average_5ms = np.fromfile(files_5ms[0], dtype='uint16') # load first image
+        average_5ms = average_5ms.reshape([2464, 3296])
+        average_5ms = average_5ms.astype('float')
+        legend = 'DF 5ms: {wf_name}: mean: {wf_mean}, median: {wf_medi}, std: {wf_stdv}, var: {wf_var}'
+
+        for file in files_5ms[1:]:
+            data = np.fromfile(file, dtype='uint16')
+            df = data.reshape([2464, 3296])
+            df = df.astype('float')                     # sonst Überlauf
+            average_5ms += df
+
+            stats = dict(
+                df_name = '{}'.format(file.strip('.data').split('/')[-1]),
+                df_mean = '{0:.2f}'.format(np.mean(df)),
+                df_medi = '{0:.2f}'.format(np.median(df)),
+                df_stdv = '{0:.2f}'.format(np.std(df)),
+                df_var  = '{0:.2f}'.format(np.var(df)),
+            )
+            print(legend.format(**stats))
+            logger.info(legend.format(**stats))
+
+        average_5ms /=len(files_5ms)
+
+        img = imprc.demosaic1(average_5ms.astype('uint16'))
+        avrg_5ms = imprc.toRGB_1(img)
+        cv2.imwrite(join(RADIOMETRICALIB ,"wf_avg5ms.jpg"),avrg_5ms)
+
+        with open(RADIOMETRICALIB + "/" + 'wf_avg5ms.data', 'wb') as g:
+            data = average_5ms.astype('uint16')
+            data.tofile(g)
+        #-------------------------------------------
+        # do the same with 50ms exposure dark frames
+        average_50ms = np.fromfile(files_50ms[0], dtype='uint16') # load first image
+        average_50ms = average_50ms.reshape([2464, 3296])
+        average_50ms = average_50ms.astype('float')
+        legend = 'WF 50ms: {wf_name}: mean: {wf_mean}, median: {wf_medi}, std: {wf_stdv}, var: {wf_var}'
+
+        for file in files_50ms[1:]:
+            data = np.fromfile(file, dtype='uint16')
+            df = data.reshape([2464, 3296])
+            df = df.astype('float')                     # sonst Überlauf
+            average_50ms += df
+
+            stats = dict(
+                df_name = '{}'.format(file.strip('.data').split('/')[-1]),
+                df_mean = '{0:.2f}'.format(np.mean(df)),
+                df_medi = '{0:.2f}'.format(np.median(df)),
+                df_stdv = '{0:.2f}'.format(np.std(df)),
+                df_var  = '{0:.2f}'.format(np.var(df)),
+            )
+            print(legend.format(**stats))
+
+        average_50ms /= len(files_5ms)
+
+        img = imprc.demosaic1(average_50ms.astype('uint16'))
+        avrg_50ms = imprc.toRGB_1(img)
+        cv2.imwrite(join(RADIOMETRICALIB,"wf_avg50ms.jpg"),avrg_50ms)
+
+        with open(RADIOMETRICALIB + "/" + 'wf_avg50ms.data', 'wb') as g:
+            data = average_50ms.astype('uint16')
+            data.tofile(g)
+
+        logger.info('Created avreged whiteframes for 5ms and 50 ms exposure.')
+        print('Done avreaging white frames.')
 
     def substract_darkframes(self, data):
         df_avg5ms  = np.fromfile(join(RADIOMETRICALIB,'df_avg5ms.data'),  dtype='uint16')
@@ -584,7 +675,6 @@ class Camera:
         helper = Helpers()
         s = Logger()
         logger = s.getLogger()
-        improc = Imgproc()
 
         five_ms =  5 * 1000  # shutterspeed is in units of microseconds
         fity_ms = 50 * 1000
@@ -607,9 +697,37 @@ class Camera:
             with open(DARKFRAMES_50MS + "/" + datafileName, 'wb') as g:
                 dat.tofile(g)
 
-        logger.info('All dark frame pictures taken.')
+        logger.info('All dark frames taken.')
         print('All dark frame pictures taken')
 
+    def take_whiteframe_pictures(self):
+        helper = Helpers()
+        s = Logger()
+        logger = s.getLogger()
+
+        five_ms =  5 * 1000  # shutterspeed is in units of microseconds
+        fity_ms = 50 * 1000
+        iso = 100
+
+        helper.createNewFolder(WHITEFRAMES_5MS)
+        helper.createNewFolder(WHITEFRAMES_50MS)
+
+        for i0 in range(10 - 1):  # 250
+            dat = self.single_shoot_data(iso, five_ms)
+            #data = improc.data2rgb(dat)
+            datafileName = '%s_wf.data' % str(i0 + 1)
+            with open(WHITEFRAMES_5MS + "/" + datafileName, 'wb') as g:
+                dat.tofile(g)
+
+        for i0 in range(10 - 1): # 250
+            dat = self.single_shoot_data(iso,fity_ms)
+            #data = improc.data2rgb(dat)
+            datafileName = '%s_wf.data' % str(i0 + 1)
+            with open(WHITEFRAMES_50MS+ "/" + datafileName, 'wb') as g:
+                dat.tofile(g)
+
+        logger.info('All white frames taken.')
+        print('All white frames taken')
 
 def main():
     try:
@@ -626,20 +744,28 @@ def main():
         helper.createNewFolder(RADIOMETRICALIB)
         imprc = Imgproc()
 
+        take_whiteframes = False
+        take_darkframes  = False
+
         if sys.platform == "linux":
             picam = picamera.PiCamera()
             camera = Camera(picam,Camera_config(cfg))
             camera.warm_up()
-            camera.take_darkframe_pictures()
+
+            if take_darkframes:
+                camera.take_darkframe_pictures()
+
+            if take_whiteframes:
+                camera.take_whiteframe_pictures()
 
         data = np.fromfile(DATAPATH, dtype='uint16')  # load first image
 
         #imprc.average_darkframes()
         #df_avg5ms = np.fromfile(DF_AVG5MS, dtype='uint16')
         #flatfield = imprc.demosaic1(df_avg5ms)
-        flatfield  = imprc.create_flatfield()
-        image = imprc.toRGB_1(flatfield)
-        cv2.imwrite(join(RADIOMETRICALIB, "flatfield.jpg"), image)
+        #flatfield  = imprc.create_flatfield()
+        #image = imprc.toRGB_1(flatfield)
+        #cv2.imwrite(join(RADIOMETRICALIB, "flatfield.jpg"), image)
 
         print('Flat Field image: {}'.format(join(RADIOMETRICALIB, "flatfield.jpg")))
 
