@@ -683,14 +683,14 @@ class Camera:
         helper.createNewFolder(DARKFRAMES_5MS)
         helper.createNewFolder(DARKFRAMES_50MS)
 
-        for i0 in range(10 - 1):  # 250
+        for i0 in range(2):  # 250 -1
             dat = self.single_shoot_data(iso, five_ms)
             #data = improc.data2rgb(dat)
             datafileName = '%s_df.data' % str(i0 + 1)
             with open(DARKFRAMES_5MS + "/" + datafileName, 'wb') as g:
                 dat.tofile(g)
 
-        for i0 in range(10 - 1): # 250
+        for i0 in range(2): # 250 -1
             dat = self.single_shoot_data(iso,fity_ms)
             #data = improc.data2rgb(dat)
             datafileName = '%s_df.data' % str(i0 + 1)
@@ -712,14 +712,14 @@ class Camera:
         helper.createNewFolder(WHITEFRAMES_5MS)
         helper.createNewFolder(WHITEFRAMES_50MS)
 
-        for i0 in range(10 - 1):  # 250
+        for i0 in range(2):  # 250 -1
             dat = self.single_shoot_data(iso, five_ms)
             #data = improc.data2rgb(dat)
             datafileName = '%s_wf.data' % str(i0 + 1)
             with open(WHITEFRAMES_5MS + "/" + datafileName, 'wb') as g:
                 dat.tofile(g)
 
-        for i0 in range(10 - 1): # 250
+        for i0 in range(2): # 250 -1
             dat = self.single_shoot_data(iso,fity_ms)
             #data = improc.data2rgb(dat)
             datafileName = '%s_wf.data' % str(i0 + 1)
