@@ -11,6 +11,7 @@ import logging
 import logging.handlers
 from matplotlib import pyplot as plt
 import numpy as np
+import math
 
 if sys.platform == "linux":
     import picamera
@@ -63,7 +64,7 @@ WHITEFRAMES_5MS = join(RADIOMETRICALIB, 'wf5')
 WHITEFRAMES_50MS = join(RADIOMETRICALIB, 'wf50')
 WF_AVG5MS  = join(RADIOMETRICALIB, 'wf_avg5ms.data')
 WF_AVG50MS = join(RADIOMETRICALIB, 'wf_avg50ms.data')
-DATAPATH = join(RADIOMETRICALIB, 'data0.data')
+DATAPATH = join(RADIOMETRICALIB, 'wf5','1_wf.data')
 print(DATAPATH)
 
 
@@ -142,6 +143,66 @@ class Helpers:
         except IOError as e:
             print('PERM : Could not set permissions for file: ' + str(e))
 
+class Color_Balance:
+
+    def apply_mask(self, matrix, mask, fill_value):
+        masked = np.ma.array(matrix, mask=mask, fill_value=fill_value)
+        return masked.filled()
+
+    def apply_threshold(self, matrix, low_value, high_value):
+        low_mask = matrix < low_value
+        matrix = self.apply_mask(matrix, low_mask, low_value)
+
+        high_mask = matrix > high_value
+        matrix = self.apply_mask(matrix, high_mask, high_value)
+
+        return matrix
+
+    def simplest_cb(self, path_to_image, percent):
+
+        imprc = Imgproc()
+        data = np.fromfile(path_to_image, dtype='uint16')
+        data = data.reshape([2464, 3296])
+        img = imprc.demosaic1(data)
+
+        assert img.shape[2] == 3
+        assert percent > 0 and percent < 100
+
+        half_percent = percent / 200.0
+
+        channels = cv2.split(img)
+
+        out_channels = []
+        for channel in channels:
+            assert len(channel.shape) == 2
+            # find the low and high precentile values (based on the input percentile)
+            height, width = channel.shape
+            vec_size = width * height
+            flat = channel.reshape(vec_size)
+
+            assert len(flat.shape) == 1
+
+            flat = np.sort(flat)
+
+            n_cols = flat.shape[0]
+
+            low_val = flat[math.floor(n_cols * half_percent)]
+            high_val = flat[math.ceil(n_cols * (1.0 - half_percent))]
+
+            print("Lowval: ", low_val)
+            print("Highval: ", high_val)
+
+            # saturate below the low percentile and above the high percentile
+            thresholded = self.apply_threshold(channel, low_val, high_val)
+            # scale the channel
+            img_16bit = (2**16) -1
+            img_8bit = 255
+            normalized = cv2.normalize(thresholded, thresholded.copy(), 0, img_16bit, cv2.NORM_MINMAX)
+            out_channels.append(normalized)
+            img = cv2.merge(out_channels)
+            img = imprc.toRGB_1(img)
+        return img
+
 class Imgproc:
 
     def demosaic1(self, mosaic, awb_gains = None):
@@ -156,9 +217,9 @@ class Imgproc:
 
 
             if awb_gains is None:
-                vb_gain = 37 / 32
+                vb_gain = 1.0
                 vg_gain = 1.0  # raspi raw has already gain = 1 of green channel
-                vr_gain = 63 / 32
+                vr_gain = 1.0
             else:
                 vb_gain = awb_gains[1]
                 vg_gain = 1.0  # raspi raw has already gain = 1 of green channel
@@ -188,7 +249,7 @@ class Imgproc:
             return image
 
         except Exception as e:
-            print('Error in deraw: {}'.format(e))
+            print('Error in demosaic1: {}'.format(e))
 
     def demosiac2(self, data, awb_gains = None):
         try:
@@ -706,7 +767,7 @@ class Camera:
         logger = s.getLogger()
         imprc = Imgproc()
 
-        five_ms =  5 * 1000  # shutterspeed is in units of microseconds
+        five_ms =  5 * 1000   # shutterspeed is in units of microseconds
         fity_ms = 50 * 1000
         iso = 100
 
@@ -714,7 +775,7 @@ class Camera:
         helper.createNewFolder(WHITEFRAMES_50MS)
         legend = 'WF 5ms: {df_name}: mean: {df_mean}, median: {df_medi}, std: {df_stdv}, var: {df_var}'
 
-        for i0 in range(2):  # 250 -1
+        for i0 in range(200-1):  # 250 -1
             dat = self.single_shoot_data(iso, five_ms)
             datafileName = '%s_wf.data' % str(i0 + 1)
 
@@ -728,7 +789,7 @@ class Camera:
             print(legend.format(**stats))
 
             if with_jpg:
-                wf_name = '{}_wf5ms.jpg'.format(i0)
+                wf_name = '{}_wf5ms.jpg'.format(i0 + 1)
                 img = imprc.demosaic1(dat.astype('uint16'))
                 wf = imprc.toRGB_1(img)
                 cv2.imwrite(join(WHITEFRAMES_5MS, wf_name), wf)
@@ -737,7 +798,7 @@ class Camera:
                 dat.tofile(g)
 
         legend = 'WF 50ms: {df_name}: mean: {df_mean}, median: {df_medi}, std: {df_stdv}, var: {df_var}'
-        for i0 in range(2): # 250 -1
+        for i0 in range(200-1): # 250 -1
             dat = self.single_shoot_data(iso,fity_ms)
             datafileName = '%s_wf.data' % str(i0 + 1)
 
@@ -751,7 +812,7 @@ class Camera:
             print(legend.format(**stats))
 
             if with_jpg:
-                wf_name = '{}_wf50ms.jpg'.format(i0)
+                wf_name = '{}_wf50ms.jpg'.format(i0 + 1)
                 img = imprc.demosaic1(dat.astype('uint16'))
                 wf = imprc.toRGB_1(img)
                 cv2.imwrite(join(WHITEFRAMES_50MS, wf_name), wf)
@@ -790,6 +851,18 @@ def main():
 
             if take_whiteframes:
                 camera.take_whiteframe_pictures(True)
+
+        # imprc.plot_data_histogram(DATAPATH)
+
+        cb = Color_Balance()
+        out = cb.simplest_cb('/home/pi/python_scripts/picam/radiometric/wf50/2_wf.data',1)
+        jpg = cv2.imread('/home/pi/python_scripts/picam/radiometric/wf50/1_wf50ms.jpg')
+        cv2.imshow("before", jpg)
+        cv2.imshow("after", out)
+        cv2.imwrite('/home/pi/python_scripts/picam/radiometric/wf.jpg',out)
+        cv2.waitKey(0)
+
+        #imprc.average_darkframes()
 
         #data = np.fromfile(DATAPATH, dtype='uint16')
         #imprc.average_darkframes()

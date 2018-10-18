@@ -50,7 +50,7 @@ global CAM
 global LogFileName
 global SELECTION
 global NameWellExpImg
-Path_to_sourceDir = r'I:\SkY_CAM_IMGS\picam\camera_3\test'
+Path_to_sourceDir = r'C:\Users\ati\Desktop\test'
 #Path_to_raw = r'G:\SkyCam\camera_1\20180429_raw_cam1'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
 Path_to_copy_wellExp = os.path.join(Path_to_sourceDir, 'wellExp')
 Path_to_copy_jpgHDR = os.path.join(Path_to_sourceDir, 'jpg_hdr')
@@ -630,9 +630,9 @@ def main():
         unzipall          = False
         delallzip         = False
         runslideshow      = False
-        copyAndTag        = False
+        copyAndTag        = True
         createJPGvideo    = False
-        hdr_pics_from_jpg = False
+        hdr_pics_from_jpg = True
         creat_HDR_Video   = False
         hdr_from_data     = True
 
