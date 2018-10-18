@@ -21,7 +21,7 @@ from fractions import Fraction
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 26.03.2018 Version 1 : postprocess.py
+## Hoa: 26.03.2018 Version 1 : postprocess1.py
 ######################################################################
 # This version runs on images created with raw2.py
 # Creates HDR images and tone mapped versions.
