@@ -51,11 +51,7 @@ global DB_NAME
 global DB_CON
 global DB_PATH
 
-Path_to_sourceDir = r'I:\SkY_CAM_IMGS\picam\camera_1\20181005'  # ACHTUNG BEACHTE LAUFWERKS BUCHSTABEN
-Path_to_copy_img5s = os.path.join(Path_to_sourceDir, 'imgs5')
-Path_to_copy_HDR = os.path.join(Path_to_sourceDir, 'hdr')
-Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
-Avoid_This_Directories = ['imgs5','hdr','rest']
+
 CAM = Path_to_sourceDir.rstrip('\\').rpartition('\\')[-1][-1]  # determin if cam1 or cam2
 
 class Config(object):
