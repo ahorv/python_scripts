@@ -725,9 +725,9 @@ class Camera:
 
         print('Warm up will take some time!')
 
-        for i in range(2):
+        for i in range(25):
             self.single_shoot_data(iso,ss)
-            print('{} left'.format(200-i))
+            print('{} left'.format(25-i))
 
         print('Warm up done!')
         logger.info('Warm up done.')
@@ -744,14 +744,14 @@ class Camera:
         helper.createNewFolder(DARKFRAMES_5MS)
         helper.createNewFolder(DARKFRAMES_50MS)
 
-        for i0 in range(2):  # 250 -1
+        for i0 in range(200):  # 250 -1
             dat = self.single_shoot_data(iso, five_ms)
             #data = improc.data2rgb(dat)
             datafileName = '%s_df.data' % str(i0 + 1)
             with open(DARKFRAMES_5MS + "/" + datafileName, 'wb') as g:
                 dat.tofile(g)
 
-        for i0 in range(2): # 250 -1
+        for i0 in range(200): # 250 -1
             dat = self.single_shoot_data(iso,fity_ms)
             #data = improc.data2rgb(dat)
             datafileName = '%s_df.data' % str(i0 + 1)
@@ -839,7 +839,7 @@ def main():
         imprc = Imgproc()
 
         take_whiteframes = False
-        take_darkframes  = False
+        take_darkframes  = True
 
         if sys.platform == "linux":
             picam = picamera.PiCamera()
@@ -854,16 +854,19 @@ def main():
 
         # imprc.plot_data_histogram(DATAPATH)
 
-        #cb = Color_Balance()
-        #out = cb.simplest_cb('/home/pi/python_scripts/picam/radiometric/wf50/2_wf.data',1)
-        #jpg = cv2.imread('/home/pi/python_scripts/picam/radiometric/wf50/1_wf50ms.jpg')
-        #cv2.imshow("before", jpg)
-        #cv2.imshow("after", out)
-        #cv2.imwrite('/home/pi/python_scripts/picam/radiometric/wf.jpg',out)
-        #cv2.waitKey(0)
+
+        '''
+        cb = Color_Balance()
+        out = cb.simplest_cb('/home/pi/python_scripts/picam/radiometric/wf_avg50ms.data',1)
+        jpg = cv2.imread('/home/pi/python_scripts/picam/radiometric/wf_avg50ms.jpg')
+        cv2.imshow("before", jpg)
+        cv2.imshow("after", out)
+        cv2.imwrite('/home/pi/python_scripts/picam/radiometric/wf_avg50ms_wb.jpg',out)
+        cv2.waitKey(0)
+        '''
 
         #imprc.average_darkframes()
-        imprc.average_whiteframes()
+        #imprc.average_whiteframes()
 
         #data = np.fromfile(DATAPATH, dtype='uint16')
         #imprc.average_darkframes()
