@@ -439,16 +439,16 @@ class Imgproc:
 
         for file in files_5ms[1:]:
             data = np.fromfile(file, dtype='uint16')
-            df = data.reshape([2464, 3296])
-            df = df.astype('float')                     # sonst Überlauf
-            average_5ms += df
+            wf = data.reshape([2464, 3296])
+            ff = wf.astype('float')                     # sonst Überlauf
+            average_5ms += wf
 
             stats = dict(
-                df_name = '{}'.format(file.strip('.data').split('/')[-1]),
-                df_mean = '{0:.2f}'.format(np.mean(df)),
-                df_medi = '{0:.2f}'.format(np.median(df)),
-                df_stdv = '{0:.2f}'.format(np.std(df)),
-                df_var  = '{0:.2f}'.format(np.var(df)),
+                wf_name = '{}'.format(file.strip('.data').split('/')[-1]),
+                wf_mean = '{0:.2f}'.format(np.mean(wf)),
+                wf_medi = '{0:.2f}'.format(np.median(wf)),
+                wf_stdv = '{0:.2f}'.format(np.std(wf)),
+                wf_var  = '{0:.2f}'.format(np.var(wf)),
             )
             print(legend.format(**stats))
             logger.info(legend.format(**stats))
@@ -471,16 +471,16 @@ class Imgproc:
 
         for file in files_50ms[1:]:
             data = np.fromfile(file, dtype='uint16')
-            df = data.reshape([2464, 3296])
-            df = df.astype('float')                     # sonst Überlauf
-            average_50ms += df
+            wf = data.reshape([2464, 3296])
+            wf = wf.astype('float')                     # sonst Überlauf
+            average_50ms += wf
 
             stats = dict(
-                df_name = '{}'.format(file.strip('.data').split('/')[-1]),
-                df_mean = '{0:.2f}'.format(np.mean(df)),
-                df_medi = '{0:.2f}'.format(np.median(df)),
-                df_stdv = '{0:.2f}'.format(np.std(df)),
-                df_var  = '{0:.2f}'.format(np.var(df)),
+                wf_name = '{}'.format(file.strip('.data').split('/')[-1]),
+                wf_mean = '{0:.2f}'.format(np.mean(wf)),
+                wf_medi = '{0:.2f}'.format(np.median(wf)),
+                wf_stdv = '{0:.2f}'.format(np.std(wf)),
+                wf_var  = '{0:.2f}'.format(np.var(wf)),
             )
             print(legend.format(**stats))
 
@@ -838,7 +838,7 @@ def main():
         helper.createNewFolder(RADIOMETRICALIB)
         imprc = Imgproc()
 
-        take_whiteframes = True
+        take_whiteframes = False
         take_darkframes  = False
 
         if sys.platform == "linux":
@@ -854,15 +854,16 @@ def main():
 
         # imprc.plot_data_histogram(DATAPATH)
 
-        cb = Color_Balance()
-        out = cb.simplest_cb('/home/pi/python_scripts/picam/radiometric/wf50/2_wf.data',1)
-        jpg = cv2.imread('/home/pi/python_scripts/picam/radiometric/wf50/1_wf50ms.jpg')
-        cv2.imshow("before", jpg)
-        cv2.imshow("after", out)
-        cv2.imwrite('/home/pi/python_scripts/picam/radiometric/wf.jpg',out)
-        cv2.waitKey(0)
+        #cb = Color_Balance()
+        #out = cb.simplest_cb('/home/pi/python_scripts/picam/radiometric/wf50/2_wf.data',1)
+        #jpg = cv2.imread('/home/pi/python_scripts/picam/radiometric/wf50/1_wf50ms.jpg')
+        #cv2.imshow("before", jpg)
+        #cv2.imshow("after", out)
+        #cv2.imwrite('/home/pi/python_scripts/picam/radiometric/wf.jpg',out)
+        #cv2.waitKey(0)
 
         #imprc.average_darkframes()
+        imprc.average_whiteframes()
 
         #data = np.fromfile(DATAPATH, dtype='uint16')
         #imprc.average_darkframes()
