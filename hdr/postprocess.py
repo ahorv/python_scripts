@@ -18,6 +18,7 @@ import numpy as np
 from fractions import Fraction
 import logging
 import logging.handlers
+from datetime import datetime
 
 if sys.platform == "linux":
     import pwd
@@ -120,10 +121,13 @@ class Logger:
 
 class DB_handler:
 
+    def __init__(self):
+        self.config = Config()
+
     def createDB(self):
-            global DB_NAME
             global DB_CON
-            global DB_PATH
+            DB_NAME = self.config.databaseName
+            DB_PATH = self.config.sourceDirectory
             success = False
 
             try:
@@ -132,7 +136,7 @@ class DB_handler:
                 root_logger = s.getLogger()
                 DB_CON = open(DB_PATH, 'r+')
                 DB_CON = sqlite3.connect(DB_PATH)
-                self.create_SensorData_table()
+                self.create_data_camera_table()
                 # root_logger.info(' DB  : Found existing DB at program startup')
                 if sys.platform == "linux":
                     h.setOwnerAndPermission(DB_PATH)
@@ -144,7 +148,7 @@ class DB_handler:
                     DB_CON = sqlite3.connect(DB_PATH)
                     h.setOwnerAndPermission(DB_PATH)
                     if sys.platform == "linux":
-                        self.create_SensorData_table()
+                        self.create_data_camera_table()
                     success = True
                     root_logger.info(' DB: Created new DB: ' + str(DB_NAME.replace("/", "")))
                     return success
@@ -156,8 +160,100 @@ class DB_handler:
                     root_logger.error(' DB: DB Permission when Error occured: ' + permission)
                     return success
 
+    def create_data_camera_table(self):
+        try:
+            global DB_CON
+            s = Logger()
+            root_logger = s.getLogger()
+            curs = DB_CON.cursor()
+            curs.execute("""CREATE TABLE IF NOT EXISTS data_camera
+                 (                 
+                    sw_vers text,
+                    cam_id text,
+                    image_date text,
+                    dont_use INTEGER,
+                    was_clearsky INTEGER,
+                    was_rainy INTEGER,
+                    was_biased INTEGER,
+                    was_foggy INTEGER,
+                    had_nimbocum INTEGER,             
+                  )
+               """)
+        except Exception as e:
+            root_logger.error('DB  : Error creating MeterRealtime Table: ' + str(e))
+
+
+    def add_new_image_table(self, date):
+        try:
+            global DB_CON
+            s = Logger()
+            root_logger = s.getLogger()
+            table_name = date + '_images'
+            curs = DB_CON.cursor()
+            curs.execute("""CREATE TABLE IF NOT EXISTS {}
+                 (
+                    img_nr text,        
+                    time text,
+                    fstop text,
+                    ss text,
+                    exp text,
+                    iso text,
+                    ag text,
+                    dg text,
+                    awb text,
+                    
+                                     
+                  )
+               """.format(table_name) )
+        except Exception as e:
+            root_logger.error('DB  : Error creating MeterRealtime Table: ' + str(e))
+
 
 class Helpers:
+
+    def strip_date(self, newdatestr):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            H_S = datetime.now().strftime('%M-%S')
+            formated_date = '0000-{}'.format(H_S)
+            dateAndTime = (newdatestr.rstrip('\\').rpartition('\\')[-1]).replace('_', ' ')
+
+            year = dateAndTime[:4]
+            month = dateAndTime[4:6]
+            day = dateAndTime[6:8]
+
+            formated_date = '{}-{}-{}'.format(year, month, day)
+
+            return formated_date
+        except IOError as e:
+            logger.Error('strip_date: could not read date used {} instead !{}').format(formated_date, e)
+            return formated_date
+
+    def strip_date_and_time(self, newdatetimestr):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            formated_date = '0000-00-00'
+            formated_time = datetime.now().strftime('%H:%M:%S')
+
+            dateAndTime = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).replace('_', ' ')
+
+            year = dateAndTime[:4]
+            month = dateAndTime[4:6]
+            day = dateAndTime[6:8]
+            hour = dateAndTime[9:11]
+            min = dateAndTime[11:13]
+            sec = dateAndTime[13:15]
+
+            formated_date = '{}-{}-{}'.format(year,month,day)
+            formated_time = '{}:{}:{}'.format(hour,min,sec)
+
+            return formated_date, formated_time
+        except IOError as e:
+            logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}').format(formated_date,formated_time, e)
+            return formated_date, formated_time
+
 
     def createNewFolder(self, thispath):
         try:
@@ -702,7 +798,7 @@ def main():
 
         cfg = {
             'databaseDirectory': 0,
-            'sourceDirectory': '\\HOANAS\HOA_SKYCam',
+            'sourceDirectory': 'E:\SkY_CAM_IMGS',     # 'sourceDirectory': '\\HOANAS\HOA_SKYCam',
 
         }
 
