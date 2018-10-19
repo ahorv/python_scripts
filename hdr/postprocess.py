@@ -46,19 +46,16 @@ global Path_to_sourceDir
 global Path_to_copy_img5s
 global Path_to_ffmpeg
 global Avoid_This_Directories
-global CAM
 
-global DB_NAME
+
 global DB_CON
-global DB_PATH
+global CFG
 
-
-CAM = Path_to_sourceDir.rstrip('\\').rpartition('\\')[-1][-1]  # determin if cam1 or cam2
 
 class Config(object):
     """Container class for configuration.
     """
-    def __init__(self, config, state_map={}):
+    def __init__(self, state_map={}):
         # Database Name
         self.databaseName = state_map.get('databaseName','sky_db')
         self.databaseDirectory = state_map.get('databaseDirectory', '?')
@@ -71,7 +68,9 @@ class Logger:
     def getLogger(self, newLogPath=None):
 
         try:
-            global SCRIPTPATH
+            global CFG
+            config = Config(CFG)
+            SCRIPTPATH = config.databaseDirectory
 
             if newLogPath is None:
                 LOGFILEPATH = os.path.join(SCRIPTPATH, 'postprocessor.log')
@@ -794,15 +793,24 @@ def main():
         import os
         os.listdir(r'\\DISKSTATION')
         '''
+        global CFG
 
-
-        cfg = {
-            'databaseDirectory': 0,
+        CFG = {
+            'databaseDirectory': 'E:\SkY_CAM_IMGS',
             'sourceDirectory': 'E:\SkY_CAM_IMGS',     # 'sourceDirectory': '\\HOANAS\HOA_SKYCam',
 
         }
 
+        # classe config fehlerhaft !
+        config = Config(CFG)
 
+        test_string = r'Z:\camera_2\cam_2_vers1\20180109_raw_cam2' # ACHTUNG r verwenden !
+
+        h = Helpers()
+        date = h.strip_date(test_string)
+        print(date)
+
+        '''
         global Path_to_sourceDir
         unzipall          = False
         delallzip         = False
@@ -844,26 +852,8 @@ def main():
 
         if hdr_from_data:
             hdr.makeHDR_from_data(allDirs)
+        '''
 
-        if runslideshow:
-
-            counter = 0
-            fig = plt.figure()
-            ax = plt.gca()
-
-            list_images = help.readAllImages(allDirs)
-            cur_window = ax.imshow(list_images[0])
-
-            while counter < len(list_images):
-
-                next = list_images[counter]
-                plt.title('Image: {}'.format(counter))
-                cur_window.set_data(next)
-
-                plt.pause(.05)
-                plt.draw()
-
-                counter += 1
 
         print('Postprocess.py done')
 
