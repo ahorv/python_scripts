@@ -725,7 +725,7 @@ class Camera:
 
         print('Warm up will take some time!')
 
-        for i in range(25):
+        for i in range(2):
             self.single_shoot_data(iso,ss)
             print('{} left'.format(25-i))
 
@@ -839,7 +839,7 @@ def main():
         imprc = Imgproc()
 
         take_whiteframes = False
-        take_darkframes  = True
+        take_darkframes  = False
 
         if sys.platform == "linux":
             picam = picamera.PiCamera()
@@ -855,18 +855,18 @@ def main():
         # imprc.plot_data_histogram(DATAPATH)
 
 
-        '''
+        imprc.average_darkframes()
+        # imprc.average_whiteframes()
+
+
         cb = Color_Balance()
-        out = cb.simplest_cb('/home/pi/python_scripts/picam/radiometric/wf_avg50ms.data',1)
-        jpg = cv2.imread('/home/pi/python_scripts/picam/radiometric/wf_avg50ms.jpg')
+        out = cb.simplest_cb('/home/pi/python_scripts/picam/radiometric/df_avg50ms.data',1)
+        jpg = cv2.imread('/home/pi/python_scripts/picam/radiometric/df_avg50ms.jpg')
         cv2.imshow("before", jpg)
         cv2.imshow("after", out)
-        cv2.imwrite('/home/pi/python_scripts/picam/radiometric/wf_avg50ms_wb.jpg',out)
+        cv2.imwrite('/home/pi/python_scripts/picam/radiometric/df_avg50ms_wb.jpg',out)
         cv2.waitKey(0)
-        '''
 
-        #imprc.average_darkframes()
-        #imprc.average_whiteframes()
 
         #data = np.fromfile(DATAPATH, dtype='uint16')
         #imprc.average_darkframes()
