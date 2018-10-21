@@ -364,7 +364,7 @@ class DB_handler:
                   "VALUES (%s)" % format_strings
 
             print('SQL: ' + sql)
-            curs.execute(sql)
+            curs.execute(sql,values)
 
             self.con_close()
             success = True
