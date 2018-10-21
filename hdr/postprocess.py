@@ -2,7 +2,8 @@
 
 from __future__ import print_function
 
-import sqlite3
+import mysql.connector
+from mysql.connector import Error
 import os
 import cv2
 import sys
@@ -33,7 +34,7 @@ print('Version opencv: ' + cv2.__version__)
 # Reads all images from FTP - server. Creates HDR images. Data and
 # Images are stored in SQLite database.
 # Remarks:
-#
+# - use phpmyadmin to see contents of database#
 #
 # New /Changes:
 # ----------------------------------------------------------------------
@@ -50,13 +51,71 @@ global Avoid_This_Directories
 
 global DB_CON
 global CFG
+global CAMERADATA
+global IMGDATA
 
+class Image_Data(object):
+    """Container class for image data.
+    """
+    def __init__(self, state_map={}):
+        self.img_nr = state_map.get('sw_vers',0)
+        self.time = state_map.get('time','?' )
+        self.fstop = state_map.get('fstop', '?')
+        self.ss = state_map.get('ss', 0)
+        self.exp = state_map.get('exp', 0)
+        self.iso = state_map.get('iso', 0)
+        self.ag = state_map.get('ag', 0)
+        self.awb_red = state_map.get('awb_red', 0)
+        self.awb_blue = state_map.get('awb_blue', 0)
+        self.ldr = state_map.get('ldr', 0)
+        self.hdr = state_map.get('hdr', 0)
 
-class Config(object):
+    def to_dict(self):
+        return {
+            'img_nr': self.img_nr,
+            'time':   self.time,
+            'fstop':  self.fstop,
+            'ss' :    self.ss,
+            'exp':    self.exp,
+            'iso':    self.iso,
+            'ag':     self.ag,
+            'awb_red': self.awb_red,
+            'awb_blue': self.awb_blue,
+            'ldr': self.ldr,
+            'hdr': self.hdr,
+        }
+
+class Camera_Data(object):
+    """Container class for camera data.
+    """
+    def __init__(self, state_map={}):
+        self.sw_vers = state_map.get('sw_vers',0)
+        self.cam_id = state_map.get('cam_id','?' )
+        self.image_date = state_map.get('image_date', '?')
+        self.dont_use     = state_map.get('dont_use', 0)
+        self.was_clearsky = state_map.get('was_clearsky', 0)
+        self.was_rainy    = state_map.get('was_rainy', 0)
+        self.was_biased   = state_map.get('was_biased', 0)
+        self.was_foggy    = state_map.get('was_foggy', 0)
+        self.had_nimbocum = state_map.get('had_nimbocum', 0)
+
+    def to_dict(self):
+        return {
+            'sw_vers'       :self.sw_vers,
+            'cam_id'        :self.cam_id,
+            'image_date'    :self.image_date,
+            'dont_use'      :self.dont_use,
+            'was_clearsky'  :self.was_clearsky,
+            'was_rainy'     :self.was_rainy,
+            'was_biased'    :self.was_biased,
+            'was_foggy'     :self.was_foggy,
+            'had_nimbocum'  :self.had_nimbocum,
+        }
+
+class DB_config(object):
     """Container class for configuration.
     """
     def __init__(self, state_map={}):
-        # Database Name
         self.databaseName = state_map.get('databaseName','sky_db')
         self.databaseDirectory = state_map.get('databaseDirectory', '?')
         self.sourceDirectory = state_map.get('sourceDirectory', '?')
@@ -69,11 +128,13 @@ class Logger:
 
         try:
             global CFG
-            config = Config(CFG)
-            SCRIPTPATH = config.databaseDirectory
+            config = DB_config(CFG)
+            PATH = config.databaseDirectory
 
             if newLogPath is None:
-                LOGFILEPATH = os.path.join(SCRIPTPATH, 'postprocessor.log')
+                FILEPATH = os.path.join(PATH, 'postprocessor.log')
+                LOGFILEPATH = join(r'\\',FILEPATH)
+
                 logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
                 fileHandler = logging.FileHandler(LOGFILEPATH)
                 name = 'rootlogger'
@@ -121,91 +182,197 @@ class Logger:
 class DB_handler:
 
     def __init__(self):
-        self.config = Config()
+        self.config = DB_config()
+        self.connection = None
+        self.cursor = None
+
+    def connect2MySQL(self):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            self.connection = mysql.connector.connect(
+                            host='192.168.1.10',
+                            user='root',
+                            password='123ihomelab'
+                            )
+            if self.connection.is_connected():
+                return self.connection
+
+        except Error as e:
+            logger.error('Could not connect to NAS: {}'.format(e))
+            self.connection.close()
+
+    def connect2DB(self):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            config = DB_config()
+            cb_name = config.databaseName
+            self.connection = mysql.connector.connect(
+                host='192.168.1.10',
+                user='root',
+                password='123ihomelab',
+                database = cb_name
+            )
+            if self.connection .is_connected():
+                return self.connection
+
+        except Error as e:
+            logger.error('Could not get database cursor: {}'.format(e))
+            self.connection.close()
+
+    def con_close(self):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            if self.cursor:
+                self.cursor.close()
+
+            if self.connection.is_connected():
+                self.connection.close()
+
+        except Error as e:
+            logger.error('Could not close database connection: {}'.format(e))
 
     def createDB(self):
-            global DB_CON
-            DB_NAME = self.config.databaseName
-            DB_PATH = self.config.sourceDirectory
+        try:
             success = False
+            s = Logger()
+            logger = s.getLogger()
+            db_con = self.connect2MySQL()
+            config = DB_config()
+            db_name = config.databaseName
 
-            try:
-                h = Helpers()
-                s = Logger()
-                root_logger = s.getLogger()
-                DB_CON = open(DB_PATH, 'r+')
-                DB_CON = sqlite3.connect(DB_PATH)
-                self.create_data_camera_table()
-                # root_logger.info(' DB  : Found existing DB at program startup')
-                if sys.platform == "linux":
-                    h.setOwnerAndPermission(DB_PATH)
-                success = True
+            if(db_con):
+                myDB = db_con.cursor()
+                myDB.execute("CREATE DATABASE IF NOT EXISTS {} DEFAULT CHARACTER SET 'utf8'".format(db_name))
+                self.con_close()
+                ok_table = self.create_data_camera_table()
+                if(not ok_table): raise IOError
+            else:
+                raise IOError
+
+            success = True
+            return success
+
+        except IOError as e:
+            if not db_con:
+                logger.error('CreateDB: failed to create new {} database with error: {}').format(db_name,e)
+                self.con_close()
                 return success
-
-            except IOError as e:
-                if e.args[0] == 2:  # No such file or directory -> as expected(!)
-                    DB_CON = sqlite3.connect(DB_PATH)
-                    h.setOwnerAndPermission(DB_PATH)
-                    if sys.platform == "linux":
-                        self.create_data_camera_table()
-                    success = True
-                    root_logger.info(' DB: Created new DB: ' + str(DB_NAME.replace("/", "")))
-                    return success
-
-                else:  # permission denied or something else?
-                    file_state = os.stat(DB_PATH)  # get file permissions
-                    permission = oct(file_state.st_mode)
-                    root_logger.error(' DB: Error creating new DB at startup: ' + str(DB_NAME) + str(e))
-                    root_logger.error(' DB: DB Permission when Error occured: ' + permission)
-                    return success
 
     def create_data_camera_table(self):
         try:
-            global DB_CON
+            success = False
             s = Logger()
-            root_logger = s.getLogger()
-            curs = DB_CON.cursor()
+            logger = s.getLogger()
+            con = self.connect2DB()
+            curs = con.cursor()
             curs.execute("""CREATE TABLE IF NOT EXISTS data_camera
-                 (                 
-                    sw_vers text,
-                    cam_id text,
-                    image_date text,
-                    dont_use INTEGER,
-                    was_clearsky INTEGER,
-                    was_rainy INTEGER,
-                    was_biased INTEGER,
-                    was_foggy INTEGER,
-                    had_nimbocum INTEGER,             
+                 (  sw_vers VARCHAR(5) NOT NULL,
+                    cam_id VARCHAR(5),
+                    image_date VARCHAR(12) NOT NULL,
+                    dont_use BOOLEAN,
+                    was_clearsky BOOLEAN,
+                    was_rainy BOOLEAN,
+                    was_biased BOOLEAN,
+                    was_foggy BOOLEAN,
+                    had_nimbocum BOOLEAN             
+                  )"""
                   )
-               """)
+            self.con_close()
+            success = True
+            return success
         except Exception as e:
-            root_logger.error('DB  : Error creating MeterRealtime Table: ' + str(e))
+            self.con_close()
+            logger.error('DB  : Error creating data_camera Table: ' + str(e))
+            return success
 
-
-    def add_new_image_table(self, date):
+    def create_new_image_table(self, date):
         try:
-            global DB_CON
+            success = False
             s = Logger()
             root_logger = s.getLogger()
-            table_name = date + '_images'
-            curs = DB_CON.cursor()
-            curs.execute("""CREATE TABLE IF NOT EXISTS {}
+            table_name = 'images_' + date
+            con = self.connect2DB()
+            curs = con.cursor()
+            sql = """CREATE TABLE IF NOT EXISTS %s
                  (
-                    img_nr text,        
-                    time text,
-                    fstop text,
-                    ss text,
-                    exp text,
-                    iso text,
-                    ag text,
-                    dg text,
-                    awb text,
-                    
-                                     
+                    img_nr INTEGER NOT NULL,        
+                    time VARCHAR(10) NOT NULL,
+                    fstop VARCHAR(4),
+                    ss INTEGER,
+                    exp INTEGER,
+                    iso INTEGER,
+                    ag INTEGER,
+                    awb_blue INTEGER,
+                    awb_red INTEGER,
+                    ldr LONGBLOB NOT NULL,
+                    hdr LONGBLOB NOT NULL
                   )
-               """.format(table_name) )
+               """ % table_name
+
+            curs.execute(sql)
+            self.con_close()
+            success = True
+            return success
         except Exception as e:
+            self.con_close()
             root_logger.error('DB  : Error creating MeterRealtime Table: ' + str(e))
+            return success
+
+    def insert_camera_data(self):
+        try:
+            success = False
+            s = Logger()
+            logger = s.getLogger()
+            con = self.connect2DB()
+            curs = con.cursor()
+            param_list = 'sw_vers, cam_id, image_date, dont_use, was_clearsky, was_rainy, was_biased, was_foggy, had_nimbocum'
+            cameradata = CAMERADATA.to_dict()
+            values = list(cameradata.values())
+            format_strings = ','.join(['%s'] * len(values))
+
+            sql = "INSERT INTO data_camera " \
+                  "("+ param_list +") " \
+                  "VALUES (%s)" % format_strings
+
+            curs.execute(sql,values)
+            self.con_close()
+            success = True
+            return success
+        except Exception as e:
+            self.con_close()
+            logger.error('insert_camera_data: {}' + str(e))
+            return success
+
+    def insert_image_data(self, date):
+        try:
+            success = False
+            s = Logger()
+            logger = s.getLogger()
+            table_name = 'images_' + date
+            con = self.connect2DB()
+            curs = con.cursor()
+            param_list = 'img_nr, time, fstop, ss, exp, iso, ag, awb_red, awb_blue, ldr, hdr'
+            imagedata = IMGDATA.to_dict()
+            values = list(imagedata.values())
+            format_strings = ','.join(['%s'] * len(values))
+
+            sql = "INSERT INTO {} ".format(table_name) + \
+                  "("+ param_list +") " \
+                  "VALUES (%s)" % format_strings
+
+            print('SQL: ' + sql)
+            curs.execute(sql)
+
+            self.con_close()
+            success = True
+            return success
+        except Exception as e:
+            self.con_close()
+            logger.error('DB  : Error creating MeterRealtime Table: ' + str(e))
+            return success
 
 
 class Helpers:
@@ -222,6 +389,13 @@ class Helpers:
             month = dateAndTime[4:6]
             day = dateAndTime[6:8]
 
+            check = [year,month,day]
+
+            for item in check:
+                if not item or not item.isdigit():
+                    logger.Error('strip_date: could not read date and time  used {} !'.format(formated_date))
+                    return formated_date
+
             formated_date = '{}-{}-{}'.format(year, month, day)
 
             return formated_date
@@ -236,21 +410,31 @@ class Helpers:
             formated_date = '0000-00-00'
             formated_time = datetime.now().strftime('%H:%M:%S')
 
-            dateAndTime = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).replace('_', ' ')
+            date = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[0]
+            time = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[-1]
 
-            year = dateAndTime[:4]
-            month = dateAndTime[4:6]
-            day = dateAndTime[6:8]
-            hour = dateAndTime[9:11]
-            min = dateAndTime[11:13]
-            sec = dateAndTime[13:15]
+            year  = date[:4]
+            month = date[4:6]
+            day   = date[6:8]
+            hour  = time[:2]
+            min   = time[2:4]
+            sec   = time[4:6]
+
+            check = [year,month,day,hour,min,sec]
+
+            for item in check:
+                if not item or not item.isdigit():
+                    logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
+                    formated_date, formated_time))
+                    return formated_date, formated_time
 
             formated_date = '{}-{}-{}'.format(year,month,day)
             formated_time = '{}:{}:{}'.format(hour,min,sec)
 
             return formated_date, formated_time
         except IOError as e:
-            logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}').format(formated_date,formated_time, e)
+            logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
+            formated_date,formated_time, e))
             return formated_date, formated_time
 
 
@@ -787,28 +971,53 @@ class IMGPROC(object):
 
 def main():
     try:
-
-        '''
-        Connect to NAS
-        import os
-        os.listdir(r'\\DISKSTATION')
-        '''
         global CFG
+        global CAMERADATA
+        global IMGDATA
 
         CFG = {
-            'databaseDirectory': 'E:\SkY_CAM_IMGS',
-            'sourceDirectory': 'E:\SkY_CAM_IMGS',     # 'sourceDirectory': '\\HOANAS\HOA_SKYCam',
-
+            'databaseDirectory': r'\\HOANAS\HOA_SKYCam',
+            'sourceDirectory': r'\\HOANAS\HOA_SKYCam',  # 'sourceDirectory': '\\HOANAS\HOA_SKYCam',
         }
 
         # classe config fehlerhaft !
-        config = Config(CFG)
+        config = DB_config(CFG)
+        db = DB_handler()
+        # db.createDB()
 
-        test_string = r'Z:\camera_2\cam_2_vers1\20180109_raw_cam2' # ACHTUNG r verwenden !
+        NEW = {
+            'sw_vers': 101,
+            'cam_id': '101',
+            'image_date': '21-10-2018',
+            'dont_use' : 0,
+            'was_clearsky':0,
+            'was_rainy' :0,
+            'was_biased':0,
+            'was_foggy':0,
+            'had_nimbocum':0
+        }
 
-        h = Helpers()
-        date = h.strip_date(test_string)
-        print(date)
+        IMG = {
+            'img_nr': 1,
+            'time':  '12:23:34',
+            'fstop':  '-4',
+            'ss' :    1234,
+            'exp':    9876,
+            'iso':    100,
+            'ag':     1,
+            'awb_blue': 0.2345,
+            'awb_red':  0.4567,
+            'ldr': '?',
+            'hdr': '?',
+        }
+
+        CAMERADATA = Camera_Data(NEW)
+        db.insert_camera_data()
+
+        db.create_new_image_table('2018_10_21')
+
+        IMGDATA = Image_Data(IMG)
+        db.insert_image_data('2018_10_21')
 
         '''
         global Path_to_sourceDir
