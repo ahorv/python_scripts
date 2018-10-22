@@ -212,7 +212,8 @@ class DB_handler:
                 host='192.168.1.10',
                 user='root',
                 password='123ihomelab',
-                database = cb_name
+                database = cb_name,
+                connect_timeout=1000
             )
             if self.connection .is_connected():
                 return self.connection
@@ -296,6 +297,7 @@ class DB_handler:
             root_logger = s.getLogger()
             table_name = 'images_' + date
             con = self.connect2DB()
+            con.reconnect(attempts=2, delay=0)
             curs = con.cursor()
             sql = """CREATE TABLE IF NOT EXISTS %s
                  (
@@ -306,10 +308,10 @@ class DB_handler:
                     exp INTEGER,
                     iso INTEGER,
                     ag INTEGER,
-                    awb_blue INTEGER,
                     awb_red INTEGER,
-                    ldr LONGBLOB NOT NULL,
-                    hdr LONGBLOB NOT NULL
+                    awb_blue INTEGER,             
+                    ldr LONGBLOB,
+                    hdr LONGBLOB
                   )
                """ % table_name
 
@@ -319,7 +321,7 @@ class DB_handler:
             return success
         except Exception as e:
             self.con_close()
-            root_logger.error('DB  : Error creating MeterRealtime Table: ' + str(e))
+            root_logger.error('create_new_image_table: ' + str(e))
             return success
 
     def insert_camera_data(self):
@@ -358,6 +360,7 @@ class DB_handler:
             param_list = 'img_nr, time, fstop, ss, exp, iso, ag, awb_red, awb_blue, ldr, hdr'
             imagedata = IMGDATA.to_dict()
             values = list(imagedata.values())
+            print('values: '.format(values))
             format_strings = ','.join(['%s'] * len(values))
 
             sql = "INSERT INTO {} ".format(table_name) + \
@@ -372,7 +375,7 @@ class DB_handler:
             return success
         except Exception as e:
             self.con_close()
-            logger.error('DB  : Error creating MeterRealtime Table: ' + str(e))
+            logger.error('insert_image_data ' + str(e))
             return success
 
 
@@ -1029,13 +1032,13 @@ def main():
             'exp':    9876,
             'iso':    100,
             'ag':     1,
+            'awb_red': 0.4567,
             'awb_blue': 0.2345,
-            'awb_red':  0.4567,
             'ldr': '?',
             'hdr': '?',
         }
 
-        test_image_path = r'E:\SkY_CAM_IMGS\camera_1\cam_1_vers2\20180403_raw_cam1\20180403_080014'
+        test_image_path = r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers2\20180403_raw_cam1\20180403_080014'
 
         CAMERADATA = Camera_Data(CAM_DATA)
         db.insert_camera_data()
@@ -1045,8 +1048,8 @@ def main():
 
         imgproc = IMAGEPROC(CAMERADATA)
 
-        IMGDATA.ldr = imgproc.image2binary(test_image_path + '\data0_.data')
-        IMGDATA.hdr = imgproc.image2binary(test_image_path + '\raw_img0.jpg')
+        #IMGDATA.ldr = imgproc.image2binary(join(test_image_path,'data0_.data'))
+        #IMGDATA.hdr = imgproc.image2binary(join(test_image_path,'raw_img0.jpg'))
 
         db.insert_image_data('2018_10_22')
 
