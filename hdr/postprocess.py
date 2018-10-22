@@ -277,7 +277,8 @@ class DB_handler:
                     was_rainy BOOLEAN,
                     was_biased BOOLEAN,
                     was_foggy BOOLEAN,
-                    had_nimbocum BOOLEAN             
+                    had_nimbocum BOOLEAN,
+                    UNIQUE KEY (image_date)
                   )"""
                   )
             self.con_close()
@@ -333,7 +334,7 @@ class DB_handler:
             values = list(cameradata.values())
             format_strings = ','.join(['%s'] * len(values))
 
-            sql = "INSERT INTO data_camera " \
+            sql = "INSERT IGNORE INTO data_camera " \
                   "("+ param_list +") " \
                   "VALUES (%s)" % format_strings
 
@@ -544,7 +545,7 @@ class Helpers:
     def copyAndMaskAll_img5(self, list_alldirs):
 
         try:
-            imgproc = IMGPROC()
+            imgproc = IMAGEPROC()
             global Path_to_copy_img5s
             global CAM
             cnt = 1
@@ -642,7 +643,7 @@ class HDR:
 
     def data2rgb(self, path_to_img):
         try:
-            imgproc = IMGPROC()
+            imgproc = IMAGEPROC()
             data = np.fromfile(path_to_img, dtype='uint16')
             data = data.reshape([2464, 3296])
 
@@ -736,7 +737,7 @@ class HDR:
             print('readRawImages: Could not read *.data files ' + str(e))
 
     def readImagesAndExpos(self, mypath, piclist=[0,5,9]):
-        postproc = IMGPROC()
+        postproc = IMAGEPROC()
         try:
             onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
             image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
@@ -815,7 +816,7 @@ class HDR:
     def makeHDR_from_jpg(self, ListofAllDirs):
         global Path_to_sourceDir
         global CAM
-        imgproc = IMGPROC()
+        imgproc = IMAGEPROC()
         try:
             cnt = 0
             if not os.path.exists(join(Path_to_raw,'hdr')):
@@ -891,10 +892,17 @@ class HDR:
         except Exception as e:
             print('createVideo: Error: ' + str(e))
 
-class IMGPROC(object):
+class IMAGEPROC:
 
-    def __init__(self):
-        global CAM
+    def __init__(self, cam_data=None):
+
+        if cam_data == None:
+            print('Empty camera data !')
+
+        self.cam_data = cam_data
+
+        CAM = cam_data.cam_id
+
         # Create image mask
         size = 1944, 2592, 3
         empty_img = np.zeros(size, dtype=np.uint8)
@@ -969,6 +977,22 @@ class IMGPROC(object):
 
         return output_image
 
+    def image2binary(self, path_to_binary):
+
+        try:
+            image_bytes = None
+            s = Logger()
+            logger = s.getLogger()
+
+            with open(path_to_binary, 'rb') as f:
+                image_bytes = f.read()
+            f.close()
+
+            return image_bytes
+
+        except Exception as e:
+            logger.error('read_image_as_binarry: {}'.format(e))
+
 def main():
     try:
         global CFG
@@ -983,11 +1007,11 @@ def main():
         # classe config fehlerhaft !
         config = DB_config(CFG)
         db = DB_handler()
-        # db.createDB()
+        db.createDB()
 
-        NEW = {
-            'sw_vers': 101,
-            'cam_id': '101',
+        CAM_DATA = {
+            'sw_vers': 3,
+            'cam_id': '1',
             'image_date': '21-10-2018',
             'dont_use' : 0,
             'was_clearsky':0,
@@ -1011,13 +1035,20 @@ def main():
             'hdr': '?',
         }
 
-        CAMERADATA = Camera_Data(NEW)
+        test_image_path = r'E:\SkY_CAM_IMGS\camera_1\cam_1_vers2\20180403_raw_cam1\20180403_080014'
+
+        CAMERADATA = Camera_Data(CAM_DATA)
         db.insert_camera_data()
 
-        db.create_new_image_table('2018_10_21')
-
+        db.create_new_image_table('2018_10_22')
         IMGDATA = Image_Data(IMG)
-        db.insert_image_data('2018_10_21')
+
+        imgproc = IMAGEPROC(CAMERADATA)
+
+        IMGDATA.ldr = imgproc.image2binary(test_image_path + '\data0_.data')
+        IMGDATA.hdr = imgproc.image2binary(test_image_path + '\raw_img0.jpg')
+
+        db.insert_image_data('2018_10_22')
 
         '''
         global Path_to_sourceDir
