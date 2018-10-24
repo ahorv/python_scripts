@@ -48,31 +48,34 @@ class Image_Data(object):
     """Container class for image data.
     """
     img_nr = 0
+    shots = 0
     time = '?'
     fstop ='?'
-    ss = 0
-    exp = 0
+    ss = '?'
+    exp ='?'
     iso = 0
-    ag = 0.00
-    awb_red = 0.00
-    awb_blue = 0.00
+    ag = '?'
+    awb_red = '?'
+    awb_blue = '?'
     ldr = 0
     hdr = 0
 
     def __init__(self, state_map={}):
         self.img_nr = state_map.get('img_nr',0)
+        self.shots = state_map.get('shots', 0)
         self.time = state_map.get('time','?' )
         self.fstop = state_map.get('fstop', '?')
-        self.ss = state_map.get('ss', 0)
-        self.exp = state_map.get('exp', 0)
+        self.ss = state_map.get('ss', '?')
+        self.exp = state_map.get('exp', '?')
         self.iso = state_map.get('iso', 0)
-        self.ag = state_map.get('ag', 0.00)
-        self.awb_red = state_map.get('awb_red', 0.00)
-        self.awb_blue = state_map.get('awb_blue', 0.00)
+        self.ag = state_map.get('ag', '?')
+        self.awb_red = state_map.get('awb_red', '?')
+        self.awb_blue = state_map.get('awb_blue', '?')
         self.ldr = state_map.get('ldr', 0)
         self.hdr = state_map.get('hdr', 0)
 
         Image_Data.img_nr = self.img_nr
+        Image_Data.shots = self.shots
         Image_Data.time = self.time
         Image_Data.fstop = self.fstop
         Image_Data.ss = self.ss
@@ -86,17 +89,17 @@ class Image_Data(object):
 
     def to_dict(self):
         return {
-            'img_nr': self.img_nr,
-            'time':   self.time,
-            'fstop':  self.fstop,
-            'ss' :    self.ss,
-            'exp':    self.exp,
-            'iso':    self.iso,
-            'ag':     self.ag,
-            'awb_red': self.awb_red,
-            'awb_blue': self.awb_blue,
-            'ldr': self.ldr,
-            'hdr': self.hdr,
+            'img_nr': Image_Data.img_nr,
+            'time':   Image_Data.time,
+            'fstop':  Image_Data.fstop,
+            'ss' :    Image_Data.ss,
+            'exp':    Image_Data.exp,
+            'iso':    Image_Data.iso,
+            'ag':     Image_Data.ag,
+            'awb_red' : Image_Data.awb_red,
+            'awb_blue': Image_Data.awb_blue,
+            'ldr': Image_Data.ldr,
+            'hdr': Image_Data.hdr,
         }
 
 class Camera_Data(object):
@@ -113,7 +116,7 @@ class Camera_Data(object):
     had_nimbocum = 0
 
     def __init__(self, state_map={}):
-        self.sw_vers = state_map.get('sw_vers',0)
+        self.sw_vers = state_map.get('sw_vers','?')
         self.cam_id = state_map.get('cam_id','?' )
         self.image_date = state_map.get('image_date', '?')
         self.dont_use     = state_map.get('dont_use', 0)
@@ -135,15 +138,15 @@ class Camera_Data(object):
 
     def to_dict(self):
         return {
-            'sw_vers'       :self.sw_vers,
-            'cam_id'        :self.cam_id,
-            'image_date'    :self.image_date,
-            'dont_use'      :self.dont_use,
-            'was_clearsky'  :self.was_clearsky,
-            'was_rainy'     :self.was_rainy,
-            'was_biased'    :self.was_biased,
-            'was_foggy'     :self.was_foggy,
-            'had_nimbocum'  :self.had_nimbocum,
+            'sw_vers'       :Camera_Data.sw_vers,
+            'cam_id'        :Camera_Data.cam_id,
+            'image_date'    :Camera_Data.image_date,
+            'dont_use'      :Camera_Data.dont_use,
+            'was_clearsky'  :Camera_Data.was_clearsky,
+            'was_rainy'     :Camera_Data.was_rainy,
+            'was_biased'    :Camera_Data.was_biased,
+            'was_foggy'     :Camera_Data.was_foggy,
+            'had_nimbocum'  :Camera_Data.had_nimbocum,
         }
 
 class Config(object):
@@ -384,15 +387,16 @@ class DB_handler:
             curs = con.cursor()
             sql = """CREATE TABLE IF NOT EXISTS %s
                  (
-                    img_nr INTEGER NOT NULL,        
+                    img_nr INTEGER NOT NULL,
+                    shots INTEGER NOT NULL,     
                     time VARCHAR(10) NOT NULL,
                     fstop VARCHAR(4),
-                    ss INTEGER,
-                    exp INTEGER,
+                    ss VARCHAR(200),
+                    exp VARCHAR(50),
                     iso INTEGER,
                     ag DOUBLE,
-                    awb_red DOUBLE,
-                    awb_blue DOUBLE,             
+                    awb_red VARCHAR(200),
+                    awb_blue VARCHAR(200),             
                     ldr LONGBLOB,
                     hdr LONGBLOB,
                     UNIQUE KEY (time)
@@ -416,7 +420,7 @@ class DB_handler:
             con = self.connect2DB()
             curs = con.cursor()
             param_list = 'sw_vers, cam_id, image_date, dont_use, was_clearsky, was_rainy, was_biased, was_foggy, had_nimbocum'
-            cameradata = CAMERADATA.to_dict()
+            cameradata = Camera_Data.to_dict()
             values = list(cameradata.values())
             format_strings = ','.join(['%s'] * len(values))
 
@@ -442,7 +446,7 @@ class DB_handler:
             con = self.connect2DB()
             curs = con.cursor()
             param_list = 'img_nr, time, fstop, ss, exp, iso, ag, awb_red, awb_blue, ldr, hdr'
-            imagedata = IMGDATA.to_dict()
+            imagedata = Image_Data.to_dict()
             values = list(imagedata.values())
             print('values: '.format(values))
             format_strings = ','.join(['%s'] * len(values))
@@ -463,23 +467,7 @@ class DB_handler:
             return success
 
 class HDR:
-    def getEXIF_TAG(self, file_path, field):
-        try:
-            foundvalue = '0'
-            with open(file_path, 'rb') as f:
-                exif = exifread.process_file(f)
 
-            for k in sorted(exif.keys()):
-                if k not in ['JPEGThumbnail', 'TIFFThumbnail', 'Filename', 'EXIF MakerNote']:
-                    if k == field:
-                        # print('%s = %s' % (k, exif[k]))
-                        foundvalue = np.float32(Fraction(str(exif[k])))
-                        break
-
-            return foundvalue
-
-        except Exception as e:
-            print('EXIF: Could not read exif data ' + str(e))
 
     def data2rgb(self, path_to_img):
         try:
@@ -835,6 +823,98 @@ class IMAGEPROC:
 
 class Helpers:
 
+    def getEXIF_TAG(self, file_path, field):
+        try:
+            foundvalue = '0'
+            with open(file_path, 'rb') as f:
+                exif = exifread.process_file(f)
+
+            for k in sorted(exif.keys()):
+                if k not in ['JPEGThumbnail', 'TIFFThumbnail', 'Filename', 'EXIF MakerNote']:
+                    if k == field:
+                        # print('%s = %s' % (k, exif[k]))
+                        foundvalue = np.float32(Fraction(str(exif[k])))
+                        break
+
+            return foundvalue
+
+        except Exception as e:
+            print('EXIF: Could not read exif data ' + str(e))
+
+    def getShutterTimes(self, path):
+        try:
+            '''
+            returns shutter_time in microseconds as np.float32 type
+            '''
+            sw_vers = Camera_Data.sw_vers
+            types = ('*.txt', '*.log')
+
+            for typ in types:
+                for file in sorted(glob(os.path.join(path,typ))):
+                    logfile = file
+
+            f = open(join(logfile), 'r')
+            logfile = f.readlines()
+
+            if sw_vers == 1:
+                listOfSS = np.empty(3, dtype=np.float32)
+                logfile.pop(0)  # remove non relevant lines
+                logfile.pop(0)  # remove non relevant lines
+
+            elif sw_vers == 2:
+                listOfSS = np.empty(3, dtype=np.float32)
+                logfile.pop(0)  # remove non relevant lines
+                logfile.pop(0)  # remove non relevant lines
+
+            elif sw_vers == 3:
+                listOfSS = np.empty(3, dtype=np.float32)
+                logfile.pop(0)  # remove non relevant lines
+                logfile.pop(0)  # remove non relevant lines
+
+            pos = 0
+            for line in logfile:
+                value = line.split("ss:", 1)[1]
+                value = value.split(',', 1)[0]
+                value = value.strip()
+                value += '/1000000'
+                val_float = np.float32(Fraction(str(value)))
+                listOfSS[pos] = val_float
+                pos +=1
+
+            return listOfSS
+
+        except Exception as e:
+            print('Error in getShutterTimes: ' + str(e))
+
+    def getAWB_Gains(self, file_path):
+        try:
+            '''
+            returns shutter_time in microseconds as np.float32 type
+            '''
+            awb_gains = np.empty([3, 2], dtype=np.float32)
+
+            f = open(join(file_path, file_name), 'r')
+            logfile = f.readlines()
+            logfile.pop(0)  # remove non relevant lines
+            logfile.pop(0)  # remove non relevant lines
+
+            pos = 0
+            for line in logfile:
+                value = line.split("awb:[", 1)[1]
+                value = value.split('],', 1)[0].replace('Fraction', '').replace('(', '', 1).replace('))', ')').replace(
+                    " ", "")
+                red_gain = value.split('),', 1)[0].strip('(').replace(',', '/')
+                blue_gain = value.split(',(', 1)[1].strip(')').replace(',', '/')
+                red_gain = np.float32(Fraction(str(red_gain)))
+                blue_gain = np.float32(Fraction(str(blue_gain)))
+                awb_gains[pos] = [red_gain, blue_gain]
+                pos += 1
+
+            return awb_gains
+
+        except Exception as e:
+            print('Error in getAWB_Gains: ' + str(e))
+
     def strip_date(self, newdatestr):
         try:
             s = Logger()
@@ -1159,8 +1239,15 @@ class Helpers:
         try:
             s = Logger()
             logger = s.getLogger()
+
+            print('Data from : {}'.format(path))
+
             date, time = self.strip_date_and_time(path)
             Image_Data.time = time
+
+            self.getShutterTimes(path)
+
+            #self.getAWB_Gains()
 
 
         except Exception as e:
@@ -1178,7 +1265,7 @@ class Helpers:
             all_dirs = self.getDirectories(r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20181012_raw_cam1\temp')
 
             for dir in all_dirs:
-                print('{}'.format(dir))
+                #print('{}'.format(dir))
                 self.collectImageData(dir)
 
 
@@ -1235,7 +1322,7 @@ def main():
         h.load_images2DB(r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20181012_raw_cam1')
 
         return
-
+        '''
         db = DB_handler()
         db.createDB()
 
@@ -1254,6 +1341,7 @@ def main():
 
 
         db.insert_image_data('2018_10_22')
+        '''
 
         '''
         global Path_to_sourceDir
