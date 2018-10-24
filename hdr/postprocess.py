@@ -43,32 +43,46 @@ print('Version opencv: ' + cv2.__version__)
 #
 ######################################################################
 
-global Path_to_sourceDir
-global Path_to_copy_img5s
-global Path_to_ffmpeg
-global Avoid_This_Directories
-
-
-global DB_CON
-global CFG
-global CAMERADATA
-global IMGDATA
 
 class Image_Data(object):
     """Container class for image data.
     """
+    img_nr = 0
+    time = '?'
+    fstop ='?'
+    ss = 0
+    exp = 0
+    iso = 0
+    ag = 0.00
+    awb_red = 0.00
+    awb_blue = 0.00
+    ldr = 0
+    hdr = 0
+
     def __init__(self, state_map={}):
-        self.img_nr = state_map.get('sw_vers',0)
+        self.img_nr = state_map.get('img_nr',0)
         self.time = state_map.get('time','?' )
         self.fstop = state_map.get('fstop', '?')
         self.ss = state_map.get('ss', 0)
         self.exp = state_map.get('exp', 0)
         self.iso = state_map.get('iso', 0)
-        self.ag = state_map.get('ag', 0)
-        self.awb_red = state_map.get('awb_red', 0)
-        self.awb_blue = state_map.get('awb_blue', 0)
+        self.ag = state_map.get('ag', 0.00)
+        self.awb_red = state_map.get('awb_red', 0.00)
+        self.awb_blue = state_map.get('awb_blue', 0.00)
         self.ldr = state_map.get('ldr', 0)
         self.hdr = state_map.get('hdr', 0)
+
+        Image_Data.img_nr = self.img_nr
+        Image_Data.time = self.time
+        Image_Data.fstop = self.fstop
+        Image_Data.ss = self.ss
+        Image_Data.exp = self.exp
+        Image_Data.iso = self.iso
+        Image_Data.ag = self.ag
+        Image_Data.awb_red = self.awb_red
+        Image_Data.awb_blue = self.awb_blue
+        Image_Data.ldr = self.ldr
+        Image_Data.hdr = self.hdr
 
     def to_dict(self):
         return {
@@ -88,6 +102,16 @@ class Image_Data(object):
 class Camera_Data(object):
     """Container class for camera data.
     """
+    sw_vers = '?'
+    cam_id = '?'
+    image_date = '?'
+    dont_use = 0
+    was_clearsky = 0
+    was_rainy = 0
+    was_biased = 0
+    was_foggy = 0
+    had_nimbocum = 0
+
     def __init__(self, state_map={}):
         self.sw_vers = state_map.get('sw_vers',0)
         self.cam_id = state_map.get('cam_id','?' )
@@ -98,6 +122,16 @@ class Camera_Data(object):
         self.was_biased   = state_map.get('was_biased', 0)
         self.was_foggy    = state_map.get('was_foggy', 0)
         self.had_nimbocum = state_map.get('had_nimbocum', 0)
+
+        Camera_Data.sw_vers = self.sw_vers
+        Camera_Data.cam_id = self.cam_id
+        Camera_Data.image_date = self.image_date
+        Camera_Data.dont_use = self.dont_use
+        Camera_Data.was_clearsky = self.was_clearsky
+        Camera_Data.was_rainy = self.was_rainy
+        Camera_Data.was_biased = self.was_biased
+        Camera_Data.was_foggy = self.was_foggy
+        Camera_Data.had_nimbocum = self.had_nimbocum
 
     def to_dict(self):
         return {
@@ -112,24 +146,73 @@ class Camera_Data(object):
             'had_nimbocum'  :self.had_nimbocum,
         }
 
-class DB_config(object):
+class Config(object):
     """Container class for configuration.
     """
+
+    sourceDirectory = '?'
+    camera_1_Directory = '?'
+    camera_2_Directory = '?'
+    databaseName = '?'
+    databaseDirectory = '?'
+
     def __init__(self, state_map={}):
+        self.sourceDirectory = state_map.get('sourceDirectory', '?')
+        self.camera_1_Directory = state_map.get('camera_1_Directory', '?')
+        self.camera_2_Directory = state_map.get('camera_2_Directory', '?')
         self.databaseName = state_map.get('databaseName','sky_db')
         self.databaseDirectory = state_map.get('databaseDirectory', '?')
-        self.sourceDirectory = state_map.get('sourceDirectory', '?')
+
+        Config.sourceDirectory = self.sourceDirectory
+        Config.camera_1_Directory = self.camera_1_Directory
+        Config.camera_2_Directory = self.camera_2_Directory
+        Config.databaseName = self.databaseName
+        Config.databaseDirectory = self.databaseDirectory
 
 class Logger:
     def __init__(self):
         self.logger = None
 
+    def getFileLogger(self):
+        try:
+            PATH = Config.databaseDirectory
+
+            FILEPATH = os.path.join(PATH, 'allFilesProcessed.log')
+            LOGFILEPATH = join(r'\\',FILEPATH)
+
+            logFormatter = logging.Formatter('%(message)s')
+            fileHandler = logging.FileHandler(LOGFILEPATH)
+            name = 'filesProcessedLogger'
+
+            # configure file handler
+            fileHandler.setFormatter(logFormatter)
+
+            # configure stream handler
+            consoleHandler = logging.StreamHandler()
+            consoleHandler.setFormatter(logFormatter)
+
+            # get the logger instance
+            self.logger = logging.getLogger(name)
+
+            # set the logging level
+            self.logger.setLevel(logging.INFO)
+
+            if not len(self.logger.handlers):
+                self.logger.addHandler(fileHandler)
+                self.logger.addHandler(consoleHandler)
+
+            helper = Helpers()
+            if sys.platform == "linux":
+                helper.setOwnerAndPermission(LOGFILEPATH)
+            return self.logger
+
+        except Exception as e:
+            print('Error Filelogger:' + str(e))
+
     def getLogger(self, newLogPath=None):
 
         try:
-            global CFG
-            config = DB_config(CFG)
-            PATH = config.databaseDirectory
+            PATH = Config.databaseDirectory
 
             if newLogPath is None:
                 FILEPATH = os.path.join(PATH, 'postprocessor.log')
@@ -167,7 +250,7 @@ class Logger:
             return self.logger
 
         except IOError as e:
-            print('Error logger:' + str(e))
+            print('Error Logger:' + str(e))
 
     def closeLogHandler(self):
         try:
@@ -182,7 +265,7 @@ class Logger:
 class DB_handler:
 
     def __init__(self):
-        self.config = DB_config()
+        self.config = Config()
         self.connection = None
         self.cursor = None
 
@@ -206,7 +289,7 @@ class DB_handler:
         try:
             s = Logger()
             logger = s.getLogger()
-            config = DB_config()
+            config = Config()
             cb_name = config.databaseName
             self.connection = mysql.connector.connect(
                 host='192.168.1.10',
@@ -241,7 +324,7 @@ class DB_handler:
             s = Logger()
             logger = s.getLogger()
             db_con = self.connect2MySQL()
-            config = DB_config()
+            config = Config()
             db_name = config.databaseName
 
             if(db_con):
@@ -307,9 +390,9 @@ class DB_handler:
                     ss INTEGER,
                     exp INTEGER,
                     iso INTEGER,
-                    ag INTEGER,
-                    awb_red INTEGER,
-                    awb_blue INTEGER,             
+                    ag DOUBLE,
+                    awb_red DOUBLE,
+                    awb_blue DOUBLE,             
                     ldr LONGBLOB,
                     hdr LONGBLOB,
                     UNIQUE KEY (time)
@@ -378,262 +461,6 @@ class DB_handler:
             self.con_close()
             logger.error('insert_image_data ' + str(e))
             return success
-
-
-class Helpers:
-
-    def strip_date(self, newdatestr):
-        try:
-            s = Logger()
-            logger = s.getLogger()
-            H_S = datetime.now().strftime('%M-%S')
-            formated_date = '0000-{}'.format(H_S)
-            dateAndTime = (newdatestr.rstrip('\\').rpartition('\\')[-1]).replace('_', ' ')
-
-            year = dateAndTime[:4]
-            month = dateAndTime[4:6]
-            day = dateAndTime[6:8]
-
-            check = [year,month,day]
-
-            for item in check:
-                if not item or not item.isdigit():
-                    logger.Error('strip_date: could not read date and time  used {} !'.format(formated_date))
-                    return formated_date
-
-            formated_date = '{}-{}-{}'.format(year, month, day)
-
-            return formated_date
-        except IOError as e:
-            logger.Error('strip_date: could not read date used {} instead !{}').format(formated_date, e)
-            return formated_date
-
-    def strip_date_and_time(self, newdatetimestr):
-        try:
-            s = Logger()
-            logger = s.getLogger()
-            formated_date = '0000-00-00'
-            formated_time = datetime.now().strftime('%H:%M:%S')
-
-            date = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[0]
-            time = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[-1]
-
-            year  = date[:4]
-            month = date[4:6]
-            day   = date[6:8]
-            hour  = time[:2]
-            min   = time[2:4]
-            sec   = time[4:6]
-
-            check = [year,month,day,hour,min,sec]
-
-            for item in check:
-                if not item or not item.isdigit():
-                    logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
-                    formated_date, formated_time))
-                    return formated_date, formated_time
-
-            formated_date = '{}-{}-{}'.format(year,month,day)
-            formated_time = '{}:{}:{}'.format(hour,min,sec)
-
-            return formated_date, formated_time
-        except IOError as e:
-            logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
-            formated_date,formated_time, e))
-            return formated_date, formated_time
-
-    def createNewFolder(self, thispath):
-        try:
-            if not os.path.exists(thispath):
-                os.makedirs(thispath)
-                self.setOwnerAndPermission(thispath)
-
-        except IOError as e:
-            print('DIR : Could not create new folder: ' + str(e))
-
-    def setOwnerAndPermission(self, pathToFile):
-        try:
-            uid = pwd.getpwnam('pi').pw_uid
-            gid = grp.getgrnam('pi').gr_gid
-            os.chown(pathToFile, uid, gid)
-            os.chmod(pathToFile, 0o777)
-        except IOError as e:
-            print('PERM : Could not set permissions for file: ' + str(e))
-
-    def createVideo(self):
-        try:
-
-            global Path_to_copy_img5s                                    # path to images
-            global Path_to_ffmpeg                                       # path to ffmpeg executable
-            fsp = ' -r 10 '                                             # frame per sec images taken
-            stnb = '-start_number 0001 '                                # what image to start at
-            imgpath = '-i ' + join(Path_to_copy_img5s,'%4d.jpg')+' '    # path to images
-            res = '-s 2592x1944 '                                       # output resolution
-            outpath = Path_to_copy_img5s + '\sky_video.mp4 '            # output file name
-            codec = '-vcodec libx264'                                   # codec to use
-
-            command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
-
-            if sys.platform == "linux":
-                subprocess(command, shell=True)
-            else:
-                print('\n{}'.format(command))
-                ffmpeg = subprocess.Popen(command, stderr=subprocess.PIPE ,stdout = subprocess.PIPE)
-                out, err = ffmpeg.communicate()
-                if (err): print(err)
-                print('Ffmpeg done.')
-
-        except Exception as e:
-            print('createVideo from jpg\'s: Error: ' + str(e))
-
-    def getDirectories(self,pathToDirectories):
-        try:
-            global Avoid_This_Directories
-            allDirs = []
-            img_cnt = 1
-
-            for dirs in sorted(glob(os.path.join(pathToDirectories, "*", ""))):
-                if os.path.isdir(dirs):
-                    if dirs.rstrip('\\').rpartition('\\')[-1] not in Avoid_This_Directories:
-                        allDirs.append(dirs)
-                        #print('{}'.format(str(dirs)))
-                        img_cnt +=1
-
-            print('All images loaded! - Found {} images.'.format(img_cnt))
-
-            return allDirs
-
-        except Exception as e:
-            print('getDirectories: Error: ' + str(e))
-
-    def getZipDirs(self,pathToDirectories):
-        allZipFiles = []
-        cnt = 0
-
-        for zipfile in sorted(glob(os.path.join(pathToDirectories, "*.zip"))):
-            if os.path.isfile(zipfile):
-                allZipFiles.append(zipfile)
-                cnt +=1
-
-        print('Found {} *.ZIP files '.format(cnt))
-        return allZipFiles
-
-    def readAllImages(self,allDirs):
-        try:
-            global Path_to_sourceDir
-            list_names = []
-            list_images = []
-            cnt = 1
-            print('Converting jpg to opencv, may take some time!')
-
-            t_start = time.time()
-            for next_dir in allDirs:
-                next_dir += 'raw_img5.jpg'
-                img = cv2.imread(next_dir, 1)
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                new_img = cv2.resize(img_rgb, None, fx=0.25, fy=0.25)
-                list_images.append(new_img)
-                cnt += 1
-
-            t_end = time.time()
-            measurement = t_end-t_start
-            print('Total number of images: {}'.format(cnt))
-            print('Time to load and convert imgs: {}'.format(measurement))
-
-            return list_images
-
-        except Exception as e:
-            print('readAllImages: Error: ' + str(e))
-
-    def copyAndMaskAll_img5(self, list_alldirs):
-
-        try:
-            imgproc = IMAGEPROC()
-            global Path_to_copy_img5s
-            global CAM
-            cnt = 1
-
-            if not os.path.exists(Path_to_copy_img5s):
-                os.makedirs(Path_to_copy_img5s)
-
-            for next_dir in list_alldirs:
-                newimg = join(next_dir,'raw_img5.jpg')
-                masked_img = imgproc.maske_jpg_Image(cv2.imread(newimg))
-                dateAndTime = (next_dir.rstrip('\\').rpartition('\\')[-1]).replace('_',' ')
-                prefix = '{0:04d}'.format(cnt)
-                year  = dateAndTime[:4]
-                month = dateAndTime[4:6]
-                day   = dateAndTime[6:8]
-                hour  = dateAndTime[9:11]
-                min   = dateAndTime[11:13]
-                sec   = dateAndTime[13:15]
-
-                img_txt = imgproc.write2img(masked_img, 'cam ' + CAM, (30, 70))
-                img_txt = imgproc.write2img(masked_img,year+" "+month+" "+day,(30,1720))
-                img_txt = imgproc.write2img(masked_img, '#: ' + str(cnt), (30,1800))
-                img_txt = imgproc.write2img(masked_img, hour+":"+min+":"+sec, (30, 1880))
-                new_img_path = join(Path_to_copy_img5s, '{}.jpg'.format(prefix))
-
-                cv2.imwrite(new_img_path,masked_img)
-                cnt += 1
-
-            print('Masked {} images and copyied to imgs5.'.format(cnt))
-
-        except Exception as e:
-            print('Error in copyAndMaskAll_img5: {}'.format(e))
-
-    def unzipall(self,path_to_extract):
-
-        try:
-            allzipDirs = self.getZipDirs(path_to_extract)
-            numb_to_unzip = len(allzipDirs)
-            cnt = 0
-
-            for dirs in allzipDirs:
-
-                newDirname = dirs.replace('.zip','')
-
-                if newDirname:
-
-                    zipfilepath = os.path.join(dirs)
-                    cnt +=1
-                    zf = zipfile.ZipFile(zipfilepath, "r")
-                    zf.extractall(os.path.join(newDirname))
-                    zf.close()
-                    percent = round(cnt/numb_to_unzip*100,2)
-                    print(str(percent)+' percent completed' + '\r')
-
-            print('unzip finished.')
-
-        except IOError as e:
-            print('unzipall: Error: ' + str(e))
-
-    def delAllZIP(self,path_to_extract):
-        try:
-            allzipDirs = self.getZipDirs(path_to_extract)
-            numb_to_unzip = len(allzipDirs)
-            cnt = 0
-
-            for zipdir in allzipDirs:
-                # delete unzipped directory
-                print('deleting: '+str(zipdir))
-                os.remove(zipdir)
-
-            print('deleted all ZIP files.')
-
-        except IOError as e:
-            print('unzipall: Error: ' + str(e))
-
-    def delUnzipedDir(self, pathtoDir):
-        try:
-            s = Logger()
-            logger = s.getLogger()
-            shutil.rmtree(pathtoDir)
-            logger.info('deleted {} folder.'.format(pathtoDir))
-
-        except IOError as e:
-            logger.error('delUnzipedDir: {}'.format(e))
-
 
 class HDR:
     def getEXIF_TAG(self, file_path, field):
@@ -1006,22 +833,375 @@ class IMAGEPROC:
         except Exception as e:
             logger.error('read_image_as_binarry: {}'.format(e))
 
+class Helpers:
+
+    def strip_date(self, newdatestr):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            H_S = datetime.now().strftime('%M-%S')
+            formated_date = '0000-{}'.format(H_S)
+            dateAndTime = (newdatestr.rstrip('\\').rpartition('\\')[-1]).replace('_', ' ')
+
+            year = dateAndTime[:4]
+            month = dateAndTime[4:6]
+            day = dateAndTime[6:8]
+
+            check = [year,month,day]
+
+            for item in check:
+                if not item or not item.isdigit():
+                    logger.Error('strip_date: could not read date and time  used {} !'.format(formated_date))
+                    return formated_date
+
+            formated_date = '{}-{}-{}'.format(year, month, day)
+
+            return formated_date
+        except IOError as e:
+            logger.Error('strip_date: could not read date used {} instead !{}').format(formated_date, e)
+            return formated_date
+
+    def strip_date_and_time(self, newdatetimestr):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            formated_date = '0000-00-00'
+            formated_time = datetime.now().strftime('%H:%M:%S')
+
+            date = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[0]
+            time = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[-1]
+
+            year  = date[:4]
+            month = date[4:6]
+            day   = date[6:8]
+            hour  = time[:2]
+            min   = time[2:4]
+            sec   = time[4:6]
+
+            check = [year,month,day,hour,min,sec]
+
+            for item in check:
+                if not item or not item.isdigit():
+                    logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
+                    formated_date, formated_time))
+                    return formated_date, formated_time
+
+            formated_date = '{}-{}-{}'.format(year,month,day)
+            formated_time = '{}:{}:{}'.format(hour,min,sec)
+
+            return formated_date, formated_time
+        except Exception as e:
+            logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
+            formated_date,formated_time, e))
+            return formated_date, formated_time
+
+    def createNewFolder(self, thispath):
+        try:
+            if not os.path.exists(thispath):
+                os.makedirs(thispath)
+                self.setOwnerAndPermission(thispath)
+
+        except IOError as e:
+            print('DIR : Could not create new folder: ' + str(e))
+
+    def setOwnerAndPermission(self, pathToFile):
+        try:
+            uid = pwd.getpwnam('pi').pw_uid
+            gid = grp.getgrnam('pi').gr_gid
+            os.chown(pathToFile, uid, gid)
+            os.chmod(pathToFile, 0o777)
+        except Exception as e:
+            print('PERM : Could not set permissions for file: ' + str(e))
+
+    def createVideo(self):
+        try:
+
+            global Path_to_copy_img5s                                    # path to images
+            global Path_to_ffmpeg                                       # path to ffmpeg executable
+            fsp = ' -r 10 '                                             # frame per sec images taken
+            stnb = '-start_number 0001 '                                # what image to start at
+            imgpath = '-i ' + join(Path_to_copy_img5s,'%4d.jpg')+' '    # path to images
+            res = '-s 2592x1944 '                                       # output resolution
+            outpath = Path_to_copy_img5s + '\sky_video.mp4 '            # output file name
+            codec = '-vcodec libx264'                                   # codec to use
+
+            command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
+
+            if sys.platform == "linux":
+                subprocess(command, shell=True)
+            else:
+                print('\n{}'.format(command))
+                ffmpeg = subprocess.Popen(command, stderr=subprocess.PIPE ,stdout = subprocess.PIPE)
+                out, err = ffmpeg.communicate()
+                if (err): print(err)
+                print('Ffmpeg done.')
+
+        except Exception as e:
+            print('createVideo from jpg\'s: Error: ' + str(e))
+
+    def getDirectories(self,pathToDirectories):
+        try:
+            allDirs = []
+            img_cnt = 1
+
+            for dirs in sorted(glob(os.path.join(pathToDirectories, "*", ""))):
+                if os.path.isdir(dirs):
+                    if dirs.rstrip('\\').rpartition('\\')[-1]:
+                        allDirs.append(dirs)
+                        img_cnt +=1
+            return allDirs
+
+        except Exception as e:
+            print('getDirectories: Error: ' + str(e))
+
+    def getZipDirs(self,pathToDirectories):
+        s = Logger()
+        logger = s.getLogger()
+        allZipFiles = []
+        cnt = 0
+
+        for zipfile in sorted(glob(os.path.join(pathToDirectories, "*.zip"))):
+            if os.path.isfile(zipfile):
+                allZipFiles.append(zipfile)
+                cnt +=1
+
+        if cnt <= 0:
+            logger.error('MISSING DATA in: {}'.format(pathToDirectories))
+
+        return allZipFiles
+
+    def readAllImages(self,allDirs):
+        try:
+            global Path_to_sourceDir
+            list_names = []
+            list_images = []
+            cnt = 1
+            print('Converting jpg to opencv, may take some time!')
+
+            t_start = time.time()
+            for next_dir in allDirs:
+                next_dir += 'raw_img5.jpg'
+                img = cv2.imread(next_dir, 1)
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                new_img = cv2.resize(img_rgb, None, fx=0.25, fy=0.25)
+                list_images.append(new_img)
+                cnt += 1
+
+            t_end = time.time()
+            measurement = t_end-t_start
+            print('Total number of images: {}'.format(cnt))
+            print('Time to load and convert imgs: {}'.format(measurement))
+
+            return list_images
+
+        except Exception as e:
+            print('readAllImages: Error: ' + str(e))
+
+    def copyAndMaskAll_img5(self, list_alldirs):
+
+        try:
+            imgproc = IMAGEPROC()
+            global Path_to_copy_img5s
+            global CAM
+            cnt = 1
+
+            if not os.path.exists(Path_to_copy_img5s):
+                os.makedirs(Path_to_copy_img5s)
+
+            for next_dir in list_alldirs:
+                newimg = join(next_dir,'raw_img5.jpg')
+                masked_img = imgproc.maske_jpg_Image(cv2.imread(newimg))
+                dateAndTime = (next_dir.rstrip('\\').rpartition('\\')[-1]).replace('_',' ')
+                prefix = '{0:04d}'.format(cnt)
+                year  = dateAndTime[:4]
+                month = dateAndTime[4:6]
+                day   = dateAndTime[6:8]
+                hour  = dateAndTime[9:11]
+                min   = dateAndTime[11:13]
+                sec   = dateAndTime[13:15]
+
+                img_txt = imgproc.write2img(masked_img, 'cam ' + CAM, (30, 70))
+                img_txt = imgproc.write2img(masked_img,year+" "+month+" "+day,(30,1720))
+                img_txt = imgproc.write2img(masked_img, '#: ' + str(cnt), (30,1800))
+                img_txt = imgproc.write2img(masked_img, hour+":"+min+":"+sec, (30, 1880))
+                new_img_path = join(Path_to_copy_img5s, '{}.jpg'.format(prefix))
+
+                cv2.imwrite(new_img_path,masked_img)
+                cnt += 1
+
+            print('Masked {} images and copyied to imgs5.'.format(cnt))
+
+        except Exception as e:
+            print('Error in copyAndMaskAll_img5: {}'.format(e))
+
+    def unzipall(self,path_to_extract):
+        try:
+            s = Logger()
+            logger = s.getFileLogger()
+            temp_path = join(path_to_extract, 'temp')
+
+            if not os.path.exists(temp_path):
+                os.makedirs(temp_path)
+
+            allzipDirs = self.getZipDirs(path_to_extract)
+
+            for dirs in allzipDirs:
+                path = dirs.replace('.zip','')
+                dirName = (path.rstrip('\\').rpartition('\\')[-1])
+                new_temp_path = join(temp_path,dirName)
+
+                if path:
+                    zipfilepath = os.path.join(dirs)
+                    zf = zipfile.ZipFile(zipfilepath, "r")
+                    zf.extractall(os.path.join(new_temp_path))
+                    zf.close()
+
+            return temp_path
+
+        except Exception as e:
+            logger.error('unzipall: ' + str(e))
+
+    def delAllZIP(self,path_to_extract):
+        try:
+            allzipDirs = self.getZipDirs(path_to_extract)
+            numb_to_unzip = len(allzipDirs)
+            cnt = 0
+
+            for zipdir in allzipDirs:
+                # delete unzipped directory
+                print('deleting: '+str(zipdir))
+                os.remove(zipdir)
+
+            print('deleted all ZIP files.')
+
+        except Exception as e:
+            print('unzipall: Error: ' + str(e))
+
+    def delUnzipedDir(self, pathtoDir):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            shutil.rmtree(pathtoDir)
+            logger.info('deleted {} folder.'.format(pathtoDir))
+
+        except Exception as e:
+            logger.error('delUnzipedDir: {}'.format(e))
+
+    def search_list(self, myList, search_str):
+        matching = None
+        matching = [s for s in myList if search_str in s]
+        return matching
+
+    def getAllCamDirectories(self):
+
+        all_cam1_vers = self.getDirectories(Config.camera_1_Directory)
+        all_cam2_vers = self.getDirectories(Config.camera_2_Directory)
+        all_cam_vers = []
+
+        for i, val in enumerate(all_cam1_vers):
+            all_cam_vers.append(val)
+            all_cam_vers.append(all_cam2_vers[i])
+
+        return  all_cam_vers
+
+    def load_images2DB(self, path_to_one_dir=None):
+        try:
+            s = Logger()
+            logger = s.getFileLogger()
+            f = Logger()
+            fileLogger = f.getFileLogger()
+
+            if path_to_one_dir:
+                success = self.processOneDirectory(path_to_one_dir)
+
+                if success:
+                    fileLogger.info(path_to_one_dir)
+
+            else:
+                allCamDirectorys = self.getAllCamDirectories()
+                for path in allCamDirectorys:
+                    allDirs = self.getDirectories(path)
+
+                    for raw_cam_dir in allDirs:
+                        #print('{}'.format(raw_cam_dir))
+                        success = self.processOneDirectory(raw_cam_dir)
+                        if success:
+                            fileLogger.info('{}'.format(raw_cam_dir))
+
+        except Exception as e:
+            logger.error('load_images2DB: ' + str(e))
+
+    def collectCamData(self, path):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            temp = (path.split('\\'))[-2]
+            temp = temp.split('_')
+
+            # sw version and camera ID
+            camera_ID = temp[1]
+            sw_vers = temp[-1]
+            sw_vers = sw_vers.replace('vers','')
+
+            if camera_ID.isdigit(): camera_ID = int(camera_ID)
+            if sw_vers.isdigit(): sw_vers = int(sw_vers)
+            Camera_Data.cam_id = camera_ID
+            Camera_Data.sw_vers = sw_vers
+
+            # extract date
+            date = self.strip_date(path)
+            Image_Data.image_date = date
+
+        except Exception as e:
+            logger.error('collectCamData: ' + str(e))
+
+    def collectImageData(self, path):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            date, time = self.strip_date_and_time(path)
+            Image_Data.time = time
+
+
+        except Exception as e:
+            logger.error('collectImageData: ' + str(e))
+
+    def processOneDirectory(self, path):
+        try:
+            s = Logger()
+            logger = s.getFileLogger()
+            success = False
+
+            #path_to_unziped = self.unzipall(path)
+            self.collectCamData(path)
+            #all_dirs = self.getDirectories(path_to_unziped)
+            all_dirs = self.getDirectories(r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20181012_raw_cam1\temp')
+
+            for dir in all_dirs:
+                print('{}'.format(dir))
+                self.collectImageData(dir)
+
+
+            #shutil.rmtree(path_to_unziped)
+
+
+            success = True
+            return success
+
+        except Exception as e:
+          logger.error('processOneDirectory: ' + str(e))
+          return success
+
+
+
 def main():
     try:
-        global CFG
-        global CAMERADATA
-        global IMGDATA
-
         CFG = {
-            'databaseDirectory': r'\\HOANAS\HOA_SKYCam',
-            'sourceDirectory': r'\\HOANAS\HOA_SKYCam',  # 'sourceDirectory': '\\HOANAS\HOA_SKYCam',
+            'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
+            'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
+            'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
+            'camera_2_Directory': r'\\HOANAS\HOA_SKYCam\camera_2',
         }
-
-        # classe config fehlerhaft !
-        config = DB_config(CFG)
-        db = DB_handler()
-        db.createDB()
-
         CAM_DATA = {
             'sw_vers': 3,
             'cam_id': '1',
@@ -1033,7 +1213,6 @@ def main():
             'was_foggy':0,
             'had_nimbocum':0
         }
-
         IMG = {
             'img_nr': 1,
             'time':  '12:23:34',
@@ -1041,12 +1220,24 @@ def main():
             'ss' :    1000,
             'exp':    1000,
             'iso':    100,
-            'ag':     1111,
-            'awb_red': 4567,
-            'awb_blue': 2345,
+            'ag':     0.12345,
+            'awb_red': 0.12345,
+            'awb_blue': 0.12345,
             'ldr': '?',
             'hdr': '?',
         }
+        config = Config(CFG)
+        h = Helpers()
+        s = Logger()
+        logger = s.getLogger()
+
+        #h.load_images2DB()
+        h.load_images2DB(r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20181012_raw_cam1')
+
+        return
+
+        db = DB_handler()
+        db.createDB()
 
         test_image_path = r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers2\20180403_raw_cam1\20180403_080014'
 
@@ -1112,7 +1303,7 @@ def main():
         print('Postprocess.py done')
 
     except Exception as e:
-        print('MAIN: Error in main: ' + str(e))
+        logger.error('MAIN: {}'.format(e))
 
 
 if __name__ == '__main__':
