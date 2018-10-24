@@ -268,7 +268,6 @@ class Logger:
 class DB_handler:
 
     def __init__(self):
-        self.config = Config()
         self.connection = None
         self.cursor = None
 
@@ -292,8 +291,7 @@ class DB_handler:
         try:
             s = Logger()
             logger = s.getLogger()
-            config = Config()
-            cb_name = config.databaseName
+            cb_name = Config.databaseName
             self.connection = mysql.connector.connect(
                 host='192.168.1.10',
                 user='root',
@@ -327,8 +325,7 @@ class DB_handler:
             s = Logger()
             logger = s.getLogger()
             db_con = self.connect2MySQL()
-            config = Config()
-            db_name = config.databaseName
+            db_name = Config.databaseName
 
             if(db_con):
                 myDB = db_con.cursor()
@@ -848,6 +845,7 @@ class Helpers:
             '''
             sw_vers = Camera_Data.sw_vers
             types = ('*.txt', '*.log')
+            ss_to_db = []
 
             for typ in types:
                 for file in sorted(glob(os.path.join(path,typ))):
@@ -876,6 +874,8 @@ class Helpers:
                 value = line.split("ss:", 1)[1]
                 value = value.split(',', 1)[0]
                 value = value.strip()
+                print('value: {}'.format(value))
+                ss_to_db.append(value + ",")
                 value += '/1000000'
                 val_float = np.float32(Fraction(str(value)))
                 listOfSS[pos] = val_float
@@ -1317,6 +1317,9 @@ def main():
         h = Helpers()
         s = Logger()
         logger = s.getLogger()
+
+        db = DB_handler()
+        db.createDB()
 
         #h.load_images2DB()
         h.load_images2DB(r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20181012_raw_cam1')
