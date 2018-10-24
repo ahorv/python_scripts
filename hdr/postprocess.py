@@ -12,7 +12,7 @@ import exifread
 from glob import glob
 import subprocess
 import zipfile
-from matplotlib import pyplot as plt
+import shutil
 from os import listdir
 from os.path import isfile, join
 import numpy as np
@@ -311,7 +311,8 @@ class DB_handler:
                     awb_red INTEGER,
                     awb_blue INTEGER,             
                     ldr LONGBLOB,
-                    hdr LONGBLOB
+                    hdr LONGBLOB,
+                    UNIQUE KEY (time)
                   )
                """ % table_name
 
@@ -363,7 +364,7 @@ class DB_handler:
             print('values: '.format(values))
             format_strings = ','.join(['%s'] * len(values))
 
-            sql = "INSERT INTO {} ".format(table_name) + \
+            sql = "INSERT IGNORE INTO {} ".format(table_name) + \
                   "("+ param_list +") " \
                   "VALUES (%s)" % format_strings
 
@@ -440,7 +441,6 @@ class Helpers:
             logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
             formated_date,formated_time, e))
             return formated_date, formated_time
-
 
     def createNewFolder(self, thispath):
         try:
@@ -609,7 +609,6 @@ class Helpers:
             print('unzipall: Error: ' + str(e))
 
     def delAllZIP(self,path_to_extract):
-
         try:
             allzipDirs = self.getZipDirs(path_to_extract)
             numb_to_unzip = len(allzipDirs)
@@ -624,6 +623,17 @@ class Helpers:
 
         except IOError as e:
             print('unzipall: Error: ' + str(e))
+
+    def delUnzipedDir(self, pathtoDir):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            shutil.rmtree(pathtoDir)
+            logger.info('deleted {} folder.'.format(pathtoDir))
+
+        except IOError as e:
+            logger.error('delUnzipedDir: {}'.format(e))
+
 
 class HDR:
     def getEXIF_TAG(self, file_path, field):
@@ -1027,13 +1037,13 @@ def main():
         IMG = {
             'img_nr': 1,
             'time':  '12:23:34',
-            'fstop':  '-4',
-            'ss' :    1234,
-            'exp':    9876,
+            'fstop':  '-40',
+            'ss' :    1000,
+            'exp':    1000,
             'iso':    100,
-            'ag':     1,
-            'awb_red': 0.4567,
-            'awb_blue': 0.2345,
+            'ag':     1111,
+            'awb_red': 4567,
+            'awb_blue': 2345,
             'ldr': '?',
             'hdr': '?',
         }
@@ -1048,8 +1058,9 @@ def main():
 
         imgproc = IMAGEPROC(CAMERADATA)
 
-        #IMGDATA.ldr = imgproc.image2binary(join(test_image_path,'data0_.data'))
-        #IMGDATA.hdr = imgproc.image2binary(join(test_image_path,'raw_img0.jpg'))
+        IMGDATA.ldr = imgproc.image2binary(join(test_image_path,'raw_img0.jpg'))
+        IMGDATA.hdr = imgproc.image2binary(join(test_image_path,'data0_.data'))
+
 
         db.insert_image_data('2018_10_22')
 
