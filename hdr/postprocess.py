@@ -97,6 +97,7 @@ class Image_Data(object):
         return {
             'date':   Image_Data.date,
             'img_nr': Image_Data.img_nr,
+            'shots': Image_Data.shots,
             'time':   Image_Data.time,
             'fstop':  Image_Data.fstop,
             'ss' :    Image_Data.ss,
@@ -394,9 +395,9 @@ class DB_handler:
                     img_nr INTEGER NOT NULL,
                     shots INTEGER NOT NULL,     
                     time VARCHAR(10) NOT NULL,
-                    fstop VARCHAR(4),
+                    fstop VARCHAR(25),
                     ss VARCHAR(200),
-                    exp VARCHAR(50),
+                    exp VARCHAR(100),
                     iso INTEGER,
                     ag DOUBLE,
                     dg DOUBLE,
@@ -451,7 +452,7 @@ class DB_handler:
             print('inserting new img data into: {}'.format(table_name))  # LOESCHEN !
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'img_nr, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr'
+            param_list = 'img_nr, shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr'
             imagedata = Image_Data.to_dict(None)
             del imagedata['date']
             values = list(imagedata.values())
@@ -1596,6 +1597,10 @@ class Helpers:
             Image_Data.awb_blue = awb_blue_to_db
 
             # Hier HDR / ldr Bilder einfügen resp erzeugen !!!
+            # Image_Data.ldr = h.image2binary(join(test_image_path, 'raw_img0.jpg'))
+            # Image_Data.hdr = imgproc.image2binary(join(test_image_path, 'data0_.data'))
+
+
 
             success = True
             return success
@@ -1624,6 +1629,7 @@ class Helpers:
             s = Logger()
             logger = s.getFileLogger()
             success = False
+            img_nr = 0
 
             #path_to_temp = self.unzipall(path)
             self.collectCamData(path)
@@ -1631,6 +1637,8 @@ class Helpers:
             all_dirs = self.getDirectories(path)  # loeschen nur zu testzwecken !
 
             for dir in all_dirs:
+                img_nr += 1
+                Image_Data.img_nr = img_nr
                 success = self.collectImageData(dir)
                 if success:
                     success = self.writeImageData2DB()
