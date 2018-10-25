@@ -843,6 +843,8 @@ class Helpers:
             '''
             returns shutter_time in microseconds as np.float32 type
             '''
+            s = Logger()
+            logger = s.getLogger()
             sw_vers = Camera_Data.sw_vers
             types = ('*.txt', '*.log')
             ss_to_db = []
@@ -855,48 +857,90 @@ class Helpers:
             logfile = f.readlines()
 
             if sw_vers == 1:
+                listOfSS = np.empty(10, dtype=np.float32)
+
+                if os.stat(file).st_size == 0:
+                    ss_to_db = '0,0,0,0,0,0,0,0,0,0'
+                    logger.error('Empty camstat - file: {}'.format(file))
+                    return listOfSS, ss_to_db
+
+                logfile.pop(0)  # remove non relevant lines
+                logfile.pop(0)
+                logfile.pop(0)
+                pos = 0
+                for line in logfile:
+                    value = line.split("camera shutter speed:", 1)[1].replace('[','').replace(']','')
+                    value = value.split('|', 1)[0]
+                    value = value.strip()
+                    ss_to_db.append(value + ",")
+                    value += '/1000000'
+                    val_float = np.float32(Fraction(str(value)))
+                    listOfSS[pos] = val_float
+                    pos +=1
+
+            else :
+
                 listOfSS = np.empty(3, dtype=np.float32)
-                logfile.pop(0)  # remove non relevant lines
-                logfile.pop(0)  # remove non relevant lines
 
-            elif sw_vers == 2:
-                listOfSS = np.empty(3, dtype=np.float32)
-                logfile.pop(0)  # remove non relevant lines
-                logfile.pop(0)  # remove non relevant lines
+                if os.stat(file).st_size == 0:
+                    ss_to_db = '0,0,0'
+                    logger.error('Empty camstat - file: {}'.format(file))
+                    return listOfSS, ss_to_db
 
-            elif sw_vers == 3:
-                listOfSS = np.empty(3, dtype=np.float32)
-                logfile.pop(0)  # remove non relevant lines
-                logfile.pop(0)  # remove non relevant lines
+                if sw_vers == 2:
+                    logfile.pop(0)
+                if sw_vers == 3:
+                    logfile.pop(0)
+                    logfile.pop(0)
 
-            pos = 0
-            for line in logfile:
-                value = line.split("ss:", 1)[1]
-                value = value.split(',', 1)[0]
-                value = value.strip()
-                print('value: {}'.format(value))
-                ss_to_db.append(value + ",")
-                value += '/1000000'
-                val_float = np.float32(Fraction(str(value)))
-                listOfSS[pos] = val_float
-                pos +=1
+                pos = 0
+                for line in logfile:
+                    value = line.split("ss:", 1)[1]
+                    value = value.split(',', 1)[0]
+                    value = value.strip()
+                    ss_to_db.append(value + ",")
+                    value += '/1000000'
+                    val_float = np.float32(Fraction(str(value)))
+                    listOfSS[pos] = val_float
+                    pos +=1
 
-            return listOfSS
+            ss_to_db_str = ''.join(ss_to_db)
+
+            return listOfSS, ss_to_db_str.rstrip(',')
 
         except Exception as e:
             print('Error in getShutterTimes: ' + str(e))
 
-    def getAWB_Gains(self, file_path):
+    def getAWB_Gains(self, path):
         try:
             '''
-            returns shutter_time in microseconds as np.float32 type
+            returns auto white balance values [red,blue]
             '''
-            awb_gains = np.empty([3, 2], dtype=np.float32)
+            s = Logger()
+            logger = s.getLogger()
+            types = ('*.txt', '*.log')
+            sw_vers = Camera_Data.sw_vers
 
-            f = open(join(file_path, file_name), 'r')
+            for typ in types:
+                for file in sorted(glob(os.path.join(path,typ))):
+                    logfile = file
+
+            f = open(join(logfile), 'r')
             logfile = f.readlines()
-            logfile.pop(0)  # remove non relevant lines
-            logfile.pop(0)  # remove non relevant lines
+
+            listOfAWB = np.empty([3, 2], dtype=np.float32)
+            awb_red_to_db = []
+            awb_blue_to_db = []
+
+            if sw_vers == 1:
+                logfile.pop(0)  # remove non relevant lines
+                logfile.pop(0)
+                logfile.pop(0)
+            if sw_vers == 2:
+                logfile.pop(0)
+            if sw_vers == 3:
+                logfile.pop(0)
+                logfile.pop(0)
 
             pos = 0
             for line in logfile:
@@ -904,13 +948,17 @@ class Helpers:
                 value = value.split('],', 1)[0].replace('Fraction', '').replace('(', '', 1).replace('))', ')').replace(
                     " ", "")
                 red_gain = value.split('),', 1)[0].strip('(').replace(',', '/')
+                awb_red_to_db.append(red_gain + ',')
                 blue_gain = value.split(',(', 1)[1].strip(')').replace(',', '/')
+                awb_blue_to_db.append(blue_gain + ',')
                 red_gain = np.float32(Fraction(str(red_gain)))
                 blue_gain = np.float32(Fraction(str(blue_gain)))
-                awb_gains[pos] = [red_gain, blue_gain]
+                listOfAWB[pos] = [red_gain, blue_gain]
                 pos += 1
 
-            return awb_gains
+            awb_red_to_db_str  = ''.join(awb_red_to_db)
+            awb_blue_to_db_str = ''.join(awb_blue_to_db)
+            return   listOfAWB, awb_red_to_db_str.rstrip(','), awb_blue_to_db_str.rstrip(',')
 
         except Exception as e:
             print('Error in getAWB_Gains: ' + str(e))
@@ -931,14 +979,14 @@ class Helpers:
 
             for item in check:
                 if not item or not item.isdigit():
-                    logger.Error('strip_date: could not read date and time  used {} !'.format(formated_date))
+                    logger.error('strip_date: could not read date and time  used {} !'.format(formated_date))
                     return formated_date
 
             formated_date = '{}-{}-{}'.format(year, month, day)
 
             return formated_date
         except IOError as e:
-            logger.Error('strip_date: could not read date used {} instead !{}').format(formated_date, e)
+            logger.error('strip_date: could not read date used {} instead !{}').format(formated_date, e)
             return formated_date
 
     def strip_date_and_time(self, newdatetimestr):
@@ -962,7 +1010,7 @@ class Helpers:
 
             for item in check:
                 if not item or not item.isdigit():
-                    logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
+                    logger.error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
                     formated_date, formated_time))
                     return formated_date, formated_time
 
@@ -971,7 +1019,7 @@ class Helpers:
 
             return formated_date, formated_time
         except Exception as e:
-            logger.Error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
+            logger.error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
             formated_date,formated_time, e))
             return formated_date, formated_time
 
@@ -981,7 +1029,7 @@ class Helpers:
                 os.makedirs(thispath)
                 self.setOwnerAndPermission(thispath)
 
-        except IOError as e:
+        except Exception as e:
             print('DIR : Could not create new folder: ' + str(e))
 
     def setOwnerAndPermission(self, pathToFile):
@@ -1192,7 +1240,7 @@ class Helpers:
             fileLogger = f.getFileLogger()
 
             if path_to_one_dir:
-                success = self.processOneDirectory(path_to_one_dir)
+                success = self.processOneDay(path_to_one_dir)
 
                 if success:
                     fileLogger.info(path_to_one_dir)
@@ -1204,7 +1252,7 @@ class Helpers:
 
                     for raw_cam_dir in allDirs:
                         #print('{}'.format(raw_cam_dir))
-                        success = self.processOneDirectory(raw_cam_dir)
+                        success = self.processOneDay(raw_cam_dir)
                         if success:
                             fileLogger.info('{}'.format(raw_cam_dir))
 
@@ -1215,7 +1263,7 @@ class Helpers:
         try:
             s = Logger()
             logger = s.getLogger()
-            temp = (path.split('\\'))[-2]
+            temp = (path.split('\\'))[-3]
             temp = temp.split('_')
 
             # sw version and camera ID
@@ -1240,29 +1288,28 @@ class Helpers:
             s = Logger()
             logger = s.getLogger()
 
-            print('Data from : {}'.format(path))
-
             date, time = self.strip_date_and_time(path)
             Image_Data.time = time
 
-            self.getShutterTimes(path)
+            listOfSS, ss_to_db = self.getShutterTimes(path)
+            print('ss: {}'.format(ss_to_db))
 
-            #self.getAWB_Gains()
-
+            listOfAWB, awb_red_to_db, awb_blue_to_db = self.getAWB_Gains(path)
+            print('awb_red: {} | awb_blue: {}'.format(awb_red_to_db,awb_blue_to_db))
 
         except Exception as e:
             logger.error('collectImageData: ' + str(e))
 
-    def processOneDirectory(self, path):
+    def processOneDay(self, path):
         try:
             s = Logger()
             logger = s.getFileLogger()
             success = False
 
-            #path_to_unziped = self.unzipall(path)
+            #path_to_temp = self.unzipall(path)
             self.collectCamData(path)
-            #all_dirs = self.getDirectories(path_to_unziped)
-            all_dirs = self.getDirectories(r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20181012_raw_cam1\temp')
+            #all_dirs = self.getDirectories(path_to_temp)
+            all_dirs = self.getDirectories(path)  # loeschen nur zu testzwecken !
 
             for dir in all_dirs:
                 #print('{}'.format(dir))
@@ -1322,7 +1369,11 @@ def main():
         db.createDB()
 
         #h.load_images2DB()
-        h.load_images2DB(r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20181012_raw_cam1')
+        path1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1\temp'     # alte vers 1
+        path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'     # mittlere vers 2
+        path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'     # neuste vers 3
+
+        h.load_images2DB(path2)
 
         return
         '''
