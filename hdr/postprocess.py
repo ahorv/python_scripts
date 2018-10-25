@@ -1584,6 +1584,7 @@ class Helpers:
             listOfAG,  ag_to_db = self.getAG(path)
             listOfDG,  dg_to_db = self.getDG(path)
 
+            Image_Data.date = date
             Image_Data.shots = nuberOfshots
             Image_Data.time = time
             Image_Data.fstop = fstops_to_db
@@ -1598,11 +1599,11 @@ class Helpers:
             # Hier HDR / ldr Bilder einfügen resp erzeugen !!!
 
             success = True
-            return success, date
+            return success
 
         except Exception as e:
             logger.error('collectImageData: ' + str(e))
-            return success, date
+            return success
 
     def writeImageData2DB(dir):
         success = False
@@ -1610,6 +1611,9 @@ class Helpers:
         db = DB_handler()
         success = db.create_new_image_table()
         success = db.insert_image_data()
+
+        if success:
+            success = db.insert_camera_data()
 
         # zuerst in die image_tabel schreiben wenn das ok dann erst in die data_camera
 
@@ -1630,7 +1634,7 @@ class Helpers:
             for dir in all_dirs:
                 success, date = self.collectImageData(dir)
                 if success:
-                    success = self.writeImageData2DB(date)
+                    success = self.writeImageData2DB()
 
                 #shutil.rmtree(path_to_unziped)
 
