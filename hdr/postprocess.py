@@ -7,16 +7,16 @@ from mysql.connector import Error
 import os
 import cv2
 import sys
-import time
+import math
 import exifread
 from glob import glob
-import subprocess
 import zipfile
 import shutil
-from os import listdir
-from os.path import isfile, join
+import io
+from os.path import join
 import numpy as np
 from fractions import Fraction
+import matplotlib.pyplot as plt
 import logging
 import logging.handlers
 from datetime import datetime
@@ -413,6 +413,8 @@ class DB_handler:
                     awb_blue VARCHAR(200),             
                     ldr LONGBLOB,
                     hdr LONGBLOB,
+                    rmap LONGBLOB,
+                    resp LONGBLOB,
                     UNIQUE KEY (time)
                   )
                """ % table_name
@@ -457,7 +459,6 @@ class DB_handler:
             s = Logger()
             logger = s.getLogger()
             table_name = 'images_' + (Image_Data.date).replace('-','_')
-            print('inserting new img data into: {}'.format(table_name))  # LOESCHEN !
             con = self.connect2DB()
             curs = con.cursor()
             param_list = 'img_nr, shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, rmap, resp'
@@ -481,131 +482,407 @@ class DB_handler:
             return success
 
 class HDR:
-    def data2rgb(self, path_to_img):
-        try:
-            imgproc = IMAGEPROC()
-            data = np.fromfile(path_to_img, dtype='uint16')
-            data = data.reshape([2464, 3296])
-
-            p1 = data[0::2, 1::2]  # Blue
-            p2 = data[0::2, 0::2]  # Green
-            p3 = data[1::2, 1::2]  # Green
-            p4 = data[1::2, 0::2]  # Red
-
-            blue = p1
-            green = ((p2 + p3)) / 2
-            red = p4
-
-            gamma = 1.6  # gamma correction           # neu : 1.55
-            # b, g and r gain;  wurden rausgelesen aus den picam Aufnahmedaten
-            vb = 1.3  # 87 / 64.  = 1.359375           # neu : 0.56
-            vg = 1.80  # 1.                             # neu : 1
-            vr = 1.8  # 235 / 128.  = 1.8359375        # neu : 0.95
-
-            # color conversion matrix (from raspi_dng/dcraw)
-            # R        g        b
-            cvm = np.array(
-                [[1.20, -0.30, 0.00],
-                 [-0.05, 0.80, 0.14],
-                 [0.20, 0.20, 0.7]])
-
-            s = (1232, 1648, 3)
-            rgb = np.zeros(s)
-
-            rgb[:, :, 0] = vr * 1023 * (red / 1023.) ** gamma
-            rgb[:, :, 1] = vg * 1023 * (green / 1023.) ** gamma
-            rgb[:, :, 2] = vb * 1023 * (blue / 1023.) ** gamma
-
-            # rgb = rgb.dot(cvm)
-
-            rgb = (rgb - np.min(rgb)) / (np.max(rgb) - np.min(rgb))
-
-            height, width = rgb.shape[:2]
-
-            img = cv2.resize(rgb, (width, height), interpolation=cv2.INTER_CUBIC)
-            # img = img.astype(np.float32)
-
-            # ormalizeImage
-            out = np.zeros(img.shape, dtype=np.float)
-            min = img.min()
-            out = img - min
-
-            # get the max from out after normalizing to 0
-            max = out.max()
-            out *= (255 / max)
-
-            out = np.uint8(out)
-
-            #out = imgproc.maske_image(np.uint8(out), [1232, 1648, 3], (616, 824), 1000)
-
-            return out
-
-
-        except Exception as e:
-            print('data2rgb: Could not convert data to rgb: ' + str(e))
-
-    def readRawImages(self,mypath, piclist = [0,5,9]):
-        try:
-            onlyfiles_data = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.data')]
-            onlyfiles_jpg  = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
-            image_stack = np.empty(len(piclist), dtype=object)
-            expos_stack = np.empty(len(piclist), dtype=np.float32)
-
-            # Importing and debayering raw images
-            for n in range(0, len(onlyfiles_data)):
-                picnumber = ''.join(filter(str.isdigit, onlyfiles_data[n]))
-                pos = 0
-                for pic in piclist:
-                    if str(picnumber) == str(pic):
-                        image_stack[pos] = self.data2rgb(join(mypath, onlyfiles_data[n]))
-                        print('Pic {}, reading data : {}'.format(str(picnumber), onlyfiles_data[n]))
-                    pos +=1
-
-            #Importing exif data from jpg images
-            for n in range(0, len(onlyfiles_jpg)):
-                picnumber = ''.join(filter(str.isdigit, onlyfiles_jpg[n]))
-                pos = 0
-                for pic in piclist:
-                    if str(picnumber) == str(pic):
-                        expos_stack[pos] = self.getEXIF_TAG(join(mypath, onlyfiles_jpg[n]), "EXIF ExposureTime")
-                        print('Pic {}, reading exif: {}'.format(str(picnumber), expos_stack[n]))
-                    pos +=1
-
-            return image_stack, expos_stack
-
-        except Exception as e:
-            print('readRawImages: Could not read *.data files ' + str(e))
-
-    def readImagesAndExpos(self, mypath, piclist=[0,5,9]):
-        postproc = IMAGEPROC()
-        try:
-            onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f)) & f.endswith('.jpg')]
-            image_stack = np.empty(len(piclist), dtype=object)  # Achtung len = onlyfiles für alle bilder
-            expos_stack = np.empty(len(piclist), dtype=np.float32)  # Achtung len = onlyfiles für alle bilder
-            for n in range(0, len(onlyfiles)):
-                picnumber = ''.join(filter(str.isdigit, onlyfiles[n]))
-                pos = 0
-                for pic in piclist:
-                    if str(picnumber) == str(pic):
-                        expos_stack[pos] = self.getEXIF_TAG(join(mypath, onlyfiles[n]), "EXIF ExposureTime")
-                        image_stack[pos] = postproc.maske_jpg_Image(cv2.imread(join(mypath, onlyfiles[n]), cv2.IMREAD_COLOR))
-                        print('Pic {}, reading data from : {}, exif: {}'.format(str(picnumber), onlyfiles[n], expos_stack[n]))
-                    pos +=1
-
-            return image_stack, expos_stack
-
-        except Exception as e:
-            print('readImagesAndExpos: Could not read images ' + str(e))
-
     def make_ldr(self, path):
         success = False
 
         return success
 
-    def make_hdr(self, path):
-        success = False
+    def make_hdr(self, path, listOfSS, img_type = 'jpg'):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            success = False
+            allImgFiles = []
+            type = ''
 
-        return success
+            if img_type is 'jpg':
+                type = '*.jpg'
+            else:
+                type = '*.data'
+
+            # Load all images
+            for imgFile in sorted(glob(os.path.join(path, type))):
+                if os.path.isfile(imgFile):
+                    allImgFiles.append(imgFile)
+
+            # Loading images channel - wise
+            img_list_b = self.load_exposures(allImgFiles, 0)
+            img_list_g = self.load_exposures(allImgFiles, 1)
+            img_list_r = self.load_exposures(allImgFiles, 2)
+
+            # Solving response curves
+            gb, _ = self.hdr_debvec(img_list_b, listOfSS)
+            gg, _ = self.hdr_debvec(img_list_g, listOfSS)
+            gr, _ = self.hdr_debvec(img_list_r, listOfSS)
+
+            if img_type is 'data':
+                # Create and plot response curve
+                plt.figure(figsize=(10, 10))
+                plt.plot(gr, range(256), 'rx')
+                plt.plot(gg, range(256), 'gx')
+                plt.plot(gb, range(256), 'bx')
+                plt.ylabel('pixel value Z')
+                plt.xlabel('log exposure X')
+                fig = plt.gcf()
+                respc = io.BytesIO()
+                fig.savefig(respc, format='jpg')
+                respc.seek(0)
+                resp_blob = respc.read()
+                Image_Data.resp = resp_blob
+
+            # make the HDR
+            hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
+            Image_Data.hdr = self.hdr_to_blob(hdr)
+
+            if img_type is 'data':
+                # Create radiance map
+                plt.figure(figsize=(12, 8))
+                plt.imshow(np.log2(cv2.cvtColor(hdr, cv2.COLOR_BGR2GRAY)), cmap='jet')
+                plt.colorbar()
+                fig = plt.gcf()
+                rmap = io.BytesIO()
+                fig.savefig(rmap, format='jpg')
+                rmap.seek(0)
+                rmap_blob = rmap.read()
+                Image_Data.rmap = rmap_blob
+
+            return success
+
+        except Exception as e:
+            logger.error('make_hdr ' + str(e))
+            return success
+
+    def demosaic1(self, mosaic, awb_gains=None):
+        '''
+        nedded by make_hdr
+        :param mosaic:
+        :param awb_gains:
+        :return:
+        '''
+        try:
+            black = mosaic.min()
+            saturation = mosaic.max()
+
+            uint14_max = 2 ** 14 - 1
+            mosaic -= black  # black subtraction
+            mosaic *= int(uint14_max / (saturation - black))
+            mosaic = np.clip(mosaic, 0, uint14_max)  # clip to range
+
+            if awb_gains is None:
+                vb_gain = 1.0
+                vg_gain = 1.0
+                vr_gain = 1.0
+            else:
+                vb_gain = awb_gains[1]
+                vg_gain = 1.0
+                vr_gain = awb_gains[0]
+
+            mosaic = mosaic.reshape([2464, 3296])
+            mosaic = mosaic.astype('float')
+            mosaic[0::2, 1::2] *= vb_gain  # Blue
+            mosaic[1::2, 0::2] *= vr_gain  # Red
+            mosaic = np.clip(mosaic, 0, uint14_max)  # clip to range
+            mosaic *= 2 ** 2
+
+            # demosaic
+            p1 = mosaic[0::2, 1::2]  # Blue
+            p2 = mosaic[0::2, 0::2]  # Green
+            p3 = mosaic[1::2, 1::2]  # Green
+            p4 = mosaic[1::2, 0::2]  # Red
+
+            blue = p1
+            green = np.clip((p2 // 2 + p3 // 2), 0, 2 ** 16 - 1)
+            red = p4
+
+            image = np.dstack([red, green, blue])  # 16 - bit 'image'
+
+            # down sample to RGB 8 bit image use: self.deraw2rgb1(image)
+
+            return image
+
+        except Exception as e:
+            print('Error in demosaic1: {}'.format(e))
+
+    def toRGB_1(self, data):
+        '''
+        nedded by make_hdr
+        Belongs to deraw1
+        :param data:
+        :return:
+        '''
+        image = data // 256  # reduce dynamic range to 8 bpp
+        image = np.clip(image, 0, 255).astype(np.uint8)
+
+        return image
+
+    def read_data(self, path_to_image):
+        '''
+        nedded by make_hdr
+        :param path_to_image:
+        :return:
+        '''
+        data = np.fromfile(path_to_image, dtype='uint16')
+        data = data.reshape([2464, 3296])
+        raw = self.demosaic1(data)
+
+        return raw.astype('uint16')
+
+    def load_exposures_data(self, source_dir, channel=0):
+        '''
+        nedded by make_hdr
+        Reads raw (16 bit) data files
+        :param source_dir:
+        :param channel:
+        :return:
+        '''
+        is_data_type = False
+        filenames = []
+        exposure_times = []
+        f = open(os.path.join(source_dir, 'image_list.txt'))
+        for line in f:
+            if (line[0] == '#'):
+                continue
+            (filename, exposure, *rest) = line.split()
+            filenames += [filename]
+            exposure_times += [exposure]
+
+            img_list = [toRGB_1(read_data(os.path.join(source_dir, f))) for f in filenames]
+            img_list = [img[:, :, channel] for img in img_list]
+            exposure_times = np.array(exposure_times, dtype=np.float32)
+
+    def load_exposures(self, dir_list, channel=0):
+        '''
+        nedded by make_hdr
+        Reads either of jpg or raw depending on file extension
+        :param source_dir:
+        :param channel:
+        :return:
+        '''
+        for file in dir_list:
+            if '.jpg' in file:
+                img_list = [cv2.imread(file, 1) ]
+                img_list = [img[:, :, channel] for img in img_list]
+            else:
+                img_list = [self.toRGB_1(self.read_data(file)) ]
+                img_list = [img[:, :, channel] for img in img_list]
+
+        return img_list
+
+    def load_exposures_jpg(self, source_dir, channel=0):
+        '''
+        nedded by make_hdr
+        Reads jpg images
+        :param source_dir:
+        :param channel:
+        :return:
+        '''
+        filenames = []
+        exposure_times = []
+        f = open(os.path.join(source_dir, 'image_list.txt'))
+        for line in f:
+            if (line[0] == '#'):
+                continue
+            (filename, exposure, *rest) = line.split()
+            filenames += [filename]
+            exposure_times += [exposure]
+
+        img_list = [cv2.imread(os.path.join(source_dir, f), 1) for f in filenames]
+        img_list = [img[:, :, channel] for img in img_list]
+        exposure_times = np.array(exposure_times, dtype=np.float32)
+
+        return (img_list, exposure_times)
+
+    def median_threshold_bitmap_alignment(self, img_list):
+        '''
+         MTB implementation
+         nedded by make_hdr
+        :return:
+        '''
+        median = [np.median(img) for img in img_list]
+        binary_thres_img = [cv2.threshold(img_list[i], median[i], 255, cv2.THRESH_BINARY)[1] for i in
+                            range(len(img_list))]
+        mask_img = [cv2.inRange(img_list[i], median[i] - 20, median[i] + 20) for i in range(len(img_list))]
+
+        plt.imshow(mask_img[0], cmap='gray')
+        plt.show()
+
+        max_offset = np.max(img_list[0].shape)
+        levels = 5
+
+        global_offset = []
+        for i in range(0, len(img_list)):
+            offset = [[0, 0]]
+            for level in range(levels, -1, -1):
+                scaled_img = cv2.resize(binary_thres_img[i], (0, 0), fx=1 / (2 ** level), fy=1 / (2 ** level))
+                ground_img = cv2.resize(binary_thres_img[0], (0, 0), fx=1 / (2 ** level), fy=1 / (2 ** level))
+                ground_mask = cv2.resize(mask_img[0], (0, 0), fx=1 / (2 ** level), fy=1 / (2 ** level))
+                mask = cv2.resize(mask_img[i], (0, 0), fx=1 / (2 ** level), fy=1 / (2 ** level))
+
+                level_offset = [0, 0]
+                diff = float('Inf')
+                for y in [-1, 0, 1]:
+                    for x in [-1, 0, 1]:
+                        off = [offset[-1][0] * 2 + y, offset[-1][1] * 2 + x]
+                        error = 0
+                        for row in range(ground_img.shape[0]):
+                            for col in range(ground_img.shape[1]):
+                                if off[1] + col < 0 or off[0] + row < 0 or off[1] + col >= ground_img.shape[1] or off[
+                                    0] + row >= ground_img.shape[1]:
+                                    continue
+                                if ground_mask[row][col] == 255:
+                                    continue
+                                error += 1 if ground_img[row][col] != scaled_img[y + off[0]][x + off[1]] else 0
+                        if error < diff:
+                            level_offset = off
+                            diff = error
+                offset += [level_offset]
+            global_offset += [offset[-1]]
+        return global_offset
+
+    def hdr_debvec(self, img_list, exposure_times):
+        '''
+        needed by make_hdr
+        :param exposure_times:
+        :return:
+        '''
+        B = [math.log(e, 2) for e in exposure_times]
+        l = 50  # lambda sets amount of smoothness
+        w = [z if z <= 0.5 * 255 else 255 - z for z in range(256)]
+
+        small_img = [cv2.resize(img, (10, 10)) for img in img_list]
+        Z = [img.flatten() for img in small_img]
+
+        return self.response_curve_solver(Z, B, l, w)
+
+    def response_curve_solver(self, Z, B, l, w):
+        '''
+        Implementation of paper's Equation(3) with weight
+         needed by make_hdr
+        :param B:
+        :param l:
+        :param w:
+        :return:
+        '''
+        n = 256
+        A = np.zeros(shape=(np.size(Z, 0) * np.size(Z, 1) + n + 1, n + np.size(Z, 1)), dtype=np.float32)
+        b = np.zeros(shape=(np.size(A, 0), 1), dtype=np.float32)
+
+        # Include the data−fitting equations
+        k = 0
+        for i in range(np.size(Z, 1)):
+            for j in range(np.size(Z, 0)):
+                z = Z[j][i]
+                wij = w[z]
+                A[k][z] = wij
+                A[k][n + i] = -wij
+                b[k] = wij * B[j]
+                k += 1
+
+        # Fix the curve by setting its middle value to 0
+        A[k][128] = 1
+        k += 1
+
+        # Include the smoothness equations
+        for i in range(n - 1):
+            A[k][i] = l * w[i + 1]
+            A[k][i + 1] = -2 * l * w[i + 1]
+            A[k][i + 2] = l * w[i + 1]
+            k += 1
+
+        # Solve the system using SVD
+        x = np.linalg.lstsq(A, b)[0]
+        g = x[:256]
+        lE = x[256:]
+
+        return g, lE
+
+    def construct_radiance_map(self, g, Z, ln_t, w):
+        '''
+        Implementation of paper's Equation(6)
+        needed by make_hdr
+        :param Z:
+        :param ln_t:
+        :param w:
+        :return:
+        '''
+        acc_E = [0] * len(Z[0])
+        ln_E = [0] * len(Z[0])
+
+        pixels, imgs = len(Z[0]), len(Z)
+        for i in range(pixels):
+            acc_w = 0
+            for j in range(imgs):
+                z = Z[j][i]
+                acc_E[i] += w[z] * (g[z] - ln_t[j])
+                acc_w += w[z]
+            ln_E[i] = acc_E[i] / acc_w if acc_w > 0 else acc_E[i]
+            acc_w = 0
+
+        return ln_E
+
+    def construct_hdr(self, img_list, response_curve, exposure_times):
+        '''
+        Construct radiance map for each channels
+        needed by make_hdr
+        :param img_list:
+        :param response_curve:
+        :param exposure_times:
+        :return:
+        '''
+        img_size = img_list[0][0].shape
+        w = [z if z <= 0.5 * 255 else 255 - z for z in range(256)]
+        ln_t = np.log2(exposure_times)
+
+        vfunc = np.vectorize(lambda x: math.exp(x))
+        hdr = np.zeros((img_size[0], img_size[1], 3), 'float32')
+
+        # construct radiance map for BGR channels
+        for i in range(3):
+            Z = [img.flatten().tolist() for img in img_list[i]]
+            E = self.construct_radiance_map(response_curve[i], Z, ln_t, w)
+            # Exponational each channels and reshape to 2D-matrix
+            hdr[..., i] = np.reshape(vfunc(E), img_size)
+
+        return hdr
+
+    def hdr_to_blob(self, hdr):
+        '''
+        Concatenates HDR image and header to BLBO
+        Code based on https://gist.github.com/edouardp/3089602
+        needed by make_hdr
+        :param filename:
+        :return:
+        '''
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            image = np.zeros((hdr.shape[0], hdr.shape[1], 3), 'float32')
+            image[..., 0] = hdr[..., 2]
+            image[..., 1] = hdr[..., 1]
+            image[..., 2] = hdr[..., 0]
+
+            title = (b"#?RADIANCE\n# Made with Python & Numpy\nFORMAT=32-bit_rle_rgbe\n\n")
+            header = '-Y {0} +X {1}\n'.format(image.shape[0], image.shape[1])
+            header = (bytes(header, encoding='utf-8'))
+
+            brightest = np.maximum(np.maximum(image[..., 0], image[..., 1]), image[..., 2])
+            mantissa = np.zeros_like(brightest)
+            exponent = np.zeros_like(brightest)
+            np.frexp(brightest, mantissa, exponent)
+            scaled_mantissa = mantissa * 256.0 / brightest
+            rgbe = np.zeros((image.shape[0], image.shape[1], 4), dtype=np.uint8)
+            rgbe[..., 0:3] = np.around(image[..., 0:3] * scaled_mantissa[..., None])
+            rgbe[..., 3] = np.around(exponent + 128)
+            _rgbe = bytes(rgbe.flatten())
+            blob = title + header + _rgbe
+
+            return blob
+
+        except Exception as e:
+            logger.error('hdr_to_blob ' + str(e))
+            return None
+
+
 
 class IMAGEPROC:
     def __init__(self, cam_data=None):
@@ -1401,6 +1678,7 @@ class Helpers:
         try:
             s = Logger()
             logger = s.getLogger()
+            hdr = HDR()
             success = False
 
             date, time = self.strip_date_and_time(path)
@@ -1426,10 +1704,8 @@ class Helpers:
             Image_Data.awb_blue = awb_blue_to_db
 
             # Hier HDR / ldr Bilder einfügen resp erzeugen !!!
-            Image_Data.ldr = h.image2binary(join(test_image_path, 'raw_img0.jpg'))
-            # Image_Data.hdr = imgproc.image2binary(join(test_image_path, 'data0_.data'))
-            # Image_Data.rmap = imgproc.image2binary(join(test_image_path, 'data0_.data'))
-            # Image_Data.resp = imgproc.image2binary(join(test_image_path, 'data0_.data'))
+            Image_Data.ldr = hdr.make_hdr(path,listOfSS ,'jpg')
+            Image_Data.hdr = hdr.make_hdr(path, listOfSS, 'data')
 
             success = True
             return success
