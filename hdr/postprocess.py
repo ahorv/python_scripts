@@ -61,6 +61,8 @@ class Image_Data(object):
     awb_blue = '?'
     ldr = 0
     hdr = 0
+    rmap = 0
+    resp = 0
 
     def __init__(self, state_map={}):
         self.date = state_map.get('date', 0)
@@ -77,6 +79,8 @@ class Image_Data(object):
         self.awb_blue = state_map.get('awb_blue', '?')
         self.ldr = state_map.get('ldr', 0)
         self.hdr = state_map.get('hdr', 0)
+        self.rmap = state_map.get('rmap', 0)
+        self.resp = state_map.get('resp', 0)
 
         Image_Data.date = self.date
         Image_Data.img_nr = self.img_nr
@@ -92,6 +96,8 @@ class Image_Data(object):
         Image_Data.awb_blue = self.awb_blue
         Image_Data.ldr = self.ldr
         Image_Data.hdr = self.hdr
+        Image_Data.rmap = self.rmap
+        Image_Data.resp = self.resp
 
     def to_dict(self):
         return {
@@ -109,6 +115,8 @@ class Image_Data(object):
             'awb_blue': Image_Data.awb_blue,
             'ldr': Image_Data.ldr,
             'hdr': Image_Data.hdr,
+            'rmap': Image_Data.rmap,
+            'resp': Image_Data.resp,
         }
 
 class Camera_Data(object):
@@ -452,7 +460,7 @@ class DB_handler:
             print('inserting new img data into: {}'.format(table_name))  # LOESCHEN !
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'img_nr, shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr'
+            param_list = 'img_nr, shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, rmap, resp'
             imagedata = Image_Data.to_dict(None)
             del imagedata['date']
             values = list(imagedata.values())
@@ -589,143 +597,17 @@ class HDR:
         except Exception as e:
             print('readImagesAndExpos: Could not read images ' + str(e))
 
-    def composeOneHDRimgJpg(self, oneDirsPath, piclist = [0, 5, 9]):
-        try:
+    def make_ldr(self, path):
+        success = False
 
-            images, times = self.readImagesAndExpos(oneDirsPath, piclist)
+        return success
 
-            # Align input images
-            alignMTB = cv2.createAlignMTB()
-            alignMTB.process(images, images)
+    def make_hdr(self, path):
+        success = False
 
-            # Obtain Camera Response Function (CRF)
-            calibrateDebevec = cv2.createCalibrateDebevec()
-            responseDebevec = calibrateDebevec.process(images, times)
-
-            # Merge images into an HDR linear image
-            mergeDebevec = cv2.createMergeDebevec()
-            hdrDebevec = mergeDebevec.process(images, times, responseDebevec)
-
-            # Tonemap using Reinhard's method to obtain 24-bit color image
-            tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
-            ldrReinhard = tonemapReinhard.process(hdrDebevec)
-
-            _ldrReinhard = ldrReinhard * 255
-
-            return _ldrReinhard
-
-        except Exception as e:
-            print('composeOneHDRimg: Error: ' + str(e))
-
-    def composeOneHDRimgData(self,oneDirsPath, piclist = [0,5,9]):
-        try:
-
-            images, times = self.readRawImages(oneDirsPath, piclist)
-
-            # Align input images
-            alignMTB = cv2.createAlignMTB()
-            alignMTB.process(images, images)
-
-            # Obtain Camera Response Function (CRF)
-            calibrateDebevec = cv2.createCalibrateDebevec()
-            responseDebevec = calibrateDebevec.process(images, times)
-
-            # Merge images into an HDR linear image
-            mergeDebevec = cv2.createMergeDebevec()
-            hdrDebevec = mergeDebevec.process(images, times, responseDebevec)
-
-            # Tonemap using Reinhard's method to obtain 24-bit color image
-            tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
-            ldrReinhard = tonemapReinhard.process(hdrDebevec)
-
-            _ldrReinhard = ldrReinhard * 255
-
-            return _ldrReinhard
-
-        except Exception as e:
-            print('composeOneHDRimgData: Error: ' + str(e))
-
-    def makeHDR_from_jpg(self, ListofAllDirs):
-        global Path_to_sourceDir
-        global CAM
-        imgproc = IMAGEPROC()
-        try:
-            cnt = 0
-            if not os.path.exists(join(Path_to_raw,'hdr')):
-                os.makedirs(join(Path_to_raw,'hdr'))
-
-            for next_dir in ListofAllDirs:
-                cnt += 1
-                prefix = '{0:04d}'.format(cnt)
-                ldrReinhard = self.composeOneHDRimgJpg(next_dir)
-
-                remasked_img = imgproc.maske_jpg_Image(ldrReinhard)
-
-                dateAndTime = (next_dir.rstrip('\\').rpartition('\\')[-1]).replace('_',' ')
-                year  = dateAndTime[:4]
-                month = dateAndTime[4:6]
-                day   = dateAndTime[6:8]
-                hour  = dateAndTime[9:11]
-                min   = dateAndTime[11:13]
-                sec   = dateAndTime[13:15]
-
-                ldrReinhard_txt = imgproc.write2img(remasked_img,'cam '+CAM,(30,70))
-                ldrReinhard_txt = imgproc.write2img(remasked_img,year+" "+month+" "+day,(30,1720))
-                ldrReinhard_txt = imgproc.write2img(remasked_img, '#: ' + str(cnt), (30,1800))
-                ldrReinhard_txt = imgproc.write2img(remasked_img, hour+":"+min+":"+sec, (30, 1880))
-
-                cv2.imwrite(join(Path_to_raw, 'hdr', "{}.jpg".format(prefix)), ldrReinhard_txt)
-
-            print("Done creating all HDR images")
-
-        except Exception as e:
-            print('createAllHDR: Error: ' + str(e))
-
-    def makeHDR_from_data(self, ListofAllDirs):
-        global Path_to_sourceDir
-        try:
-            cnt = 0
-            if not os.path.exists(join(Path_to_raw,'raw_hdr')):
-                os.makedirs(join(Path_to_raw,'raw_hdr'))
-
-            for oneDir in ListofAllDirs:
-                cnt += 1
-                ldrReinhard = self.composeOneHDRimgData(oneDir)
-                cv2.imwrite(join(Path_to_raw,'raw_hdr',str(cnt) + "_ldr-Reinhard.jpg"), ldrReinhard)
-
-            print("Done creating all HDR images")
-
-        except Exception as e:
-            print('createAllHDR: Error: ' + str(e))
-
-    def createHDRVideo(self):
-        try:
-            global Path_to_sourceDir
-            hdrpath = join(Path_to_raw, 'hdr')
-            global Path_to_ffmpeg                                 # path to ffmpeg executable
-            fsp = ' -r 10 '                                       # frame per sec images taken
-            stnb = '-start_number 0001 '                          # what image to start at
-            imgpath = '-i ' + join(hdrpath ,'%4d.jpg ')           # path to images
-            res = '-s 2592x1944 '                                 # output resolution
-            outpath = Path_to_copy_HDR+'\sky_HDR_video.mp4 '      # output file name
-            codec = '-vcodec libx264'                             # codec to use
-
-            command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
-
-            if sys.platform == "linux":
-                subprocess(command, shell=True)
-            else:
-                print(' {}'.format(command))
-                ffmpeg = subprocess.Popen(command, stderr=subprocess.PIPE ,stdout = subprocess.PIPE)
-                out, err = ffmpeg.communicate()
-                if (err): print(err)
-                print('ffmpeg ldr Video done.')
-
-        except Exception as e:
-            print('createVideo: Error: ' + str(e))
+        return success
 
 class IMAGEPROC:
-
     def __init__(self, cam_data=None):
 
         if cam_data == None:
@@ -1325,32 +1207,6 @@ class Helpers:
         except Exception as e:
             print('PERM : Could not set permissions for file: ' + str(e))
 
-    def createVideo(self):
-        try:
-
-            global Path_to_copy_img5s                                    # path to images
-            global Path_to_ffmpeg                                       # path to ffmpeg executable
-            fsp = ' -r 10 '                                             # frame per sec images taken
-            stnb = '-start_number 0001 '                                # what image to start at
-            imgpath = '-i ' + join(Path_to_copy_img5s,'%4d.jpg')+' '    # path to images
-            res = '-s 2592x1944 '                                       # output resolution
-            outpath = Path_to_copy_img5s + '\sky_video.mp4 '            # output file name
-            codec = '-vcodec libx264'                                   # codec to use
-
-            command = Path_to_ffmpeg + fsp + stnb + imgpath + res + outpath + codec
-
-            if sys.platform == "linux":
-                subprocess(command, shell=True)
-            else:
-                print('\n{}'.format(command))
-                ffmpeg = subprocess.Popen(command, stderr=subprocess.PIPE ,stdout = subprocess.PIPE)
-                out, err = ffmpeg.communicate()
-                if (err): print(err)
-                print('Ffmpeg done.')
-
-        except Exception as e:
-            print('createVideo from jpg\'s: Error: ' + str(e))
-
     def getDirectories(self,pathToDirectories):
         try:
             allDirs = []
@@ -1381,33 +1237,6 @@ class Helpers:
             logger.error('MISSING DATA in: {}'.format(pathToDirectories))
 
         return allZipFiles
-
-    def readAllImages(self,allDirs):
-        try:
-            global Path_to_sourceDir
-            list_names = []
-            list_images = []
-            cnt = 1
-            print('Converting jpg to opencv, may take some time!')
-
-            t_start = time.time()
-            for next_dir in allDirs:
-                next_dir += 'raw_img5.jpg'
-                img = cv2.imread(next_dir, 1)
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                new_img = cv2.resize(img_rgb, None, fx=0.25, fy=0.25)
-                list_images.append(new_img)
-                cnt += 1
-
-            t_end = time.time()
-            measurement = t_end-t_start
-            print('Total number of images: {}'.format(cnt))
-            print('Time to load and convert imgs: {}'.format(measurement))
-
-            return list_images
-
-        except Exception as e:
-            print('readAllImages: Error: ' + str(e))
 
     def copyAndMaskAll_img5(self, list_alldirs):
 
@@ -1597,10 +1426,10 @@ class Helpers:
             Image_Data.awb_blue = awb_blue_to_db
 
             # Hier HDR / ldr Bilder einfügen resp erzeugen !!!
-            # Image_Data.ldr = h.image2binary(join(test_image_path, 'raw_img0.jpg'))
+            Image_Data.ldr = h.image2binary(join(test_image_path, 'raw_img0.jpg'))
             # Image_Data.hdr = imgproc.image2binary(join(test_image_path, 'data0_.data'))
-
-
+            # Image_Data.rmap = imgproc.image2binary(join(test_image_path, 'data0_.data'))
+            # Image_Data.resp = imgproc.image2binary(join(test_image_path, 'data0_.data'))
 
             success = True
             return success
