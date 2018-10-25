@@ -16,7 +16,7 @@ img_dir = r'C:\Users\ati\Desktop\HDR-imaging-master\sky_1'
 output_hdr_filename = join(img_dir,'output_hdr')
 
 ###############################################################################
-## Hoa: 18.10.2018 Version 1 : hdr1.py
+## Hoa: 18.10.2018 Version 1 : hdr16.py
 ###############################################################################
 # Adapted from : https://github.com/SSARCandy/HDR-imaging/blob/master/HDR-playground.py
 # See also: https://github.com/vivianhylee/high-dynamic-range-image/blob/master/hdr.py
@@ -103,13 +103,14 @@ def read_data(path_to_image):
 
     return raw.astype('uint16')
 
-def load_exposures(source_dir, channel=0):
+def load_exposures_data(source_dir, channel=0):
     '''
     Reads raw (16 bit) data files
     :param source_dir:
     :param channel:
     :return:
     '''
+    is_data_type = False
     filenames = []
     exposure_times = []
     f = open(os.path.join(source_dir, 'image_list.txt'))
@@ -120,9 +121,38 @@ def load_exposures(source_dir, channel=0):
         filenames += [filename]
         exposure_times += [exposure]
 
-    img_list = [toRGB_1(read_data(os.path.join(source_dir, f))) for f in filenames]
-    img_list = [img[:, :, channel] for img in img_list]
-    exposure_times = np.array(exposure_times, dtype=np.float32)
+        img_list = [toRGB_1(read_data(os.path.join(source_dir, f))) for f in filenames]
+        img_list = [img[:, :, channel] for img in img_list]
+        exposure_times = np.array(exposure_times, dtype=np.float32)
+
+def load_exposures(source_dir, channel=0):
+    '''
+    Reads either of jpg or raw depending on file extension
+    in the image_list.txt - file.
+    :param source_dir:
+    :param channel:
+    :return:
+    '''
+    is_data_type = False
+    filenames = []
+    exposure_times = []
+    f = open(os.path.join(source_dir, 'image_list.txt'))
+    for line in f:
+        if (line[0] == '#'):
+            continue
+        (filename, exposure, *rest) = line.split()
+        if 'data' in filename: is_data_type = True
+        filenames += [filename]
+        exposure_times += [exposure]
+
+    if is_data_type:
+        img_list = [toRGB_1(read_data(os.path.join(source_dir, f))) for f in filenames]
+        img_list = [img[:, :, channel] for img in img_list]
+        exposure_times = np.array(exposure_times, dtype=np.float32)
+    else:
+        img_list = [cv2.imread(os.path.join(source_dir, f), 1) for f in filenames]
+        img_list = [img[:, :, channel] for img in img_list]
+        exposure_times = np.array(exposure_times, dtype=np.float32)
 
     return (img_list, exposure_times)
 
