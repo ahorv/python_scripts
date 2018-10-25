@@ -47,6 +47,7 @@ print('Version opencv: ' + cv2.__version__)
 class Image_Data(object):
     """Container class for image data.
     """
+    date =  '?'
     img_nr = 0
     shots = 0
     time = '?'
@@ -55,12 +56,14 @@ class Image_Data(object):
     exp ='?'
     iso = 0
     ag = '?'
+    dg = '?'
     awb_red = '?'
     awb_blue = '?'
     ldr = 0
     hdr = 0
 
     def __init__(self, state_map={}):
+        self.date = state_map.get('date', 0)
         self.img_nr = state_map.get('img_nr',0)
         self.shots = state_map.get('shots', 0)
         self.time = state_map.get('time','?' )
@@ -69,11 +72,13 @@ class Image_Data(object):
         self.exp = state_map.get('exp', '?')
         self.iso = state_map.get('iso', 0)
         self.ag = state_map.get('ag', '?')
+        self.dg = state_map.get('dg', '?')
         self.awb_red = state_map.get('awb_red', '?')
         self.awb_blue = state_map.get('awb_blue', '?')
         self.ldr = state_map.get('ldr', 0)
         self.hdr = state_map.get('hdr', 0)
 
+        Image_Data.date = self.date
         Image_Data.img_nr = self.img_nr
         Image_Data.shots = self.shots
         Image_Data.time = self.time
@@ -82,13 +87,15 @@ class Image_Data(object):
         Image_Data.exp = self.exp
         Image_Data.iso = self.iso
         Image_Data.ag = self.ag
+        Image_Data.ag = self.dg
         Image_Data.awb_red = self.awb_red
         Image_Data.awb_blue = self.awb_blue
         Image_Data.ldr = self.ldr
         Image_Data.hdr = self.hdr
 
-    def to_dict(self):
+    def to_dict(self, placeholder = None):
         return {
+            'date': Image_Data.date,
             'img_nr': Image_Data.img_nr,
             'time':   Image_Data.time,
             'fstop':  Image_Data.fstop,
@@ -96,6 +103,7 @@ class Image_Data(object):
             'exp':    Image_Data.exp,
             'iso':    Image_Data.iso,
             'ag':     Image_Data.ag,
+            'dg':     Image_Data.dg,
             'awb_red' : Image_Data.awb_red,
             'awb_blue': Image_Data.awb_blue,
             'ldr': Image_Data.ldr,
@@ -136,7 +144,7 @@ class Camera_Data(object):
         Camera_Data.was_foggy = self.was_foggy
         Camera_Data.had_nimbocum = self.had_nimbocum
 
-    def to_dict(self):
+    def to_dict(self, placeholder = None):
         return {
             'sw_vers'       :Camera_Data.sw_vers,
             'cam_id'        :Camera_Data.cam_id,
@@ -152,7 +160,6 @@ class Camera_Data(object):
 class Config(object):
     """Container class for configuration.
     """
-
     sourceDirectory = '?'
     camera_1_Directory = '?'
     camera_2_Directory = '?'
@@ -373,12 +380,13 @@ class DB_handler:
             logger.error('DB  : Error creating data_camera Table: ' + str(e))
             return success
 
-    def create_new_image_table(self, date):
+    def create_new_image_table(self):
         try:
             success = False
             s = Logger()
             root_logger = s.getLogger()
-            table_name = 'images_' + date
+            table_name = 'images_' + Image_Data.date
+            print('create new img table: {}'.format(table_name))  # LOESCHEN !
             con = self.connect2DB()
             con.reconnect(attempts=2, delay=0)
             curs = con.cursor()
@@ -435,12 +443,13 @@ class DB_handler:
             logger.error('insert_camera_data: {}' + str(e))
             return success
 
-    def insert_image_data(self, date):
+    def insert_image_data(self):
         try:
             success = False
             s = Logger()
             logger = s.getLogger()
-            table_name = 'images_' + date
+            table_name = 'images_' + Image_Data.date
+            print('inserting new img data into: {}'.format(table_name))  # LOESCHEN !
             con = self.connect2DB()
             curs = con.cursor()
             param_list = 'img_nr, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr'
@@ -465,8 +474,6 @@ class DB_handler:
             return success
 
 class HDR:
-
-
     def data2rgb(self, path_to_img):
         try:
             imgproc = IMAGEPROC()
@@ -839,6 +846,17 @@ class Helpers:
         except Exception as e:
             print('EXIF: Could not read exif data ' + str(e))
 
+    def getNumOfShots(self):
+        sw_vers = Camera_Data.sw_vers
+        shots = 0
+
+        if sw_vers == 1:
+            shots = 10
+        else:
+            shots = 3
+
+        return shots
+
     def getShutterTimes(self, path):
         try:
             '''
@@ -1078,7 +1096,7 @@ class Helpers:
         except Exception as e:
             print('Error in getEXP: ' + str(e))
 
-    def get_ag(self, path):
+    def getAG(self, path):
         try:
             '''
             returns exposure value
@@ -1129,7 +1147,7 @@ class Helpers:
         except Exception as e:
             print('Error in get_ag: ' + str(e))
 
-    def get_dg(self, path):
+    def getDG(self, path):
         try:
             '''
             returns exposure value
@@ -1179,6 +1197,52 @@ class Helpers:
 
         except Exception as e:
             print('Error in get_dg: ' + str(e))
+
+    def getFstops(self, path):
+        try:
+            '''
+            returns exposure value
+            '''
+            s = Logger()
+            logger = s.getLogger()
+            types = ('*.txt', '*.log')
+            sw_vers = Camera_Data.sw_vers
+
+            for typ in types:
+                for file in sorted(glob(os.path.join(path,typ))):
+                    logfile = file
+
+            f = open(join(logfile), 'r')
+            logfile = f.readlines()
+
+            fStop_to_db = []
+
+            if sw_vers == 1:
+                listOfFSTOP = np.empty(10, dtype=np.float32)
+                fStop_to_db = ['0,0,0,0,0,0,0,0,0,0']
+            else:
+                listOfFSTOP = np.empty(3, dtype=np.float32)
+                if sw_vers == 2:
+                    fStop_to_db = ['0,0,0']
+                if sw_vers == 3:
+                    logfile.pop(0)
+                    logfile.pop(0)
+
+            pos = 0
+            for line in logfile:
+               if sw_vers == 1 or sw_vers == 2:
+                    break
+               else:
+                    fstop = (line.split("F Stop:")[-1]).split(',')[0]
+                    fStop_to_db.append(fstop + ',')
+                    listOfFSTOP[pos] = fstop
+                    pos += 1
+
+            fStop_to_db_str = ''.join(fStop_to_db)
+            return listOfFSTOP, fStop_to_db_str.rstrip(',')
+
+        except Exception as e:
+            print('Error in getFstops: ' + str(e))
 
     def strip_date(self, path):
         try:
@@ -1460,19 +1524,19 @@ class Helpers:
             f = Logger()
             fileLogger = f.getFileLogger()
 
+            # write only one day to database
             if path_to_one_dir:
                 success = self.processOneDay(path_to_one_dir)
-
                 if success:
                     fileLogger.info(path_to_one_dir)
 
+            # write everything to database
             else:
                 allCamDirectorys = self.getAllCamDirectories()
                 for path in allCamDirectorys:
                     allDirs = self.getDirectories(path)
 
                     for raw_cam_dir in allDirs:
-                        #print('{}'.format(raw_cam_dir))
                         success = self.processOneDay(raw_cam_dir)
                         if success:
                             fileLogger.info('{}'.format(raw_cam_dir))
@@ -1508,31 +1572,49 @@ class Helpers:
         try:
             s = Logger()
             logger = s.getLogger()
+            success = False
 
             date, time = self.strip_date_and_time(path)
-            Image_Data.time = time
-
-            listOfSS, ss_to_db = self.getShutterTimes(path)
-            print('ss: {}'.format(ss_to_db))
-
-            listOfAWB, awb_red_to_db, awb_blue_to_db = self.getAWB_Gains(path)
-            print('awb_red: {} | awb_blue: {}'.format(awb_red_to_db,awb_blue_to_db))
-
+            nuberOfshots = self.getNumOfShots()
+            listOfFstops, fstops_to_db = self.getFstops(path)
+            listOfSS,  ss_to_db = self.getShutterTimes(path)
+            listOfAWB, awb_red_to_db,awb_blue_to_db = self.getAWB_Gains(path)
             listOfISO, iso_to_db = self.getISO(path)
-            print('iso: {}'.format(iso_to_db))
-
             listOfEXP, exp_to_db = self.getEXP(path)
-            print('exp: {}'.format(exp_to_db))
+            listOfAG,  ag_to_db = self.getAG(path)
+            listOfDG,  dg_to_db = self.getDG(path)
 
-            listOfAG, ag_to_db = self.get_dg(path)
-            print('ag: {}'.format(ag_to_db))
+            Image_Data.shots = nuberOfshots
+            Image_Data.time = time
+            Image_Data.fstop = fstops_to_db
+            Image_Data.ss = ss_to_db
+            Image_Data.exp = exp_to_db
+            Image_Data.iso = iso_to_db
+            Image_Data.ag = ag_to_db
+            Image_Data.dg = dg_to_db
+            Image_Data.awb_red = awb_red_to_db
+            Image_Data.awb_blue = awb_blue_to_db
 
-            listOfDG, dg_to_db = self.get_dg(path)
-            print('dg: {}'.format(dg_to_db))
+            # Hier HDR / ldr Bilder einfügen resp erzeugen !!!
 
+            success = True
+            return success, date
 
         except Exception as e:
             logger.error('collectImageData: ' + str(e))
+            return success, date
+
+    def writeImageData2DB(dir):
+        success = False
+
+        db = DB_handler()
+        success = db.create_new_image_table()
+        success = db.insert_image_data()
+
+        # zuerst in die image_tabel schreiben wenn das ok dann erst in die data_camera
+
+
+        return success
 
     def processOneDay(self, path):
         try:
@@ -1542,25 +1624,21 @@ class Helpers:
 
             #path_to_temp = self.unzipall(path)
             self.collectCamData(path)
-            #all_dirs = self.getDirectories(path_to_temp)
+            #all_dirs = self.getDirectories(path_to_temp) # einkommentieren !!
             all_dirs = self.getDirectories(path)  # loeschen nur zu testzwecken !
 
             for dir in all_dirs:
-                #print('{}'.format(dir))
-                self.collectImageData(dir)
+                success, date = self.collectImageData(dir)
+                if success:
+                    success = self.writeImageData2DB(date)
 
+                #shutil.rmtree(path_to_unziped)
 
-            #shutil.rmtree(path_to_unziped)
-
-
-            success = True
             return success
 
         except Exception as e:
           logger.error('processOneDirectory: ' + str(e))
           return success
-
-
 
 def main():
     try:
@@ -1607,7 +1685,7 @@ def main():
         path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'     # mittlere vers 2
         path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'     # neuste vers 3
 
-        h.load_images2DB(path2)
+        h.load_images2DB(path1)
 
         return
         '''
