@@ -93,9 +93,9 @@ class Image_Data(object):
         Image_Data.ldr = self.ldr
         Image_Data.hdr = self.hdr
 
-    def to_dict(self, placeholder = None):
+    def to_dict(self):
         return {
-            'date': Image_Data.date,
+            'date':   Image_Data.date,
             'img_nr': Image_Data.img_nr,
             'time':   Image_Data.time,
             'fstop':  Image_Data.fstop,
@@ -144,7 +144,7 @@ class Camera_Data(object):
         Camera_Data.was_foggy = self.was_foggy
         Camera_Data.had_nimbocum = self.had_nimbocum
 
-    def to_dict(self, placeholder = None):
+    def to_dict(self):
         return {
             'sw_vers'       :Camera_Data.sw_vers,
             'cam_id'        :Camera_Data.cam_id,
@@ -385,8 +385,7 @@ class DB_handler:
             success = False
             s = Logger()
             root_logger = s.getLogger()
-            table_name = 'images_' + Image_Data.date
-            print('create new img table: {}'.format(table_name))  # LOESCHEN !
+            table_name = 'images_' + (Image_Data.date).replace('-','_')
             con = self.connect2DB()
             con.reconnect(attempts=2, delay=0)
             curs = con.cursor()
@@ -426,7 +425,7 @@ class DB_handler:
             con = self.connect2DB()
             curs = con.cursor()
             param_list = 'sw_vers, cam_id, image_date, dont_use, was_clearsky, was_rainy, was_biased, was_foggy, had_nimbocum'
-            cameradata = Camera_Data.to_dict()
+            cameradata = Camera_Data.to_dict(None)
             values = list(cameradata.values())
             format_strings = ','.join(['%s'] * len(values))
 
@@ -448,21 +447,20 @@ class DB_handler:
             success = False
             s = Logger()
             logger = s.getLogger()
-            table_name = 'images_' + Image_Data.date
+            table_name = 'images_' + (Image_Data.date).replace('-','_')
             print('inserting new img data into: {}'.format(table_name))  # LOESCHEN !
             con = self.connect2DB()
             curs = con.cursor()
             param_list = 'img_nr, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr'
-            imagedata = Image_Data.to_dict()
+            imagedata = Image_Data.to_dict(None)
+            del imagedata['date']
             values = list(imagedata.values())
-            print('values: '.format(values))
             format_strings = ','.join(['%s'] * len(values))
 
             sql = "INSERT IGNORE INTO {} ".format(table_name) + \
                   "("+ param_list +") " \
                   "VALUES (%s)" % format_strings
 
-            print('SQL: ' + sql)
             curs.execute(sql,values)
 
             self.con_close()
@@ -1563,7 +1561,8 @@ class Helpers:
 
             # extract date
             date = self.strip_date(path)
-            Image_Data.image_date = date
+            Camera_Data.image_date = date
+
 
         except Exception as e:
             logger.error('collectCamData: ' + str(e))
@@ -1632,7 +1631,7 @@ class Helpers:
             all_dirs = self.getDirectories(path)  # loeschen nur zu testzwecken !
 
             for dir in all_dirs:
-                success, date = self.collectImageData(dir)
+                success = self.collectImageData(dir)
                 if success:
                     success = self.writeImageData2DB()
 
