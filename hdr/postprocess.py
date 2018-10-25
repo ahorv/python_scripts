@@ -392,6 +392,7 @@ class DB_handler:
                     exp VARCHAR(50),
                     iso INTEGER,
                     ag DOUBLE,
+                    dg DOUBLE,
                     awb_red VARCHAR(200),
                     awb_blue VARCHAR(200),             
                     ldr LONGBLOB,
@@ -442,7 +443,7 @@ class DB_handler:
             table_name = 'images_' + date
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'img_nr, time, fstop, ss, exp, iso, ag, awb_red, awb_blue, ldr, hdr'
+            param_list = 'img_nr, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr'
             imagedata = Image_Data.to_dict()
             values = list(imagedata.values())
             print('values: '.format(values))
@@ -928,33 +929,50 @@ class Helpers:
             f = open(join(logfile), 'r')
             logfile = f.readlines()
 
-            listOfAWB = np.empty([3, 2], dtype=np.float32)
             awb_red_to_db = []
             awb_blue_to_db = []
 
             if sw_vers == 1:
+                listOfAWB = np.empty([10, 2], dtype=np.float32)
                 logfile.pop(0)  # remove non relevant lines
                 logfile.pop(0)
                 logfile.pop(0)
-            if sw_vers == 2:
-                logfile.pop(0)
-            if sw_vers == 3:
-                logfile.pop(0)
-                logfile.pop(0)
+            else:
+                listOfAWB = np.empty([3, 2], dtype=np.float32)
+                if sw_vers == 2:
+                    logfile.pop(0)
+                if sw_vers == 3:
+                    logfile.pop(0)
+                    logfile.pop(0)
 
             pos = 0
             for line in logfile:
-                value = line.split("awb:[", 1)[1]
-                value = value.split('],', 1)[0].replace('Fraction', '').replace('(', '', 1).replace('))', ')').replace(
-                    " ", "")
-                red_gain = value.split('),', 1)[0].strip('(').replace(',', '/')
-                awb_red_to_db.append(red_gain + ',')
-                blue_gain = value.split(',(', 1)[1].strip(')').replace(',', '/')
-                awb_blue_to_db.append(blue_gain + ',')
-                red_gain = np.float32(Fraction(str(red_gain)))
-                blue_gain = np.float32(Fraction(str(blue_gain)))
-                listOfAWB[pos] = [red_gain, blue_gain]
-                pos += 1
+                if sw_vers == 1:
+                    temp = line.split("awb (", 1)[1]
+                    temp_red = (((temp.split('),', 1)[0]).replace('Fraction(', '')).replace('Fraction(', '')).replace(" ", "")
+                    red_gain = temp_red.replace(',', '/')
+                    awb_red_to_db.append(red_gain + ',')
+
+                    temp_blue = (((line.split("awb (", 1)[-1]).split('), Fraction')[-1]).split(')),')[0]).replace('(','')
+                    blue_gain = temp_blue.replace(' ','').replace(',', '/')
+                    awb_blue_to_db.append(blue_gain + ',')
+
+                    red_gain = np.float32(Fraction(str(red_gain)))
+                    blue_gain = np.float32(Fraction(str(blue_gain)))
+                    listOfAWB[pos] = [red_gain, blue_gain]
+                    pos += 1
+                else:
+                    value = line.split("awb:[", 1)[1]
+                    value = value.split('],', 1)[0].replace('Fraction', '').replace('(', '', 1).replace('))', ')').replace(
+                        " ", "")
+                    red_gain = value.split('),', 1)[0].strip('(').replace(',', '/')
+                    awb_red_to_db.append(red_gain + ',')
+                    blue_gain = value.split(',(', 1)[1].strip(')').replace(',', '/')
+                    awb_blue_to_db.append(blue_gain + ',')
+                    red_gain = np.float32(Fraction(str(red_gain)))
+                    blue_gain = np.float32(Fraction(str(blue_gain)))
+                    listOfAWB[pos] = [red_gain, blue_gain]
+                    pos += 1
 
             awb_red_to_db_str  = ''.join(awb_red_to_db)
             awb_blue_to_db_str = ''.join(awb_blue_to_db)
@@ -963,13 +981,216 @@ class Helpers:
         except Exception as e:
             print('Error in getAWB_Gains: ' + str(e))
 
-    def strip_date(self, newdatestr):
+    def getISO(self, path):
+        try:
+            '''
+            returns iso value
+            '''
+            s = Logger()
+            logger = s.getLogger()
+            types = ('*.txt', '*.log')
+            sw_vers = Camera_Data.sw_vers
+
+            for typ in types:
+                for file in sorted(glob(os.path.join(path,typ))):
+                    logfile = file
+
+            f = open(join(logfile), 'r')
+            logfile = f.readlines()
+
+            iso_to_db = []
+
+            if sw_vers == 1:
+                listOfISO = np.empty(10, dtype=np.float32)
+                iso_to_db = ['0,0,0,0,0,0,0,0,0,0']
+            else:
+                listOfISO = np.empty(3, dtype=np.float32)
+                if sw_vers == 2:
+                    logfile.pop(0)
+                if sw_vers == 3:
+                    logfile.pop(0)
+                    logfile.pop(0)
+
+            pos = 0
+            for line in logfile:
+                if sw_vers == 1:
+                    break
+                else:
+                    iso = (line.split("iso:")[-1]).split(" exp")[0]
+                    iso_to_db.append(iso + ',')
+                    listOfISO[pos] = iso
+                    pos += 1
+
+            iso_to_db_str = ''.join(iso_to_db)
+            return   listOfISO, iso_to_db_str.rstrip(',')
+
+        except Exception as e:
+            print('Error in getISO: ' + str(e))
+
+    def getEXP(self, path):
+        try:
+            '''
+            returns exposure value
+            '''
+            s = Logger()
+            logger = s.getLogger()
+            types = ('*.txt', '*.log')
+            sw_vers = Camera_Data.sw_vers
+
+            for typ in types:
+                for file in sorted(glob(os.path.join(path,typ))):
+                    logfile = file
+
+            f = open(join(logfile), 'r')
+            logfile = f.readlines()
+
+            exp_to_db = []
+
+            if sw_vers == 1:
+                listOfEXP = np.empty(10, dtype=np.float32)
+                logfile.pop(0)
+                logfile.pop(0)
+                logfile.pop(0)
+            else:
+                listOfEXP = np.empty(3, dtype=np.float32)
+                if sw_vers == 2:
+                    logfile.pop(0)
+                if sw_vers == 3:
+                    logfile.pop(0)
+                    logfile.pop(0)
+
+            pos = 0
+            for line in logfile:
+                if sw_vers == 1:
+                    exp = (line.split("exposure time ")[-1]).split(',')[0]
+                    exp_to_db.append(exp + ',')
+                    listOfEXP[pos] = exp
+                    pos += 1
+                else:
+                    exp = (line.split("exp:")[-1]).split(',')[0]
+                    exp_to_db.append(exp + ',')
+                    listOfEXP[pos] = exp
+                    pos += 1
+
+            exp_to_db_str = ''.join(exp_to_db)
+            return listOfEXP, exp_to_db_str.rstrip(',')
+
+        except Exception as e:
+            print('Error in getEXP: ' + str(e))
+
+    def get_ag(self, path):
+        try:
+            '''
+            returns exposure value
+            '''
+            s = Logger()
+            logger = s.getLogger()
+            types = ('*.txt', '*.log')
+            sw_vers = Camera_Data.sw_vers
+
+            for typ in types:
+                for file in sorted(glob(os.path.join(path,typ))):
+                    logfile = file
+
+            f = open(join(logfile), 'r')
+            logfile = f.readlines()
+
+            ag_to_db = []
+
+            if sw_vers == 1:
+                listOfAG = np.empty(10, dtype=np.float32)
+                logfile.pop(0)
+                logfile.pop(0)
+                logfile.pop(0)
+            else:
+                listOfAG = np.empty(3, dtype=np.float32)
+                if sw_vers == 2:
+                    logfile.pop(0)
+                if sw_vers == 3:
+                    logfile.pop(0)
+                    logfile.pop(0)
+
+            pos = 0
+            for line in logfile:
+                if sw_vers == 1:
+                    ag = (line.split("ag ")[-1]).split(',')[0]
+                    ag_to_db.append(ag + ',')
+                    listOfAG[pos] = ag
+                    pos += 1
+                else:
+                    ag = (line.split("ag:")[-1]).split(',')[0]
+                    ag_to_db.append(ag + ',')
+                    listOfAG[pos] = ag
+                    pos += 1
+
+            ag_to_db_str = ''.join(ag_to_db)
+            return listOfAG, ag_to_db_str.rstrip(',')
+
+        except Exception as e:
+            print('Error in get_ag: ' + str(e))
+
+    def get_dg(self, path):
+        try:
+            '''
+            returns exposure value
+            '''
+            s = Logger()
+            logger = s.getLogger()
+            types = ('*.txt', '*.log')
+            sw_vers = Camera_Data.sw_vers
+
+            for typ in types:
+                for file in sorted(glob(os.path.join(path,typ))):
+                    logfile = file
+
+            f = open(join(logfile), 'r')
+            logfile = f.readlines()
+
+            dg_to_db = []
+
+            if sw_vers == 1:
+                listOfDG = np.empty(10, dtype=np.float32)
+                logfile.pop(0)
+                logfile.pop(0)
+                logfile.pop(0)
+            else:
+                listOfDG = np.empty(3, dtype=np.float32)
+                if sw_vers == 2:
+                    logfile.pop(0)
+                if sw_vers == 3:
+                    logfile.pop(0)
+                    logfile.pop(0)
+
+            pos = 0
+            for line in logfile:
+                if sw_vers == 1:
+                    dg = (line.split("dg ")[-1]).split(',')[0]
+                    dg_to_db.append(dg + ',')
+                    listOfDG[pos] = dg
+                    pos += 1
+                else:
+                    dg = (line.split("dg:")[-1]).split(',')[0]
+                    dg_to_db.append(dg + ',')
+                    listOfDG[pos] = dg
+                    pos += 1
+
+            dg_to_db_str = ''.join(dg_to_db)
+            return listOfDG, dg_to_db_str.rstrip(',')
+
+        except Exception as e:
+            print('Error in get_dg: ' + str(e))
+
+    def strip_date(self, path):
         try:
             s = Logger()
             logger = s.getLogger()
             H_S = datetime.now().strftime('%M-%S')
             formated_date = '0000-{}'.format(H_S)
-            dateAndTime = (newdatestr.rstrip('\\').rpartition('\\')[-1]).replace('_', ' ')
+
+            temp = path.rstrip('\\temp')
+            temp = (temp.rpartition('\\'))[-1]
+            temp = temp.replace('_',' ')
+            dateAndTime = temp
 
             year = dateAndTime[:4]
             month = dateAndTime[4:6]
@@ -979,7 +1200,7 @@ class Helpers:
 
             for item in check:
                 if not item or not item.isdigit():
-                    logger.error('strip_date: could not read date and time  used {} !'.format(formated_date))
+                    logger.error('strip_date: {} could not read date and time  used {} !'.format(path, formated_date))
                     return formated_date
 
             formated_date = '{}-{}-{}'.format(year, month, day)
@@ -1296,6 +1517,19 @@ class Helpers:
 
             listOfAWB, awb_red_to_db, awb_blue_to_db = self.getAWB_Gains(path)
             print('awb_red: {} | awb_blue: {}'.format(awb_red_to_db,awb_blue_to_db))
+
+            listOfISO, iso_to_db = self.getISO(path)
+            print('iso: {}'.format(iso_to_db))
+
+            listOfEXP, exp_to_db = self.getEXP(path)
+            print('exp: {}'.format(exp_to_db))
+
+            listOfAG, ag_to_db = self.get_dg(path)
+            print('ag: {}'.format(ag_to_db))
+
+            listOfDG, dg_to_db = self.get_dg(path)
+            print('dg: {}'.format(dg_to_db))
+
 
         except Exception as e:
             logger.error('collectImageData: ' + str(e))
