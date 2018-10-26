@@ -506,9 +506,9 @@ class HDR:
                     allImgFiles.append(imgFile)
 
             # Loading images channel - wise
-            img_list_b = self.load_exposures(allImgFiles, 0)
-            img_list_g = self.load_exposures(allImgFiles, 1)
-            img_list_r = self.load_exposures(allImgFiles, 2)
+            img_list_b = self.load_exposures(allImgFiles, 0); print('exp_b:{}'.format(listOfSS))
+            img_list_g = self.load_exposures(allImgFiles, 1); print('exp_g:{}'.format(listOfSS))
+            img_list_r = self.load_exposures(allImgFiles, 2); print('exp_r:{}'.format(listOfSS))
 
             # Solving response curves
             gb, _ = self.hdr_debvec(img_list_b, listOfSS)
@@ -1056,12 +1056,11 @@ class Helpers:
                     pos +=1
 
             else :
-
                 listOfSS = np.empty(3, dtype=np.float32)
 
                 if os.stat(file).st_size == 0:
                     ss_to_db = '0,0,0'
-                    logger.error('Empty camstat - file: {}'.format(file))
+                    logger.error('Empty camstat.log - file: {}'.format(file))
                     return listOfSS, ss_to_db
 
                 if sw_vers == 2:
@@ -1133,9 +1132,9 @@ class Helpers:
                     blue_gain = temp_blue.replace(' ','').replace(',', '/')
                     awb_blue_to_db.append(blue_gain + ',')
 
-                    red_gain = np.float32(Fraction(str(red_gain)))
-                    blue_gain = np.float32(Fraction(str(blue_gain)))
-                    listOfAWB[pos] = [red_gain, blue_gain]
+                    red_gain_f = np.float32(Fraction(str(red_gain)))
+                    blue_gain_f = np.float32(Fraction(str(blue_gain)))
+                    listOfAWB[pos] = [red_gain_f, blue_gain_f]
                     pos += 1
                 else:
                     value = line.split("awb:[", 1)[1]
@@ -1145,9 +1144,10 @@ class Helpers:
                     awb_red_to_db.append(red_gain + ',')
                     blue_gain = value.split(',(', 1)[1].strip(')').replace(',', '/')
                     awb_blue_to_db.append(blue_gain + ',')
-                    red_gain = np.float32(Fraction(str(red_gain)))
-                    blue_gain = np.float32(Fraction(str(blue_gain)))
-                    listOfAWB[pos] = [red_gain, blue_gain]
+
+                    red_gain_f = np.float32(Fraction(str(red_gain)))
+                    blue_gain_f = np.float32(Fraction(str(blue_gain)))
+                    listOfAWB[pos] = [red_gain_f, blue_gain_f]
                     pos += 1
 
             awb_red_to_db_str  = ''.join(awb_red_to_db)
@@ -1240,12 +1240,14 @@ class Helpers:
                 if sw_vers == 1:
                     exp = (line.split("exposure time ")[-1]).split(',')[0]
                     exp_to_db.append(exp + ',')
-                    listOfEXP[pos] = exp
+                    exp_float = np.float32(Fraction(str(exp)))
+                    listOfEXP[pos] = exp_float
                     pos += 1
                 else:
                     exp = (line.split("exp:")[-1]).split(',')[0]
                     exp_to_db.append(exp + ',')
-                    listOfEXP[pos] = exp
+                    exp_float = np.float32(Fraction(str(exp)))
+                    listOfEXP[pos] = exp_float
                     pos += 1
 
             exp_to_db_str = ''.join(exp_to_db)
@@ -1296,7 +1298,8 @@ class Helpers:
                 else:
                     ag = (line.split("ag:")[-1]).split(',')[0]
                     ag_to_db.append(ag + ',')
-                    listOfAG[pos] = ag
+                    ag_float = np.float32(Fraction(str(ag)))
+                    listOfAG[pos] = ag_float
                     pos += 1
 
             ag_to_db_str = ''.join(ag_to_db)
@@ -1342,12 +1345,14 @@ class Helpers:
                 if sw_vers == 1:
                     dg = (line.split("dg ")[-1]).split(',')[0]
                     dg_to_db.append(dg + ',')
-                    listOfDG[pos] = dg
+                    dg_float = np.float32(Fraction(str(dg)))
+                    listOfDG[pos] = dg_float
                     pos += 1
                 else:
                     dg = (line.split("dg:")[-1]).split(',')[0]
                     dg_to_db.append(dg + ',')
-                    listOfDG[pos] = dg
+                    dg_float = np.float32(Fraction(str(dg)))
+                    listOfDG[pos] = dg_float
                     pos += 1
 
             dg_to_db_str = ''.join(dg_to_db)
@@ -1393,7 +1398,8 @@ class Helpers:
                else:
                     fstop = (line.split("F Stop:")[-1]).split(',')[0]
                     fStop_to_db.append(fstop + ',')
-                    listOfFSTOP[pos] = fstop
+                    fStop_float = np.float32(Fraction(str(fstop)))
+                    listOfFSTOP[pos] = fStop_float
                     pos += 1
 
             fStop_to_db_str = ''.join(fStop_to_db)
@@ -1704,7 +1710,7 @@ class Helpers:
             Image_Data.awb_blue = awb_blue_to_db
 
             # Hier HDR / ldr Bilder einfügen resp erzeugen !!!
-            Image_Data.ldr = hdr.make_hdr(path,listOfSS ,'jpg')
+            #Image_Data.ldr = hdr.make_hdr(path,listOfSS ,'jpg')
             Image_Data.hdr = hdr.make_hdr(path, listOfSS, 'data')
 
             success = True
@@ -1801,7 +1807,7 @@ def main():
         path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'     # mittlere vers 2
         path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'     # neuste vers 3
 
-        h.load_images2DB(path1)
+        h.load_images2DB(path3)
 
         return
         '''
