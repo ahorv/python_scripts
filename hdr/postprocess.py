@@ -524,6 +524,7 @@ class HDR:
                 plt.ylabel('pixel value Z')
                 plt.xlabel('log exposure X')
                 fig = plt.gcf()
+
                 respc = io.BytesIO()
                 fig.savefig(respc, format='jpg')
                 respc.seek(0)
@@ -546,6 +547,7 @@ class HDR:
                 rmap_blob = rmap.read()
                 Image_Data.rmap = rmap_blob
 
+            success = True
             return success
 
         except Exception as e:
@@ -908,8 +910,19 @@ class HDR:
             rgbe = np.zeros((image.shape[0], image.shape[1], 4), dtype=np.uint8)
             rgbe[..., 0:3] = np.around(image[..., 0:3] * scaled_mantissa[..., None])
             rgbe[..., 3] = np.around(exponent + 128)
-            _rgbe = bytes(rgbe.flatten())
-            blob = title + header + _rgbe
+
+            _rgbe = rgbe.flatten()
+            '''
+            byte_str = title + header + _rgbe
+            blob_b = io.BytesIO(byte_str)
+            blob_b.seek(0)
+            blob = blob_b.read()
+            '''
+            #blob = io.BytesIO()
+
+            blob = title + header + _rgbe.tobytes()
+            #bool.seek(0)
+            #blob = blob.read()
 
             return blob
 
@@ -1781,9 +1794,9 @@ class Helpers:
             Image_Data.awb_blue = awb_blue_to_db
 
             # Hier HDR / ldr Bilder einfügen resp erzeugen !!!
-            #Image_Data.ldr = hdr.make_hdr(path,listOfSS ,'jpg')
-            #Image_Data.hdr = hdr.make_hdr(path, listOfSS, 'data')  # orginal
-            Image_Data.hdr = hdr.make_hdr(path, listOfSS)   # TEST -> LOESCHEN
+            #hdr.make_hdr(path,listOfSS ,'jpg')
+            hdr.make_hdr(path, listOfSS, 'data')  # orginal
+
 
             success = True
             return success
@@ -1801,9 +1814,6 @@ class Helpers:
 
         if success:
             success = db.insert_camera_data()
-
-        # zuerst in die image_tabel schreiben wenn das ok dann erst in die data_camera
-
 
         return success
 
