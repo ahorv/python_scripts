@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import mysql.connector
 from mysql.connector import Error
+import re
 import os
 import cv2
 import sys
@@ -482,17 +483,13 @@ class DB_handler:
             return success
 
 class HDR:
-    def make_ldr(self, path):
-        success = False
-
-        return success
-
     def make_hdr(self, path, listOfSS, img_type = 'jpg'):
         try:
+            h = Helpers()
             s = Logger()
             logger = s.getLogger()
             success = False
-            allImgFiles = []
+            img_dir = []
             type = ''
 
             if img_type is 'jpg':
@@ -503,12 +500,15 @@ class HDR:
             # Load all images
             for imgFile in sorted(glob(os.path.join(path, type))):
                 if os.path.isfile(imgFile):
-                    allImgFiles.append(imgFile)
+                    img_dir.append(imgFile)
+
+            # Sort image order to match with listOfSS
+            img_dir.sort(key=h.byInteger_keys)
 
             # Loading images channel - wise
-            img_list_b = self.load_exposures(allImgFiles, 0); print('exp_b:{}'.format(listOfSS))
-            img_list_g = self.load_exposures(allImgFiles, 1); print('exp_g:{}'.format(listOfSS))
-            img_list_r = self.load_exposures(allImgFiles, 2); print('exp_r:{}'.format(listOfSS))
+            img_list_b = self.load_exposures(img_dir, 0)
+            img_list_g = self.load_exposures(img_dir, 1)
+            img_list_r = self.load_exposures(img_dir, 2)
 
             # Solving response curves
             gb, _ = self.hdr_debvec(img_list_b, listOfSS)
@@ -551,6 +551,62 @@ class HDR:
         except Exception as e:
             logger.error('make_hdr ' + str(e))
             return success
+
+    def _make_hdr(self,path, listOfSS):
+
+        output_hdr_filename = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912'
+
+        img_dir = []
+        img_1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912\data0.data'
+        img_2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912\data-2.data'
+        img_3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912\data-4.data'
+        img_dir.append(img_1)
+        img_dir.append(img_2)
+        img_dir.append(img_3)
+
+        img_dir
+
+        print('img_dir:{}'.format(img_dir))
+
+        print('Reading input images.... ', end='')
+        img_list_b = self.load_exposures(img_dir, 0);
+        img_list_g = self.load_exposures(img_dir, 1);
+        img_list_r = self.load_exposures(img_dir, 2);
+        print('done')
+
+        # Solving response curves
+        print('Solving response curves .... ', end='')
+        gb, _ = self.hdr_debvec(img_list_b, listOfSS)
+        gg, _ = self.hdr_debvec(img_list_g, listOfSS)
+        gr, _ = self.hdr_debvec(img_list_r, listOfSS)
+        print('done')
+
+        # Show response curve
+        print('Saving response curves plot .... ', end='')
+        plt.figure(figsize=(10, 10))
+        plt.plot(gr, range(256), 'rx')
+        plt.plot(gg, range(256), 'gx')
+        plt.plot(gb, range(256), 'bx')
+        plt.ylabel('pixel value Z')
+        plt.xlabel('log exposure X')
+        plt.savefig(join(output_hdr_filename, 'response-curve.png'))
+        print('done')
+
+        print('Constructing HDR image: ')
+        hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
+        print('done')
+
+        # Display Radiance map with pseudo-color image (log value)
+        print('Saving pseudo-color radiance map .... ', end='')
+        plt.figure(figsize=(12, 8))
+        plt.imshow(np.log2(cv2.cvtColor(hdr, cv2.COLOR_BGR2GRAY)), cmap='jet')
+        plt.colorbar()
+        plt.savefig(join(output_hdr_filename, 'radiance-map.png'))
+        print('done')
+
+        print('Saving HDR image .... ', end='')
+        self.save_hdr(hdr, join(output_hdr_filename, 'my_HDR.hdr'))
+        print('done')
 
     def demosaic1(self, mosaic, awb_gains=None):
         '''
@@ -627,28 +683,30 @@ class HDR:
 
         return raw.astype('uint16')
 
-    def load_exposures_data(self, source_dir, channel=0):
+    def _load_exposures(self, dir_list, channel=0):
         '''
         nedded by make_hdr
-        Reads raw (16 bit) data files
+        Reads either of jpg or raw depending on file extension
         :param source_dir:
         :param channel:
         :return:
         '''
-        is_data_type = False
-        filenames = []
-        exposure_times = []
-        f = open(os.path.join(source_dir, 'image_list.txt'))
-        for line in f:
-            if (line[0] == '#'):
-                continue
-            (filename, exposure, *rest) = line.split()
-            filenames += [filename]
-            exposure_times += [exposure]
 
-            img_list = [toRGB_1(read_data(os.path.join(source_dir, f))) for f in filenames]
-            img_list = [img[:, :, channel] for img in img_list]
-            exposure_times = np.array(exposure_times, dtype=np.float32)
+        img_list = []
+
+        for file in dir_list:
+            print('load_exposure from: {}'.format(file))
+
+            if '.data' in file:
+                #img_list = [self.toRGB_1(self.read_data(file)) for file in dir_list]
+                img_list = [self.toRGB_1(self.read_data(file))]
+                img_list = [img[:, :, channel] for img in img_list]
+
+            if '.jpg' in file:
+                img_list = [cv2.imread(file, 1)]
+                img_list = [img[:, :, channel] for img in img_list]
+
+        return img_list
 
     def load_exposures(self, dir_list, channel=0):
         '''
@@ -658,39 +716,16 @@ class HDR:
         :param channel:
         :return:
         '''
-        for file in dir_list:
-            if '.jpg' in file:
-                img_list = [cv2.imread(file, 1) ]
-                img_list = [img[:, :, channel] for img in img_list]
-            else:
-                img_list = [self.toRGB_1(self.read_data(file)) ]
-                img_list = [img[:, :, channel] for img in img_list]
+        img_list = []
+        if dir_list[0].endswith('.data'):
+            img_list = [self.toRGB_1(self.read_data(file)) for file in dir_list]
+            img_list = [img[:, :, channel] for img in img_list]
+
+        if dir_list[0].endswith('.jpg'):
+            img_list = [cv2.imread(file, 1)for file in dir_list]
+            img_list = [img[:, :, channel] for img in img_list]
 
         return img_list
-
-    def load_exposures_jpg(self, source_dir, channel=0):
-        '''
-        nedded by make_hdr
-        Reads jpg images
-        :param source_dir:
-        :param channel:
-        :return:
-        '''
-        filenames = []
-        exposure_times = []
-        f = open(os.path.join(source_dir, 'image_list.txt'))
-        for line in f:
-            if (line[0] == '#'):
-                continue
-            (filename, exposure, *rest) = line.split()
-            filenames += [filename]
-            exposure_times += [exposure]
-
-        img_list = [cv2.imread(os.path.join(source_dir, f), 1) for f in filenames]
-        img_list = [img[:, :, channel] for img in img_list]
-        exposure_times = np.array(exposure_times, dtype=np.float32)
-
-        return (img_list, exposure_times)
 
     def median_threshold_bitmap_alignment(self, img_list):
         '''
@@ -882,6 +917,36 @@ class HDR:
             logger.error('hdr_to_blob ' + str(e))
             return None
 
+    def save_hdr(self, hdr, filename):
+        '''
+        LOESCHEN
+        :param filename:
+        :return:
+        '''
+        image = np.zeros((hdr.shape[0], hdr.shape[1], 3), 'float32')
+        image[..., 0] = hdr[..., 2]
+        image[..., 1] = hdr[..., 1]
+        image[..., 2] = hdr[..., 0]
+
+        print('Path to save HDR: {}'.format(filename))
+
+        f = open(filename, 'wb')
+        f.write(b"#?RADIANCE\n# Made with Python & Numpy\nFORMAT=32-bit_rle_rgbe\n\n")
+        header = '-Y {0} +X {1}\n'.format(image.shape[0], image.shape[1])
+        f.write(bytes(header, encoding='utf-8'))
+
+        brightest = np.maximum(np.maximum(image[..., 0], image[..., 1]), image[..., 2])
+        mantissa = np.zeros_like(brightest)
+        exponent = np.zeros_like(brightest)
+        np.frexp(brightest, mantissa, exponent)
+        scaled_mantissa = mantissa * 256.0 / brightest
+        rgbe = np.zeros((image.shape[0], image.shape[1], 4), dtype=np.uint8)
+        rgbe[..., 0:3] = np.around(image[..., 0:3] * scaled_mantissa[..., None])
+        rgbe[..., 3] = np.around(exponent + 128)
+
+        rgbe.flatten().tofile(f)
+        f.close()
+
 
 
 class IMAGEPROC:
@@ -985,6 +1050,12 @@ class IMAGEPROC:
             logger.error('read_image_as_binarry: {}'.format(e))
 
 class Helpers:
+
+    def get_int(self, text):
+        return int(text) if text.isdigit() else text
+
+    def byInteger_keys(self, text):
+        return [self.get_int(c) for c in re.split('(\d+)', text)]
 
     def getEXIF_TAG(self, file_path, field):
         try:
@@ -1711,7 +1782,8 @@ class Helpers:
 
             # Hier HDR / ldr Bilder einfügen resp erzeugen !!!
             #Image_Data.ldr = hdr.make_hdr(path,listOfSS ,'jpg')
-            Image_Data.hdr = hdr.make_hdr(path, listOfSS, 'data')
+            #Image_Data.hdr = hdr.make_hdr(path, listOfSS, 'data')  # orginal
+            Image_Data.hdr = hdr.make_hdr(path, listOfSS)   # TEST -> LOESCHEN
 
             success = True
             return success
