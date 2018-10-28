@@ -515,6 +515,19 @@ class HDR:
             gg, _ = self.hdr_debvec(img_list_g, listOfSS)
             gr, _ = self.hdr_debvec(img_list_r, listOfSS)
 
+            if img_type is 'jpg':
+                hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
+
+                normalize = lambda zi: (zi - zi.min() / zi.max() - zi.min())
+                z_disp = normalize(np.log(hdr))
+                plt.figure(figsize=(12, 8))
+                plt.imshow(z_disp / z_disp.max())
+                plt.axis('off')
+                plt.show()
+
+
+                Image_Data.ldr = self.hdr_to_blob(hdr)
+
             if img_type is 'data':
                 # Create and plot response curve
                 plt.figure(figsize=(10, 10))
@@ -524,18 +537,16 @@ class HDR:
                 plt.ylabel('pixel value Z')
                 plt.xlabel('log exposure X')
                 fig = plt.gcf()
-
                 respc = io.BytesIO()
                 fig.savefig(respc, format='jpg')
                 respc.seek(0)
                 resp_blob = respc.read()
                 Image_Data.resp = resp_blob
 
-            # make the HDR
-            hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
-            Image_Data.hdr = self.hdr_to_blob(hdr)
+                # make the HDR
+                hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
+                Image_Data.hdr = self.hdr_to_blob(hdr)
 
-            if img_type is 'data':
                 # Create radiance map
                 plt.figure(figsize=(12, 8))
                 plt.imshow(np.log2(cv2.cvtColor(hdr, cv2.COLOR_BGR2GRAY)), cmap='jet')
@@ -912,17 +923,16 @@ class HDR:
             rgbe[..., 3] = np.around(exponent + 128)
 
             _rgbe = rgbe.flatten()
-            '''
-            byte_str = title + header + _rgbe
+
+            byte_str = title + header + _rgbe.tobytes()
             blob_b = io.BytesIO(byte_str)
             blob_b.seek(0)
             blob = blob_b.read()
-            '''
-            #blob = io.BytesIO()
 
-            blob = title + header + _rgbe.tobytes()
-            #bool.seek(0)
-            #blob = blob.read()
+            # filename = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\hdr.hdr'
+            # f = open(filename, 'wb')
+            # f.write(blob)
+            # f.close()
 
             return blob
 
@@ -959,7 +969,6 @@ class HDR:
 
         rgbe.flatten().tofile(f)
         f.close()
-
 
 
 class IMAGEPROC:
@@ -1793,10 +1802,8 @@ class Helpers:
             Image_Data.awb_red = awb_red_to_db
             Image_Data.awb_blue = awb_blue_to_db
 
-            # Hier HDR / ldr Bilder einfügen resp erzeugen !!!
-            #hdr.make_hdr(path,listOfSS ,'jpg')
-            hdr.make_hdr(path, listOfSS, 'data')  # orginal
-
+            hdr.make_hdr(path, listOfSS ,'jpg')
+            #hdr.make_hdr(path, listOfSS, 'data')
 
             success = True
             return success
