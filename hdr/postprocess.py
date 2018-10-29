@@ -170,6 +170,7 @@ class Camera_Data(object):
 class Config(object):
     """Container class for configuration.
     """
+    NAS_IP = '?'
     sourceDirectory = '?'
     camera_1_Directory = '?'
     camera_2_Directory = '?'
@@ -177,12 +178,15 @@ class Config(object):
     databaseDirectory = '?'
 
     def __init__(self, state_map={}):
+
+        self.NAS_IP = state_map.get('NAS_IP','?')
         self.sourceDirectory = state_map.get('sourceDirectory', '?')
         self.camera_1_Directory = state_map.get('camera_1_Directory', '?')
         self.camera_2_Directory = state_map.get('camera_2_Directory', '?')
         self.databaseName = state_map.get('databaseName','sky_db')
         self.databaseDirectory = state_map.get('databaseDirectory', '?')
 
+        Config.NAS_IP = self.NAS_IP
         Config.sourceDirectory = self.sourceDirectory
         Config.camera_1_Directory = self.camera_1_Directory
         Config.camera_2_Directory = self.camera_2_Directory
@@ -292,8 +296,9 @@ class DB_handler:
         try:
             s = Logger()
             logger = s.getLogger()
+            nas_ip = Config.NAS_IP
             self.connection = mysql.connector.connect(
-                            host='192.168.1.10',
+                            host = nas_ip,
                             user='root',
                             password='123ihomelab'
                             )
@@ -309,8 +314,9 @@ class DB_handler:
             s = Logger()
             logger = s.getLogger()
             cb_name = Config.databaseName
+            nas_ip = Config.NAS_IP
             self.connection = mysql.connector.connect(
-                host='192.168.1.10',
+                host=nas_ip,
                 user='root',
                 password='123ihomelab',
                 database = cb_name,
@@ -565,62 +571,6 @@ class HDR:
             logger.error('make_hdr ' + str(e))
             return success
 
-    def _make_hdr(self,path, listOfSS):
-
-        output_hdr_filename = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912'
-
-        img_dir = []
-        img_1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912\data0.data'
-        img_2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912\data-2.data'
-        img_3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912\data-4.data'
-        img_dir.append(img_1)
-        img_dir.append(img_2)
-        img_dir.append(img_3)
-
-        img_dir
-
-        print('img_dir:{}'.format(img_dir))
-
-        print('Reading input images.... ', end='')
-        img_list_b = self.load_exposures(img_dir, 0);
-        img_list_g = self.load_exposures(img_dir, 1);
-        img_list_r = self.load_exposures(img_dir, 2);
-        print('done')
-
-        # Solving response curves
-        print('Solving response curves .... ', end='')
-        gb, _ = self.hdr_debvec(img_list_b, listOfSS)
-        gg, _ = self.hdr_debvec(img_list_g, listOfSS)
-        gr, _ = self.hdr_debvec(img_list_r, listOfSS)
-        print('done')
-
-        # Show response curve
-        print('Saving response curves plot .... ', end='')
-        plt.figure(figsize=(10, 10))
-        plt.plot(gr, range(256), 'rx')
-        plt.plot(gg, range(256), 'gx')
-        plt.plot(gb, range(256), 'bx')
-        plt.ylabel('pixel value Z')
-        plt.xlabel('log exposure X')
-        plt.savefig(join(output_hdr_filename, 'response-curve.png'))
-        print('done')
-
-        print('Constructing HDR image: ')
-        hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
-        print('done')
-
-        # Display Radiance map with pseudo-color image (log value)
-        print('Saving pseudo-color radiance map .... ', end='')
-        plt.figure(figsize=(12, 8))
-        plt.imshow(np.log2(cv2.cvtColor(hdr, cv2.COLOR_BGR2GRAY)), cmap='jet')
-        plt.colorbar()
-        plt.savefig(join(output_hdr_filename, 'radiance-map.png'))
-        print('done')
-
-        print('Saving HDR image .... ', end='')
-        self.save_hdr(hdr, join(output_hdr_filename, 'my_HDR.hdr'))
-        print('done')
-
     def demosaic1(self, mosaic, awb_gains=None):
         '''
         nedded by make_hdr
@@ -695,31 +645,6 @@ class HDR:
         raw = self.demosaic1(data)
 
         return raw.astype('uint16')
-
-    def _load_exposures(self, dir_list, channel=0):
-        '''
-        nedded by make_hdr
-        Reads either of jpg or raw depending on file extension
-        :param source_dir:
-        :param channel:
-        :return:
-        '''
-
-        img_list = []
-
-        for file in dir_list:
-            print('load_exposure from: {}'.format(file))
-
-            if '.data' in file:
-                #img_list = [self.toRGB_1(self.read_data(file)) for file in dir_list]
-                img_list = [self.toRGB_1(self.read_data(file))]
-                img_list = [img[:, :, channel] for img in img_list]
-
-            if '.jpg' in file:
-                img_list = [cv2.imread(file, 1)]
-                img_list = [img[:, :, channel] for img in img_list]
-
-        return img_list
 
     def load_exposures(self, dir_list, channel=0):
         '''
@@ -1854,35 +1779,13 @@ class Helpers:
 def main():
     try:
         CFG = {
-            'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
-            'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
-            'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
-            'camera_2_Directory': r'\\HOANAS\HOA_SKYCam\camera_2',
+            'NAS_IP'            : r'192.168.2.115',
+            'sourceDirectory'   : r'\\IHLNAS05\SkyCam_FTP',
+            'databaseDirectory' : r'\\IHLNAS05\SkyCam_FTP',
+            'camera_1_Directory': r'\\IHLNAS05\SkyCam_FTP\camera_1',
+            'camera_2_Directory': r'\\IHLNAS05\SkyCam_FTP\camera_2',
         }
-        CAM_DATA = {
-            'sw_vers': 3,
-            'cam_id': '1',
-            'image_date': '21-10-2018',
-            'dont_use' : 0,
-            'was_clearsky':0,
-            'was_rainy' :0,
-            'was_biased':0,
-            'was_foggy':0,
-            'had_nimbocum':0
-        }
-        IMG = {
-            'img_nr': 1,
-            'time':  '12:23:34',
-            'fstop':  '-40',
-            'ss' :    1000,
-            'exp':    1000,
-            'iso':    100,
-            'ag':     0.12345,
-            'awb_red': 0.12345,
-            'awb_blue': 0.12345,
-            'ldr': '?',
-            'hdr': '?',
-        }
+
         config = Config(CFG)
         h = Helpers()
         s = Logger()
@@ -1892,80 +1795,13 @@ def main():
         db.createDB()
 
         #h.load_images2DB()
-        path1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1\temp'     # alte vers 1
-        path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'     # mittlere vers 2
-        path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'     # neuste vers 3
+        path1 = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers1\20200505_raw_cam1\temp'     # alte vers 1
+        path2 = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers2\20200505_raw_cam1\temp'     # mittlere vers 2
+        path3 = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp'     # neuste vers 3
 
         h.load_images2DB(path3)
 
-        return
-        '''
-        db = DB_handler()
-        db.createDB()
-
-        test_image_path = r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers2\20180403_raw_cam1\20180403_080014'
-
-        CAMERADATA = Camera_Data(CAM_DATA)
-        db.insert_camera_data()
-
-        db.create_new_image_table('2018_10_22')
-        IMGDATA = Image_Data(IMG)
-
-        imgproc = IMAGEPROC(CAMERADATA)
-
-        IMGDATA.ldr = imgproc.image2binary(join(test_image_path,'raw_img0.jpg'))
-        IMGDATA.hdr = imgproc.image2binary(join(test_image_path,'data0_.data'))
-
-
-        db.insert_image_data('2018_10_22')
-        '''
-
-        '''
-        global Path_to_sourceDir
-        unzipall          = False
-        delallzip         = False
-        runslideshow      = False
-        copyAndMask       = False
-        hdr_pics_from_jpg = False
-        creat_HDR_Video   = False
-        hdr_from_data     = True
-
-        if not os.path.isdir(Path_to_sourceDir):
-            print('\nError: Image directory does not exist! -> Aborting.')
-            return;
-
-        help = Helpers()
-        hdr = HDR()
-        allDirs = help.getDirectories(Path_to_sourceDir)
-
-        if unzipall:
-            help.unzipall(Path_to_sourceDir)
-
-        if delallzip:
-            help.delAllZIP(Path_to_sourceDir)
-
-        if copyAndMask:
-            help.copyAndMaskAll_img5(allDirs)
-            help.createVideo()
-
-        if hdr_pics_from_jpg:
-            hdrstart = time.time()
-            hdr.makeHDR_from_jpg(allDirs)
-            hdrend = time.time()
-            print('Time to create HDR images: {}'.format(hdrend-hdrstart))
-
-        if creat_HDR_Video:
-            hdrstart = time.time()
-            hdr.createHDRVideo()
-            hdrend = time.time()
-            print('Time to create HDR Video: {}'.format(hdrend-hdrstart))
-
-        if hdr_from_data:
-            hdr.makeHDR_from_data(allDirs)
-        '''
-
-
-        print('Postprocess.py done')
+        logger.info('All files processed.')
 
     except Exception as e:
         logger.error('MAIN: {}'.format(e))
