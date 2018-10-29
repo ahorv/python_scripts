@@ -491,6 +491,12 @@ class DB_handler:
 class HDR:
     def make_hdr(self, path, listOfSS, img_type = 'jpg'):
         try:
+
+            # jpg: tonemaped version (Reinhard?)
+            # das HDR - File 'as is' ohne convertierung zu RGBE !
+
+
+
             h = Helpers()
             s = Logger()
             logger = s.getLogger()
