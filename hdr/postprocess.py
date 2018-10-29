@@ -524,13 +524,12 @@ class HDR:
             if img_type is 'jpg':
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
 
-                normalize = lambda zi: (zi - zi.min() / zi.max() - zi.min())
-                z_disp = normalize(np.log(hdr))
-                plt.figure(figsize=(12, 8))
-                plt.imshow(z_disp / z_disp.max())
-                plt.axis('off')
-                plt.show()
-
+                #normalize = lambda zi: (zi - zi.min() / zi.max() - zi.min())
+                #z_disp = normalize(np.log(hdr))
+                #plt.figure(figsize=(12, 8))
+                #plt.imshow(z_disp / z_disp.max())
+                #plt.axis('off')
+                #plt.show()
 
                 Image_Data.ldr = self.hdr_to_blob(hdr)
 
@@ -854,7 +853,7 @@ class HDR:
             blob_b.seek(0)
             blob = blob_b.read()
 
-            # filename = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\hdr.hdr'
+            # filename = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp\hdr.hdr'
             # f = open(filename, 'wb')
             # f.write(blob)
             # f.close()
