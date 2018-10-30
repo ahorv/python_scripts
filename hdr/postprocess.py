@@ -527,10 +527,18 @@ class HDR:
 
             if img_type is 'jpg':
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
+                byte_str = hdr.tobytes()
+                blob_b = io.BytesIO(byte_str)
+                blob_b.seek(0)
+                blob = blob_b.read()
+                Image_Data.ldr = blob
+
+                cb = COLORBALANCE()
+
                 tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
                 ldrReinhard = tonemapReinhard.process(hdr)
                 path = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912'
-                cv2.imwrite(join(path,"ldr-ldrReinhard.jpg"), ldrReinhard * 255)
+                cv2.imwrite(join(path,"ldr-ldrReinhard.jpg"), cb.simplest_cb(ldrReinhard * 255, 1))
 
                 #normalize = lambda zi: (zi - zi.min() / zi.max() - zi.min())
                 #z_disp = normalize(np.log(hdr))
@@ -539,7 +547,6 @@ class HDR:
                 #plt.axis('off')
                 #plt.show()
 
-                Image_Data.ldr = self.hdr_to_blob(hdr)
 
             if img_type is 'data':
                 # Create and plot response curve
@@ -558,7 +565,12 @@ class HDR:
 
                 # make the HDR
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
-                Image_Data.hdr = hdr
+
+                byte_str = hdr.tobytes()
+                blob_b = io.BytesIO(byte_str)
+                blob_b.seek(0)
+                blob = blob_b.read()
+                Image_Data.hdr = blob
 
                 tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
                 ldrReinhard = tonemapReinhard.process(hdr)
@@ -913,6 +925,50 @@ class HDR:
 
         rgbe.flatten().tofile(f)
         f.close()
+
+class COLORBALANCE:
+
+    def apply_mask(self, matrix, mask, fill_value):
+        masked = np.ma.array(matrix, mask=mask, fill_value=fill_value)
+        return masked.filled()
+
+    def apply_threshold(self, matrix, low_value, high_value):
+        low_mask = matrix < low_value
+        matrix = self.apply_mask(matrix, low_mask, low_value)
+
+        high_mask = matrix > high_value
+        matrix = self.apply_mask(matrix, high_mask, high_value)
+
+        return matrix
+
+    def simplest_cb(self, img, percent):
+        assert img.shape[2] == 3
+        assert percent > 0 and percent < 100
+        half_percent = percent / 200.0
+        channels = cv2.split(img)
+
+        out_channels = []
+        for channel in channels:
+            assert len(channel.shape) == 2
+            # find the low and high precentile values (based on the input percentile)
+            height, width = channel.shape
+            vec_size = width * height
+            flat = channel.reshape(vec_size)
+
+            assert len(flat.shape) == 1
+            flat = np.sort(flat)
+            n_cols = flat.shape[0]
+
+            low_val = flat[math.floor(n_cols * half_percent)]
+            high_val = flat[math.ceil(n_cols * (1.0 - half_percent))]
+
+            # saturate below the low percentile and above the high percentile
+            thresholded = self.apply_threshold(channel, low_val, high_val)
+            # scale the channel
+            normalized = cv2.normalize(thresholded, thresholded.copy(), 0, 255, cv2.NORM_MINMAX)
+            out_channels.append(normalized)
+
+        return cv2.merge(out_channels)
 
 
 class IMAGEPROC:
