@@ -578,7 +578,6 @@ class HDR:
                 path = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp'
                 cv2.imwrite(join(path,"ldr-hdrReinhard.jpg"), ldrReinhard * 255)
 
-
                 # filename = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp\hdr.hdr'
                 # f = open(filename, 'wb')
                 # f.write(blob)

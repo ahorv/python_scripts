@@ -64,6 +64,7 @@ def blob2toImage(image_arr):
 
 def tonemap(hdr):
 
+    # ndarray 32
     image_f = np.asarray(hdr, dtype=np.float32)
 
     tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
