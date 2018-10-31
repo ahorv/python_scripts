@@ -80,10 +80,10 @@ def main():
         resp_img = getImageDB('2018-10-10', 'resp')
         cv2.imshow('resp', blob2toImage(resp_img))
 
-        ldr_img  = getImageDB('2018-10-10', 'ldr')
-        cv2.imshow('ldr', tonemap(ldr_img))
+        #ldr_img  = getImageDB('2018-10-10', 'ldr')
+        #cv2.imshow('ldr', tonemap(ldr_img))
 
-        hdr_img  = getImageDB('2018-10-10', 'hdr')
+        hdr_img  = getImageDB('2018-10-10', 'hdr')  # bereits das Format stimmt nicht !
         cv2.imshow('hdr', tonemap(hdr_img))
 
         cv2.waitKey(0)
