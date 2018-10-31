@@ -287,7 +287,6 @@ class Logger:
             print('Error logger:' + str(e))
 
 class DB_handler:
-
     def __init__(self):
         self.connection = None
         self.cursor = None
@@ -532,12 +531,12 @@ class HDR:
                 blob_b.seek(0)
                 blob = blob_b.read()
                 Image_Data.ldr = blob
+                blob_b.close()
 
                 cb = COLORBALANCE()
-
                 tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
                 ldrReinhard = tonemapReinhard.process(hdr)
-                path = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912'
+                path = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp'
                 cv2.imwrite(join(path,"ldr-ldrReinhard.jpg"), cb.simplest_cb(ldrReinhard * 255, 1))
 
                 #normalize = lambda zi: (zi - zi.min() / zi.max() - zi.min())
@@ -546,7 +545,6 @@ class HDR:
                 #plt.imshow(z_disp / z_disp.max())
                 #plt.axis('off')
                 #plt.show()
-
 
             if img_type is 'data':
                 # Create and plot response curve
@@ -557,11 +555,13 @@ class HDR:
                 plt.ylabel('pixel value Z')
                 plt.xlabel('log exposure X')
                 fig = plt.gcf()
+
                 respc = io.BytesIO()
                 fig.savefig(respc, format='jpg')
                 respc.seek(0)
                 resp_blob = respc.read()
                 Image_Data.resp = resp_blob
+                respc.close()
 
                 # make the HDR
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
@@ -571,17 +571,18 @@ class HDR:
                 blob_b.seek(0)
                 blob = blob_b.read()
                 Image_Data.hdr = blob
+                blob_b.close()
 
                 tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
                 ldrReinhard = tonemapReinhard.process(hdr)
-                path = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp\20181009_133912'
+                path = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp'
                 cv2.imwrite(join(path,"ldr-hdrReinhard.jpg"), ldrReinhard * 255)
+
 
                 # filename = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp\hdr.hdr'
                 # f = open(filename, 'wb')
                 # f.write(blob)
                 # f.close()
-
                 # Image_Data.hdr = self.hdr_to_blob(hdr) # save as *.hdr file
 
                 # Create radiance map
@@ -594,6 +595,7 @@ class HDR:
                 rmap.seek(0)
                 rmap_blob = rmap.read()
                 Image_Data.rmap = rmap_blob
+                rmap.close()
 
             success = True
             return success
@@ -685,16 +687,24 @@ class HDR:
         :param channel:
         :return:
         '''
-        img_list = []
-        if dir_list[0].endswith('.data'):
-            img_list = [self.toRGB_1(self.read_data(file)) for file in dir_list]
-            img_list = [img[:, :, channel] for img in img_list]
 
-        if dir_list[0].endswith('.jpg'):
-            img_list = [cv2.imread(file, 1)for file in dir_list]
-            img_list = [img[:, :, channel] for img in img_list]
+        try:
+            s = Logger()
+            logger  = s.getLogger()
 
-        return img_list
+            img_list = []
+            if dir_list[0].endswith('.data'):
+                img_list = [self.toRGB_1(self.read_data(file)) for file in dir_list]
+                img_list = [img[:, :, channel] for img in img_list]
+
+            if dir_list[0].endswith('.jpg'):
+                img_list = [cv2.imread(file, 1)for file in dir_list]
+                img_list = [img[:, :, channel] for img in img_list]
+
+            return img_list
+
+        except Exception as e:
+            logger.error('load_exposures ' + str(e))
 
     def median_threshold_bitmap_alignment(self, img_list):
         '''
@@ -794,7 +804,7 @@ class HDR:
             k += 1
 
         # Solve the system using SVD
-        x = np.linalg.lstsq(A, b, rcond=None)[0]
+        x = np.linalg.lstsq(A, b)[0]    # rcond = None
         g = x[:256]
         lE = x[256:]
 
@@ -927,7 +937,6 @@ class HDR:
         f.close()
 
 class COLORBALANCE:
-
     def apply_mask(self, matrix, mask, fill_value):
         masked = np.ma.array(matrix, mask=mask, fill_value=fill_value)
         return masked.filled()
@@ -969,7 +978,6 @@ class COLORBALANCE:
             out_channels.append(normalized)
 
         return cv2.merge(out_channels)
-
 
 class IMAGEPROC:
     def __init__(self, cam_data=None):
@@ -1072,7 +1080,6 @@ class IMAGEPROC:
             logger.error('read_image_as_binarry: {}'.format(e))
 
 class Helpers:
-
     def get_int(self, text):
         return int(text) if text.isdigit() else text
 
@@ -1802,7 +1809,7 @@ class Helpers:
             Image_Data.awb_red = awb_red_to_db
             Image_Data.awb_blue = awb_blue_to_db
 
-            hdr.make_hdr(path, listOfSS ,'jpg')
+            #hdr.make_hdr(path, listOfSS ,'jpg')
             hdr.make_hdr(path, listOfSS, 'data')
 
             success = True
@@ -1854,11 +1861,11 @@ class Helpers:
 def main():
     try:
         CFG = {
-            'NAS_IP'            : r'192.168.1.10',
-            'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
-            'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
-            'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
-            'camera_2_Directory': r'\\HOANAS\HOA_SKYCam\camera_2',
+            'NAS_IP'            : r'192.168.2.115',
+            'sourceDirectory'   : r'\\IHLNAS05\SkyCam_FTP',
+            'databaseDirectory' : r'\\IHLNAS05\SkyCam_FTP',
+            'camera_1_Directory': r'\\IHLNAS05\SkyCam_FTP\camera_1',
+            'camera_2_Directory': r'\\IHLNAS05\SkyCam_FTP\camera_2',
         }
 
         config = Config(CFG)
@@ -1870,9 +1877,9 @@ def main():
         db.createDB()
 
         #h.load_images2DB()
-        path1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1\temp'  # alte vers 1
-        path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'  # mittlere vers 2
-        path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
+        path1 = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers1\20200505_raw_cam1\temp'  # alte vers 1
+        path2 = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers2\20200505_raw_cam1\temp'  # mittlere vers 2
+        path3 = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
 
         h.load_images2DB(path3)
 
