@@ -43,27 +43,47 @@ def getImageDB(Image_Date, column):
 
         image_stream = io.BytesIO(value[0])
         image_stream.seek(0)
+        image_arr = bytearray(image_stream.read())
 
-        image = np.asarray(bytearray(image_stream.read()), dtype=np.uint8)
-        img = cv2.imdecode(image, cv2.IMREAD_COLOR)
-
-        return img
+        return image_arr
 
     except Exception as e:
         print('getImageDB: {}'.format(e))
         con.close()
 
+def blob2toImage(image_arr):
+
+    try:
+        image = np.asarray(image_arr, dtype=np.uint8)
+        img = cv2.imdecode(image, cv2.IMREAD_COLOR)
+
+        return img
+
+    except Exception as e:
+        print('blob2toImage: {}'.format(e))
+
+def tonemap(hdr):
+
+    image_f = np.asarray(hdr, dtype=np.float32)
+
+    tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
+    ldrReinhard = tonemapReinhard.process(image_f)
+
+    return  ldrReinhard * 255
+
 def main():
     try:
-        #rmap_img = getImageDB('2018-10-10', 'rmap')
-        #cv2.imshow('rmap', rmap_img)
-        #resp_img = getImageDB('2018-10-10', 'resp')
-        #cv2.imshow('resp', resp_img)
+        rmap_img = getImageDB('2018-10-10', 'rmap')
+        cv2.imshow('rmap', blob2toImage(rmap_img))
 
-        ldr_img  = getImageDB('2018-10-10', 'ldr')  #
-        cv2.imshow('ldr', ldr_img)
-        #hdr_img  = getImageDB('2018-10-10', 'hdr')
-        #cv2.imshow('hdr', hdr_img)
+        resp_img = getImageDB('2018-10-10', 'resp')
+        cv2.imshow('resp', blob2toImage(resp_img))
+
+        ldr_img  = getImageDB('2018-10-10', 'ldr')
+        cv2.imshow('ldr', tonemap(ldr_img))
+
+        hdr_img  = getImageDB('2018-10-10', 'hdr')
+        cv2.imshow('hdr', tonemap(hdr_img))
 
         cv2.waitKey(0)
         cv2.destroyAllWindows()
