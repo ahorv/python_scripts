@@ -4,17 +4,27 @@ from __future__ import print_function
 
 import mysql.connector
 from mysql.connector import Error
-import matplotlib.pyplot as plt
 import numpy as np
 import io
 import cv2
-from PIL import Image
 
+###############################################################################
+## Hoa: 20.10.2018 Version 1 : readMySQL.py
+###############################################################################
+# Small script for retrieving BLOB's (images) from a MYSQL Database
+# and show them.
+#
+# New /Changes:
+# -----------------------------------------------------------------------------
+#
+# 20.10.2018 : first implemented
+#
+###############################################################################
 
 def connect2DB():
     try:
         connection = mysql.connector.connect(
-            host='192.168.2.115',
+            host='192.168.1.10',
             user='root',
             password='123ihomelab',
             database='sky_db',
@@ -51,6 +61,31 @@ def getImageDB(Image_Date, column):
         print('getImageDB: {}'.format(e))
         con.close()
 
+def getNumpyArDB(Image_Date, column, type='jpg'):
+    try:
+        table_name = 'images_' + (Image_Date).replace('-','_')
+        con = connect2DB()
+        con.reconnect(attempts=2, delay=0)
+        curs = con.cursor()
+        sql = """SELECT {} FROM {}""".format(column,table_name)
+
+        curs.execute(sql)
+        value = curs.fetchone()
+        con.close()
+
+        image_arr = np.frombuffer(value[0], dtype = np.float32)
+
+        if type is 'jpg':
+            img = image_arr.reshape(1944, 2592, 3)
+        if type is 'data':
+            img = image_arr.reshape(1232, 1648, 3)
+
+        return img
+
+    except Exception as e:
+        print('getNumpyArDB: {}'.format(e))
+        con.close()
+
 def blob2toImage(image_arr):
 
     try:
@@ -63,28 +98,34 @@ def blob2toImage(image_arr):
         print('blob2toImage: {}'.format(e))
 
 def tonemap(hdr):
-
-    # ndarray 32
-    image_f = np.asarray(hdr, dtype=np.float32)
-
     tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
-    ldrReinhard = tonemapReinhard.process(image_f)
-
+    ldrReinhard = tonemapReinhard.process(hdr)
     return  ldrReinhard * 255
+
+def show_image(title, hdr):
+    img_tonemp = tonemap(hdr)
+    img_8bit = cv2.normalize(img_tonemp, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
+    w, h, d = img_8bit.shape
+    img_8bit_s = cv2.resize(img_8bit, (int(h / 5), int(w / 5)))
+    cv2.imshow(title, img_8bit_s)
 
 def main():
     try:
-        rmap_img = getImageDB('2018-10-10', 'rmap')
+
+        image_date = '2018-10-09'
+        print('Fetching images from database for: {}'.format(image_date))
+
+        rmap_img = getImageDB(image_date,'rmap')
         cv2.imshow('rmap', blob2toImage(rmap_img))
 
-        resp_img = getImageDB('2018-10-10', 'resp')
+        resp_img = getImageDB(image_date,'resp')
         cv2.imshow('resp', blob2toImage(resp_img))
 
-        #ldr_img  = getImageDB('2018-10-10', 'ldr')
-        #cv2.imshow('ldr', tonemap(ldr_img))
+        ldr_img  = getNumpyArDB(image_date, 'ldr','jpg')
+        show_image('ldr', ldr_img)
 
-        hdr_img  = getImageDB('2018-10-10', 'hdr')  # bereits das Format stimmt nicht !
-        cv2.imshow('hdr', tonemap(hdr_img))
+        hdr_img  = getNumpyArDB(image_date, 'hdr', 'data')
+        show_image('hdr', hdr_img)
 
         cv2.waitKey(0)
         cv2.destroyAllWindows()
