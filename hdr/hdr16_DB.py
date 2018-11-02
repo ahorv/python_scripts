@@ -21,8 +21,13 @@ output_hdr_filename = join(img_dir,'output_hdr')
 ###############################################################################
 ## Hoa: 02.11.2018 Version 1 : hdr16_DB.py
 ###############################################################################
-# HDR - images are saved as BLOB in a MYSQL Database.
-# Functions for write and read to MySQL Databse.
+# Creates a MYSQL Database.
+# Creates a HDR by merging a set of images.
+# Writes the HDR as BLOB to the Database.
+# Retrieves the BLOB from the Database.
+# Converts the BLOB back to HDR image (numpy array as 32 float)
+# Tone mappes (Reinhard) the HDR image to 8-bit RGB image.
+# Shows the retried and tone mapped image in window.
 #
 # Adapted from : https://github.com/SSARCandy/HDR-imaging/blob/master/HDR-playground.py
 # See also: https://github.com/vivianhylee/high-dynamic-range-image/blob/master/hdr.py
@@ -38,7 +43,7 @@ output_hdr_filename = join(img_dir,'output_hdr')
 # New /Changes:
 # -----------------------------------------------------------------------------
 #
-# 03.10.2018 : first implemented
+# 02.11.2018 : first implemented
 #
 ###############################################################################
 
@@ -561,9 +566,9 @@ if __name__ == '__main__':
         sys.exit()
     print('Show image ...', end='')
 
-    img_tonemapped = tonemap(hdr_ar)
+    img_tonemapped = tonemap(hdr_ar) # still a 32bit float image
     cv2.imwrite(join(output_hdr_filename, "image_from_db.jpg"),img_tonemapped)
-    img_8bit  = cv2.normalize(img_tonemapped, None, 255,0, cv2.NORM_MINMAX, cv2.CV_8UC1)
+    img_8bit  = cv2.normalize(img_tonemapped, None, 255,0, cv2.NORM_MINMAX, cv2.CV_8UC1) # convert to RGB image
     cv2.namedWindow("output", cv2.WINDOW_NORMAL)
     w,h,d = img_8bit.shape
     img_8bit_s = cv2.resize(img_8bit, (int(h/5), int(w/5)))
