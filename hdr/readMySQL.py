@@ -45,8 +45,6 @@ def getImageDB(Image_Date, column):
         curs = con.cursor()
         sql = """SELECT {} FROM {}""".format(column,table_name)
 
-        print('sql: {}'.format(sql))
-
         curs.execute(sql)
         value = curs.fetchone() #fetchall()
         con.close()
