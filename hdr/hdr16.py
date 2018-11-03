@@ -11,8 +11,8 @@ from os.path import join
 global img_dir
 global output_hdr_filename
 
-#img_dir = r'C:\Users\ati\Desktop\HDR-imaging-master\test'
-img_dir = r'C:\Users\ati\Desktop\HDR-imaging-master\sky_1'
+
+img_dir = r'C:\Users\ati\Desktop\HDR-imaging-master\20181009_133912'
 output_hdr_filename = join(img_dir,'output_hdr')
 
 ###############################################################################
@@ -260,7 +260,7 @@ def response_curve_solver(Z, B, l, w):
         k += 1
 
     # Solve the system using SVD
-    x = np.linalg.lstsq(A, b)[0]
+    x = np.linalg.lstsq(A, b,rcond=None)[0]
     g = x[:256]
     lE = x[256:]
 
