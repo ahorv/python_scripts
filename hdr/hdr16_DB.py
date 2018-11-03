@@ -324,7 +324,6 @@ class HDR:
         f.close()
 
     def tonemapReinhard(self, hdr):
-
         tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
         ldrReinhard = tonemapReinhard.process(hdr)
         return  ldrReinhard * 255
@@ -517,7 +516,8 @@ class DB_handler:
             sql = """CREATE TABLE IF NOT EXISTS %s
                  (
                     ID INT(20) PRIMARY KEY AUTO_INCREMENT,                      
-                    array LONGBLOB                 
+                    array LONGBLOB,
+                    imtype VARCHAR(5)            
                   )
                """ % table_name
 
@@ -536,13 +536,20 @@ class DB_handler:
             table_name = 'images_table'
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'array'
+            param_list = 'array, imtype'
+
+            if is_data_type:
+                type = 'data'
+            else:
+                type = 'jpg'
 
             sql = "INSERT INTO {} ".format(table_name) + \
                   "("+ param_list +") " \
-                  "VALUES (%s)"
+                  "VALUES (%s,%s)"
 
-            curs.execute(sql, (img_data,))
+            print('sql: {}'.format(sql))
+
+            curs.execute(sql, (img_data, type,))
 
             self.commit_close()
             success = True
@@ -550,7 +557,7 @@ class DB_handler:
 
         except Exception as e:
             self.commit_close()
-            print('insert_image_data ' + str(e))
+            print('\n Error in insert_image_data: {} '.format(e))
             return success
 
     def save_array2DB(self, array):
@@ -565,19 +572,27 @@ class DB_handler:
         except Exception as e:
             print('Error in save_array2DB: {}'.format(e))
 
-    def getArrayFromDB(self, column, type='jpg'):
+    def getArrayFromDB(self):
         try:
             table_name = 'images_table'
             con = self.connect2DB()
             con.reconnect(attempts=2, delay=0)
             curs = con.cursor()
-            sql = """SELECT {} FROM {} ORDER BY id DESC LIMIT 1""".format(column, table_name)
+            sql = """SELECT {} FROM {} ORDER BY id DESC LIMIT 1""".format('array, imtype', table_name)
 
             curs.execute(sql)
             value = curs.fetchone()
             con.close()
 
-            image_arr = np.frombuffer(value[0], dtype=np.float32)
+            array = value[0]
+            type  = value[1]
+
+            if type == 'data':
+                is_data_type = True
+            else:
+                is_data_type = False
+
+            image_arr = np.frombuffer(array, dtype=np.float32)
 
             if not is_data_type:
                 img = image_arr.reshape(1944, 2592, 3)
@@ -587,7 +602,7 @@ class DB_handler:
             return img
 
         except Exception as e:
-            print('getArrayFromDB: {}'.format(e))
+            print('\n Error in getArrayFromDB: {}'.format(e))
             con.close()
 
     def commit_close(self):
@@ -621,7 +636,7 @@ if __name__ == '__main__':
 
     myhdr = HDR()
 
-    CREATE_HDR = True
+    CREATE_HDR = False
 
     if CREATE_HDR:
         myhdr = HDR()
@@ -670,7 +685,7 @@ if __name__ == '__main__':
         db.save_array2DB(hdr)
         print('done')
 
-    hdr_ar = db.getArrayFromDB('array', 'data')
+    hdr_ar = db.getArrayFromDB()
 
     if hdr_ar is None:
         print('Could not fetch Image from Database!')
@@ -681,14 +696,14 @@ if __name__ == '__main__':
     hdr_8bit  = cv2.normalize(img_tonemapped, None, 255,0, cv2.NORM_MINMAX, cv2.CV_8UC1) # convert to RGB image
 
     w,h,d = hdr_8bit.shape
-    img_8bit_s = cv2.resize(hdr_8bit, (int(h/2), int(w/2)))
+    img_8bit_s = cv2.resize(hdr_8bit, (int(h/3), int(w/3)))
     cv2.imshow('Tonemapped HDR', img_8bit_s)
 
     img_list = myhdr.load_images(img_dir)
     masked_sat = myhdr.mask_sat(img_list, hdr_8bit)
 
     w, h, d = masked_sat.shape
-    sat_masked_hdr = cv2.resize(masked_sat, (int(h/2), int(w/2)))
+    sat_masked_hdr = cv2.resize(masked_sat, (int(h/3), int(w/3)))
     cv2.imshow('Saturated masked', sat_masked_hdr)
     cv2.imwrite(join(output_hdr_filename, "sat_masked_hdr.jpg"), sat_masked_hdr)
 
