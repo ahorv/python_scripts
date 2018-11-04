@@ -552,11 +552,10 @@ class HDR:
                 ax.set_axis_off()
                 ax.imshow(rhard_rgb)
                 byte_str = io.BytesIO()
-                #fig.savefig(byte_str, format='jpg',transparent=True,bbox_inches='tight', pad_inches=0)
                 fig.savefig(byte_str, format='jpg')
                 byte_str.seek(0)
                 blob = byte_str.read()
-                Image_Data.hdr_s = blob
+                Image_Data.ldr_s = blob
                 plt.close()
 
             if img_type is 'data':
@@ -585,19 +584,15 @@ class HDR:
                 hdr_reinhard_s = cv2.resize(hdr_reinhard, (int(h / 3), int(w / 3)))
                 rhard_8bit = cv2.normalize(hdr_reinhard_s, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
 
-                rhard_8bit = cv2.cvtColor(rhard_8bit, cv2.COLOR_BGR2RGB)
-
                 fig, ax = plt.subplots(figsize=plt.figaspect(rhard_8bit))
                 fig.subplots_adjust(0, 0, 1, 1)
                 ax.set_axis_off()
                 ax.imshow(rhard_8bit)
-
                 byte_str = io.BytesIO()
-                #fig.savefig(byte_str, format='jpg',bbox_inches='tight', pad_inches=0)
                 fig.savefig(byte_str, format='jpg')
                 byte_str.seek(0)
                 blob = byte_str.read()
-                Image_Data.ldr_s = blob
+                Image_Data.hdr_s = blob
                 plt.close()
 
                 # Create radiance map
