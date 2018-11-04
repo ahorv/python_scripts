@@ -37,29 +37,7 @@ def connect2DB():
         print('Could not get database cursor: {}'.format(e))
         connection.close()
 
-def getImageDB(Image_Date, column):
-    try:
-        table_name = 'images_' + (Image_Date).replace('-','_')
-        con = connect2DB()
-        con.reconnect(attempts=2, delay=0)
-        curs = con.cursor()
-        sql = """SELECT {} FROM {}""".format(column,table_name)
-
-        curs.execute(sql)
-        value = curs.fetchone() #fetchall()
-        con.close()
-
-        image_stream = io.BytesIO(value[0])
-        image_stream.seek(0)
-        image_arr = bytearray(image_stream.read())
-
-        return image_arr
-
-    except Exception as e:
-        print('getImageDB: {}'.format(e))
-        con.close()
-
-def getNumpyArDB(Image_Date, column, type='jpg'):
+def getNumpyArDB(Image_Date, column, type=None):
     try:
         table_name = 'images_' + (Image_Date).replace('-','_')
         con = connect2DB()
@@ -71,29 +49,21 @@ def getNumpyArDB(Image_Date, column, type='jpg'):
         value = curs.fetchone()
         con.close()
 
-        image_arr = np.frombuffer(value[0], dtype = np.float32)
-
         if type is 'jpg':
+            image_arr = np.frombuffer(value[0], dtype=np.float32)
             img = image_arr.reshape(1944, 2592, 3)
         if type is 'data':
+            image_arr = np.frombuffer(value[0], dtype=np.float32)
             img = image_arr.reshape(1232, 1648, 3)
+        if type is'img':
+            image = np.frombuffer(value[0], dtype=np.uint8)
+            img = cv2.imdecode(image, cv2.IMREAD_COLOR)
 
         return img
 
     except Exception as e:
         print('getNumpyArDB: {}'.format(e))
         con.close()
-
-def blob2toImage(image_arr):
-
-    try:
-        image = np.asarray(image_arr, dtype=np.uint8)
-        img = cv2.imdecode(image, cv2.IMREAD_COLOR)
-
-        return img
-
-    except Exception as e:
-        print('blob2toImage: {}'.format(e))
 
 def tonemap(hdr):
     tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
@@ -113,17 +83,23 @@ def main():
         image_date = '2018-10-09'
         print('Fetching images from database for: {}'.format(image_date))
 
-        rmap_img = getImageDB(image_date,'rmap')
-        cv2.imshow('rmap', blob2toImage(rmap_img))
+        rmap_img = getNumpyArDB(image_date,'rmap', 'img')
+        cv2.imshow('rmap', rmap_img)
 
-        resp_img = getImageDB(image_date,'resp')
-        cv2.imshow('resp', blob2toImage(resp_img))
+        resp_img = getNumpyArDB(image_date,'resp', 'img')
+        cv2.imshow('resp', resp_img)
 
         ldr_img  = getNumpyArDB(image_date, 'ldr','jpg')
         show_image('ldr', ldr_img)
 
         hdr_img  = getNumpyArDB(image_date, 'hdr', 'data')
         show_image('hdr', hdr_img)
+
+        ldr_img  = getNumpyArDB(image_date, 'ldr_s','img')
+        cv2.imshow('ldr_s', ldr_img)
+
+        hdr_img  = getNumpyArDB(image_date, 'hdr_s','img')
+        cv2.imshow('hdr_s', hdr_img)
 
         cv2.waitKey(0)
         cv2.destroyAllWindows()

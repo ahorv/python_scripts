@@ -184,6 +184,8 @@ class Config(object):
     camera_2_Directory = '?'
     databaseName = '?'
     databaseDirectory = '?'
+    allFilesProcessed_path = '?'
+    processed_dirs_list = '?'
 
     def __init__(self, state_map={}):
 
@@ -193,6 +195,8 @@ class Config(object):
         self.camera_2_Directory = state_map.get('camera_2_Directory', '?')
         self.databaseName = state_map.get('databaseName','sky_db')
         self.databaseDirectory = state_map.get('databaseDirectory', '?')
+        self.allFilesProcessed_path = state_map.get('allFilesProcessed_path', '?')
+        self.processed_dirs_list = state_map.get('processed_dirs_list', '?')
 
         Config.NAS_IP = self.NAS_IP
         Config.sourceDirectory = self.sourceDirectory
@@ -200,6 +204,8 @@ class Config(object):
         Config.camera_2_Directory = self.camera_2_Directory
         Config.databaseName = self.databaseName
         Config.databaseDirectory = self.databaseDirectory
+        Config.allFilesProcessed_path = self.allFilesProcessed_path
+        Config.processed_dirs_list = self.processed_dirs_list
 
 class Logger:
     def __init__(self):
@@ -211,6 +217,7 @@ class Logger:
 
             FILEPATH = os.path.join(PATH, 'allFilesProcessed.log')
             LOGFILEPATH = join(r'\\',FILEPATH)
+            Config.allFilesProcessed_path = LOGFILEPATH
 
             logFormatter = logging.Formatter('%(message)s')
             fileHandler = logging.FileHandler(LOGFILEPATH)
@@ -1624,6 +1631,20 @@ class Helpers:
             formated_date,formated_time, e))
             return formated_date, formated_time
 
+    def strip_swvers_camid(self, path):
+        temp = (path.split('\\'))[-3]
+        temp = temp.split('_')
+
+        # sw version and camera ID
+        camera_ID = temp[1]
+        sw_vers = temp[-1]
+        sw_vers = sw_vers.replace('vers', '')
+
+        if camera_ID.isdigit(): camera_ID = int(camera_ID)
+        if sw_vers.isdigit(): sw_vers = int(sw_vers)
+
+        return sw_vers, camera_ID
+
     def createNewFolder(self, thispath):
         try:
             if not os.path.exists(thispath):
@@ -1780,7 +1801,34 @@ class Helpers:
 
         return  all_cam_vers
 
+    def getAll_previouslyProcessed(self):
+        filename = Config.allFilesProcessed_path
+        lines = [line.rstrip('\n') for line in open(filename)]
+
+        return lines
+
+    def addProcessedDir2DB(self, dirName):
+        '''
+        Extract all information from direcory title and
+        save it to database.
+        Information needed to check if a directory was already
+        successfully processed.
+        :param titleOfDir:
+        :return:
+        '''
+
+        succes = False
+        dirName
+
+        return succes
+
     def load_images2DB(self, path_to_one_dir=None):
+        '''
+        Depending weather one directory or empty paramter given, one day of
+        captured images is processed or all days within the root directory.
+        :param path_to_one_dir:
+        :return:
+        '''
         try:
             s = Logger()
             logger = s.getFileLogger()
@@ -1811,23 +1859,24 @@ class Helpers:
         try:
             s = Logger()
             logger = s.getLogger()
+
             temp = (path.split('\\'))[-3]
             temp = temp.split('_')
 
             # sw version and camera ID
             camera_ID = temp[1]
             sw_vers = temp[-1]
-            sw_vers = sw_vers.replace('vers','')
+            sw_vers = sw_vers.replace('vers', '')
 
             if camera_ID.isdigit(): camera_ID = int(camera_ID)
             if sw_vers.isdigit(): sw_vers = int(sw_vers)
+
             Camera_Data.cam_id = camera_ID
             Camera_Data.sw_vers = sw_vers
 
             # extract date
             date = self.strip_date(path)
             Camera_Data.image_date = date
-
 
         except Exception as e:
             logger.error('collectCamData: ' + str(e))
@@ -1896,19 +1945,38 @@ class Helpers:
             all_dirs = self.getDirectories(path)  # loeschen nur zu testzwecken !
 
             for dir in all_dirs:
-                img_nr += 1
-                Image_Data.img_nr = img_nr
-                success = self.collectImageData(dir)
-                if success:
-                    success = self.writeImageData2DB()
+                if self.check_if_already_processed(dir):
+                    continue
+                else:
+                    img_nr += 1
+                    Image_Data.img_nr = img_nr
+                    success = self.collectImageData(dir)
+                    if success:
+                        success = self.writeImageData2DB()
+                    if success:
+                        success = self.addProcessedDir2DB(dir)
 
-                #shutil.rmtree(path_to_unziped)
+                    #shutil.rmtree(path_to_unziped)
 
             return success
 
         except Exception as e:
           logger.error('processOneDirectory: ' + str(e))
           return success
+
+    def check_if_already_processed(self, cur_dir):
+        found = False
+
+        list = Config.processed_dirs_list
+
+        if not any(list):
+            return found
+
+        for line in reversed(list):
+            if cur_dir in line:
+                found = True
+
+        return found
 
 def main():
     try:
@@ -1921,6 +1989,9 @@ def main():
         }
 
         config = Config(CFG)
+
+        #Config.processed_dirs_list =
+
         h = Helpers()
         s = Logger()
         logger = s.getLogger()
@@ -1933,7 +2004,7 @@ def main():
         path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'  # mittlere vers 2
         path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
 
-        h.load_images2DB(path3)
+        h.load_images2DB(path2)
 
         print('\n POSTPROCESSING DONE!')
 
