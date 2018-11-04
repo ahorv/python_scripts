@@ -62,6 +62,8 @@ class Image_Data(object):
     awb_blue = '?'
     ldr = 0
     hdr = 0
+    ldr_s = 0
+    hdr_s = 0
     rmap = 0
     resp = 0
 
@@ -80,6 +82,8 @@ class Image_Data(object):
         self.awb_blue = state_map.get('awb_blue', '?')
         self.ldr = state_map.get('ldr', 0)
         self.hdr = state_map.get('hdr', 0)
+        self.ldr_s = state_map.get('ldr_s', 0)
+        self.hdr_s = state_map.get('hdr_s', 0)
         self.rmap = state_map.get('rmap', 0)
         self.resp = state_map.get('resp', 0)
 
@@ -97,6 +101,8 @@ class Image_Data(object):
         Image_Data.awb_blue = self.awb_blue
         Image_Data.ldr = self.ldr
         Image_Data.hdr = self.hdr
+        Image_Data.ldr_s = self.ldr_s
+        Image_Data.hdr_s = self.hdr_s
         Image_Data.rmap = self.rmap
         Image_Data.resp = self.resp
 
@@ -116,6 +122,8 @@ class Image_Data(object):
             'awb_blue': Image_Data.awb_blue,
             'ldr': Image_Data.ldr,
             'hdr': Image_Data.hdr,
+            'ldr_s': Image_Data.ldr_s,
+            'hdr_s': Image_Data.hdr_s,
             'rmap': Image_Data.rmap,
             'resp': Image_Data.resp,
         }
@@ -287,6 +295,7 @@ class Logger:
             print('Error logger:' + str(e))
 
 class DB_handler:
+
     def __init__(self):
         self.connection = None
         self.cursor = None
@@ -328,7 +337,7 @@ class DB_handler:
             logger.error('Could not get database cursor: {}'.format(e))
             self.connection.close()
 
-    def con_close(self):
+    def commit_close(self):
         try:
             s = Logger()
             logger = s.getLogger()
@@ -336,6 +345,7 @@ class DB_handler:
                 self.cursor.close()
 
             if self.connection.is_connected():
+                self.connection.commit()
                 self.connection.close()
 
         except Error as e:
@@ -352,7 +362,7 @@ class DB_handler:
             if(db_con):
                 myDB = db_con.cursor()
                 myDB.execute("CREATE DATABASE IF NOT EXISTS {} DEFAULT CHARACTER SET 'utf8'".format(db_name))
-                self.con_close()
+                self.commit_close()
                 ok_table = self.create_data_camera_table()
                 if(not ok_table): raise IOError
             else:
@@ -364,7 +374,7 @@ class DB_handler:
         except IOError as e:
             if not db_con:
                 logger.error('CreateDB: failed to create new {} database with error: {}').format(db_name,e)
-                self.con_close()
+                self.commit_close()
                 return success
 
     def create_data_camera_table(self):
@@ -387,11 +397,11 @@ class DB_handler:
                     UNIQUE KEY (image_date)
                   )"""
                   )
-            self.con_close()
+            self.commit_close()
             success = True
             return success
         except Exception as e:
-            self.con_close()
+            self.commit_close()
             logger.error('DB  : Error creating data_camera Table: ' + str(e))
             return success
 
@@ -419,6 +429,8 @@ class DB_handler:
                     awb_blue VARCHAR(200),             
                     ldr LONGBLOB,
                     hdr LONGBLOB,
+                    ldr_s LONGBLOB,
+                    hdr_s LONGBLOB,
                     rmap LONGBLOB,
                     resp LONGBLOB,
                     UNIQUE KEY (time)
@@ -426,11 +438,11 @@ class DB_handler:
                """ % table_name
 
             curs.execute(sql)
-            self.con_close()
+            self.commit_close()
             success = True
             return success
         except Exception as e:
-            self.con_close()
+            self.commit_close()
             root_logger.error('create_new_image_table: ' + str(e))
             return success
 
@@ -451,11 +463,11 @@ class DB_handler:
                   "VALUES (%s)" % format_strings
 
             curs.execute(sql,values)
-            self.con_close()
+            self.commit_close()
             success = True
             return success
         except Exception as e:
-            self.con_close()
+            self.commit_close()
             logger.error('insert_camera_data: {}' + str(e))
             return success
 
@@ -467,7 +479,7 @@ class DB_handler:
             table_name = 'images_' + (Image_Data.date).replace('-','_')
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'img_nr, shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, rmap, resp'
+            param_list = 'img_nr, shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, ldr_s, hdr_s, rmap, resp'
             imagedata = Image_Data.to_dict(None)
             del imagedata['date']
             values = list(imagedata.values())
@@ -479,21 +491,17 @@ class DB_handler:
 
             curs.execute(sql,values)
 
-            self.con_close()
+            self.commit_close()
             success = True
             return success
         except Exception as e:
-            self.con_close()
+            self.commit_close()
             logger.error('insert_image_data ' + str(e))
             return success
 
 class HDR:
     def make_hdr(self, path, listOfSS, img_type = 'jpg'):
         try:
-
-            # jpg: tonemaped version (Reinhard?)
-            # das HDR - File 'as is' ohne convertierung zu RGBE !
-
             h = Helpers()
             s = Logger()
             logger = s.getLogger()
@@ -527,24 +535,29 @@ class HDR:
             if img_type is 'jpg':
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
                 byte_str = hdr.tobytes()
-                blob_b = io.BytesIO(byte_str)
-                blob_b.seek(0)
-                blob = blob_b.read()
-                Image_Data.ldr = blob
-                blob_b.close()
+                Image_Data.ldr = byte_str
 
-                cb = COLORBALANCE()
-                tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
-                ldrReinhard = tonemapReinhard.process(hdr)
-                path = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp'
-                cv2.imwrite(join(path,"ldr-ldrReinhard.jpg"), cb.simplest_cb(ldrReinhard * 255, 1))
+                # cb = COLORBALANCE() # not clear if luminace information will be preserved
 
-                #normalize = lambda zi: (zi - zi.min() / zi.max() - zi.min())
-                #z_disp = normalize(np.log(hdr))
-                #plt.figure(figsize=(12, 8))
-                #plt.imshow(z_disp / z_disp.max())
-                #plt.axis('off')
-                #plt.show()
+                # create thumbnails image
+                hdr_reinhard = self.tonemapReinhard(hdr)
+                w, h, d = hdr.shape
+                hdr_reinhard_s = cv2.resize(hdr_reinhard,(int(h/3),int(w/3)))
+                rhard_8bit = cv2.normalize(hdr_reinhard_s, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
+
+                rhard_rgb = cv2.cvtColor(rhard_8bit, cv2.COLOR_BGR2RGB)
+
+                fig, ax = plt.subplots(figsize=plt.figaspect(rhard_rgb))
+                fig.subplots_adjust(0, 0, 1, 1)
+                ax.set_axis_off()
+                ax.imshow(rhard_rgb)
+                byte_str = io.BytesIO()
+                #fig.savefig(byte_str, format='jpg',transparent=True,bbox_inches='tight', pad_inches=0)
+                fig.savefig(byte_str, format='jpg')
+                byte_str.seek(0)
+                blob = byte_str.read()
+                Image_Data.hdr_s = blob
+                plt.close()
 
             if img_type is 'data':
                 # Create and plot response curve
@@ -555,34 +568,37 @@ class HDR:
                 plt.ylabel('pixel value Z')
                 plt.xlabel('log exposure X')
                 fig = plt.gcf()
-
                 respc = io.BytesIO()
                 fig.savefig(respc, format='jpg')
                 respc.seek(0)
                 resp_blob = respc.read()
                 Image_Data.resp = resp_blob
-                respc.close()
 
                 # make the HDR
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
-
                 byte_str = hdr.tobytes()
-                blob_b = io.BytesIO(byte_str)
-                blob_b.seek(0)
-                blob = blob_b.read()
-                Image_Data.hdr = blob
-                blob_b.close()
+                Image_Data.hdr = byte_str
 
-                tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
-                ldrReinhard = tonemapReinhard.process(hdr)
-                path = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp'
-                cv2.imwrite(join(path,"ldr-hdrReinhard.jpg"), ldrReinhard * 255)
+                # create thumbnails image
+                hdr_reinhard = self.tonemapReinhard(hdr)
+                w, h, d = hdr_reinhard.shape
+                hdr_reinhard_s = cv2.resize(hdr_reinhard, (int(h / 3), int(w / 3)))
+                rhard_8bit = cv2.normalize(hdr_reinhard_s, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
 
-                # filename = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp\hdr.hdr'
-                # f = open(filename, 'wb')
-                # f.write(blob)
-                # f.close()
-                # Image_Data.hdr = self.hdr_to_blob(hdr) # save as *.hdr file
+                rhard_8bit = cv2.cvtColor(rhard_8bit, cv2.COLOR_BGR2RGB)
+
+                fig, ax = plt.subplots(figsize=plt.figaspect(rhard_8bit))
+                fig.subplots_adjust(0, 0, 1, 1)
+                ax.set_axis_off()
+                ax.imshow(rhard_8bit)
+
+                byte_str = io.BytesIO()
+                #fig.savefig(byte_str, format='jpg',bbox_inches='tight', pad_inches=0)
+                fig.savefig(byte_str, format='jpg')
+                byte_str.seek(0)
+                blob = byte_str.read()
+                Image_Data.ldr_s = blob
+                plt.close()
 
                 # Create radiance map
                 plt.figure(figsize=(12, 8))
@@ -594,7 +610,6 @@ class HDR:
                 rmap.seek(0)
                 rmap_blob = rmap.read()
                 Image_Data.rmap = rmap_blob
-                rmap.close()
 
             success = True
             return success
@@ -602,6 +617,11 @@ class HDR:
         except Exception as e:
             logger.error('make_hdr ' + str(e))
             return success
+
+    def tonemapReinhard(self, hdr):
+        tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
+        ldrReinhard = tonemapReinhard.process(hdr)
+        return  ldrReinhard * 255
 
     def demosaic1(self, mosaic, awb_gains=None):
         '''
@@ -686,24 +706,16 @@ class HDR:
         :param channel:
         :return:
         '''
+        img_list = []
+        if dir_list[0].endswith('.data'):
+            img_list = [self.toRGB_1(self.read_data(file)) for file in dir_list]
+            img_list = [img[:, :, channel] for img in img_list]
 
-        try:
-            s = Logger()
-            logger  = s.getLogger()
+        if dir_list[0].endswith('.jpg'):
+            img_list = [cv2.imread(file, 1)for file in dir_list]
+            img_list = [img[:, :, channel] for img in img_list]
 
-            img_list = []
-            if dir_list[0].endswith('.data'):
-                img_list = [self.toRGB_1(self.read_data(file)) for file in dir_list]
-                img_list = [img[:, :, channel] for img in img_list]
-
-            if dir_list[0].endswith('.jpg'):
-                img_list = [cv2.imread(file, 1)for file in dir_list]
-                img_list = [img[:, :, channel] for img in img_list]
-
-            return img_list
-
-        except Exception as e:
-            logger.error('load_exposures ' + str(e))
+        return img_list
 
     def median_threshold_bitmap_alignment(self, img_list):
         '''
@@ -803,7 +815,7 @@ class HDR:
             k += 1
 
         # Solve the system using SVD
-        x = np.linalg.lstsq(A, b)[0]    # rcond = None
+        x = np.linalg.lstsq(A, b, rcond=None)[0]
         g = x[:256]
         lE = x[256:]
 
@@ -935,7 +947,52 @@ class HDR:
         rgbe.flatten().tofile(f)
         f.close()
 
+    def mask_sat(self,img_list, comb_I):
+        '''
+        # This function is used to mask the pixels of any image comb_I; given three
+        # LDR images I1, I2, I3. If a pixel > 240, in all the three LDR images
+        # simulateneously, it is called saturated.
+        # Source is matlab script from
+        # https://github.com/Soumyabrata/HDR-cloud-segmentation/tree/master/HDRimaging
+        :param I1:
+        :param I2:
+        :param I3:
+        :param comb_I:
+        :return:
+        '''
+        try:
+            I1 = img_list[0]
+            I2 = img_list[1]
+            I3 = img_list[2]
+            w, h, d = I1.shape
+            I1_gray = cv2.cvtColor(I1, cv2.COLOR_BGR2GRAY)
+            I2_gray = cv2.cvtColor(I2, cv2.COLOR_BGR2GRAY)
+            I3_gray = cv2.cvtColor(I3, cv2.COLOR_BGR2GRAY)
+
+            mask = np.ones((w,h))
+
+            for i in range(0, w - 1):
+                for j in range(0, h - 1):
+                    if (I1_gray[i][j] > 240)and (I2_gray[i][j] > 240) and (I3_gray[i][j] > 240):
+                        mask[i][j] = 0
+
+            mask_I = comb_I
+
+            for i in range(0, w - 1):
+                for j in range(0, h - 1):
+                    if mask[i][j] == 0:
+                        mask_I[i][j][0] = 255
+                        mask_I[i][j][1] = 0
+                        mask_I[i][j][2] = 255
+
+            return mask_I
+
+        except Exception as e:
+            print('Error in mask_sat: {}'.format(e))
+            return mask_I
+
 class COLORBALANCE:
+
     def apply_mask(self, matrix, mask, fill_value):
         masked = np.ma.array(matrix, mask=mask, fill_value=fill_value)
         return masked.filled()
@@ -1079,6 +1136,7 @@ class IMAGEPROC:
             logger.error('read_image_as_binarry: {}'.format(e))
 
 class Helpers:
+
     def get_int(self, text):
         return int(text) if text.isdigit() else text
 
@@ -1808,8 +1866,8 @@ class Helpers:
             Image_Data.awb_red = awb_red_to_db
             Image_Data.awb_blue = awb_blue_to_db
 
-            #hdr.make_hdr(path, listOfSS ,'jpg')
             hdr.make_hdr(path, listOfSS, 'data')
+            hdr.make_hdr(path, listOfSS ,'jpg')
 
             success = True
             return success
@@ -1860,11 +1918,11 @@ class Helpers:
 def main():
     try:
         CFG = {
-            'NAS_IP'            : r'192.168.2.115',
-            'sourceDirectory'   : r'\\IHLNAS05\SkyCam_FTP',
-            'databaseDirectory' : r'\\IHLNAS05\SkyCam_FTP',
-            'camera_1_Directory': r'\\IHLNAS05\SkyCam_FTP\camera_1',
-            'camera_2_Directory': r'\\IHLNAS05\SkyCam_FTP\camera_2',
+            'NAS_IP'            : r'192.168.1.10',
+            'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
+            'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
+            'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
+            'camera_2_Directory': r'\\HOANAS\HOA_SKYCam\camera_2',
         }
 
         config = Config(CFG)
@@ -1876,11 +1934,13 @@ def main():
         db.createDB()
 
         #h.load_images2DB()
-        path1 = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers1\20200505_raw_cam1\temp'  # alte vers 1
-        path2 = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers2\20200505_raw_cam1\temp'  # mittlere vers 2
-        path3 = r'\\IHLNAS05\SkyCam_FTP\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
+        path1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1\temp'  # alte vers 1
+        path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'  # mittlere vers 2
+        path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
 
         h.load_images2DB(path3)
+
+        print('\n POSTPROCESSING DONE!')
 
         logger.info('All files processed.')
 
