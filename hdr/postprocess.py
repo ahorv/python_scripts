@@ -1837,7 +1837,7 @@ class Helpers:
         except Exception as e:
             print('Error in copyAndMaskAll_img5: {}'.format(e))
 
-    def unzipall(self,path_to_extract):
+    def unzipall(self, path_to_extract):
         try:
             s = Logger()
             logger = s.getLogger()
@@ -1849,9 +1849,9 @@ class Helpers:
             allzipDirs = self.getZipDirs(path_to_extract)
 
             for dirs in allzipDirs:
-                path = dirs.replace('.zip','')
+                path = dirs.lower().replace('.zip', '')
                 dirName = (path.rstrip('\\').rpartition('\\')[-1])
-                new_temp_path = join(temp_path,dirName)
+                new_temp_path = join(temp_path, dirName)
 
                 if path:
                     zipfilepath = os.path.join(dirs)
@@ -1878,7 +1878,7 @@ class Helpers:
             print('deleted all ZIP files.')
 
         except Exception as e:
-            print('unzipall: Error: ' + str(e))
+            print('delAllZIP: Error: ' + str(e))
 
     def delUnzipedDir(self, pathtoDir):
         try:
@@ -1933,12 +1933,6 @@ class Helpers:
                 allCamDirectorys = self.getAllCamDirectories()
                 for path in allCamDirectorys:
                     allDirs = self.getDirectories(path)
-
-                    ######################################
-                    #
-                    # PRUEFEN ob tatsächlich alle dirs durchlaufen werden !
-                    #
-                    ########################################
 
                     for raw_cam_dir in allDirs:
                         success = self.processOneDay(raw_cam_dir)
@@ -2052,10 +2046,9 @@ class Helpers:
             success = False
             img_nr = 0
 
-            #path_to_temp = self.unzipall(path)
+            path_to_temp = self.unzipall(path)
             self.collectCamData(path)
-            #all_dirs = self.getDirectories(path_to_temp) # einkommentieren !!
-            all_dirs = self.getDirectories(path)  # loeschen nur zu testzwecken !
+            all_dirs = self.getDirectories(path_to_temp)
 
             for dir in all_dirs:
                 if self.check_if_already_processed(dir.rstrip('\\')):
@@ -2068,9 +2061,8 @@ class Helpers:
                         success = self.writeImageData2DB()
                     if success:
                         success = self.addProcessedDir2DB(dir)
-                    #if success:
-                        #shutil.rmtree(path_to_unziped)
-
+                    if success:
+                        shutil.rmtree(path_to_temp)
             return success
 
         except Exception as e:
@@ -2096,8 +2088,6 @@ def main():
 
         config = Config(CFG)
 
-        #Config.processed_dirs_list =
-
         h = Helpers()
         s = Logger()
         logger = s.getLogger()
@@ -2108,15 +2098,21 @@ def main():
         #h.load_images2DB()
         path1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1\temp'  # alte vers 1
         path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'  # mittlere vers 2
-        path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
+        #path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
+
+        path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1'  # neuste vers 3
 
         logger.info('STARTED file processing.')
 
-        h.load_images2DB(path3)
+        #h.load_images2DB()        # Durchlauft alles auf dem NAS
 
-        print('\n POSTPROCESSING DONE!')
+        ###########################################
+        # FEHLER in collectCamData -> sw wird nicht korrekt gelesen !
+        ##########################################
+        h.load_images2DB(path3) # LOESCHEN NUR FUER TESTS
 
         logger.info('STOPPED file processing.')
+
 
     except Exception as e:
         logger.error('MAIN: {}'.format(e))
