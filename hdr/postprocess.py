@@ -590,28 +590,6 @@ class DB_handler:
             logger.error('object_exists: {} '.format(e))
             return exists
 
-    def addProcessedDir2DB(self, dirName):
-        '''
-        Extract all information from direcory title and
-        save it to database.
-        Information needed to check if a directory was already
-        successfully processed.
-        :param titleOfDir:
-        :return:
-        '''
-        h = Helpers()
-
-        dir_name, sw_vers, camera_ID = h.strip_name_swvers_camid(dirName)
-
-        #print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
-
-        data_list = [dir_name, sw_vers, camera_ID]
-
-        self.insert_dir_data(data_list)
-        succes = False
-
-        return succes
-
     def getLastID_from_dir_data(self):
         try:
             last_id = 0
@@ -1186,12 +1164,10 @@ class IMAGEPROC:
     def cmask(self, index, radius, array):
         """Generates the mask for a given input image.
         The generated mask is needed to remove occlusions during post-processing steps.
-
         Args:
             index (numpy array): Array containing the x- and y- co-ordinate of the center of the circular mask.
             radius (float): Radius of the circular mask.
             array (numpy array): Input sky/cloud image for which the mask is generated.
-
         Returns:
             numpy array: Generated mask image."""
 
@@ -1937,21 +1913,6 @@ class Helpers:
 
         return lines
 
-    def addProcessedDir2DB(self, dirName):
-        '''
-        Extract all information from direcory title and
-        save it to database.
-        Information needed to check if a directory was already
-        successfully processed.
-        :param titleOfDir:
-        :return:
-        '''
-
-        succes = False
-        dirName
-
-        return succes
-
     def load_images2DB(self, path_to_one_dir=None):
         '''
         Depending weather one directory or empty paramter given, one day of
@@ -2068,6 +2029,28 @@ class Helpers:
 
         return success
 
+    def addProcessedDir2DB(self, dirName):
+        '''
+        Extract all information from direcory title and
+        save it to database.
+        Information needed to check if a directory was already
+        successfully processed.
+        :param titleOfDir:
+        :return:
+        '''
+        db = DB_handler()
+
+        dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(dirName)
+
+        print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
+
+        data_list = [dir_name, sw_vers, camera_ID]
+
+        db.insert_dir_data(data_list)
+        succes = False
+
+        return succes
+
     def processOneDay(self, path):
         try:
             s = Logger()
@@ -2133,7 +2116,7 @@ def main():
         path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'  # mittlere vers 2
         path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
 
-        h.load_images2DB(path2)
+        h.load_images2DB(path1)
 
         print('\n POSTPROCESSING DONE!')
 
