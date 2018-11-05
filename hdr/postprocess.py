@@ -1840,7 +1840,7 @@ class Helpers:
     def unzipall(self,path_to_extract):
         try:
             s = Logger()
-            logger = s.getFileLogger()
+            logger = s.getLogger()
             temp_path = join(path_to_extract, 'temp')
 
             if not os.path.exists(temp_path):
@@ -1922,15 +1922,11 @@ class Helpers:
         '''
         try:
             s = Logger()
-            logger = s.getFileLogger()
-            f = Logger()
-            fileLogger = f.getFileLogger()
+            logger = s.getLogger()
 
             # write only one day to database
             if path_to_one_dir:
                 success = self.processOneDay(path_to_one_dir)
-                if success:
-                    fileLogger.info(path_to_one_dir)
 
             # write everything to database
             else:
@@ -1946,8 +1942,6 @@ class Helpers:
 
                     for raw_cam_dir in allDirs:
                         success = self.processOneDay(raw_cam_dir)
-                        if success:
-                            fileLogger.info('{}'.format(raw_cam_dir))
 
         except Exception as e:
             logger.error('load_images2DB: ' + str(e))
@@ -2054,7 +2048,7 @@ class Helpers:
     def processOneDay(self, path):
         try:
             s = Logger()
-            logger = s.getFileLogger()
+            logger = s.getLogger()
             success = False
             img_nr = 0
 
@@ -2116,11 +2110,13 @@ def main():
         path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'  # mittlere vers 2
         path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
 
-        h.load_images2DB(path1)
+        logger.info('STARTED file processing.')
+
+        h.load_images2DB(path3)
 
         print('\n POSTPROCESSING DONE!')
 
-        logger.info('All files processed.')
+        logger.info('STOPPED file processing.')
 
     except Exception as e:
         logger.error('MAIN: {}'.format(e))
