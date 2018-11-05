@@ -3,8 +3,17 @@ import exifread
 import cv2
 from scipy import ndimage
 
-# User defined functions
-# import via relativ path
+######################################################################
+## Hoa: 05.11.2018 Version 1 : LuminanceSquareCrop.py
+######################################################################
+# Source : https://github.com/Soumyabrata/solar-irradiance-estimation
+#
+# New /Changes:
+# ----------------------------------------------------------------------
+#
+# 05.11.2018 : first add
+#
+######################################################################
 
 print('Started sol')
 
@@ -41,13 +50,12 @@ def LuminanceSquareCrop(LDR_path,sun_x,sun_y,crop_dim):
             #print ('Rotating')
             im1 = ndimage.rotate(im1, -90)
 
-        tags = exifread.process_file(f1)
-        date_time = tags["EXIF DateTimeDigitized"].values
-        im_date = date_time[0:10]
-        im_time = date_time[11:20]
-        exp_time = tags["EXIF ExposureTime"].values
-        exp_time1 = exp_time[0].num / exp_time[0].den
-
+        #tags = exifread.process_file(f1)
+        #date_time = tags["EXIF DateTimeDigitized"].values
+        #im_date = date_time[0:10]
+        #im_time = date_time[11:20]
+        #exp_time = tags["EXIF ExposureTime"].values
+        #exp_time1 = exp_time[0].num / exp_time[0].den
 
         centroid_x = sun_x
         centroid_y = sun_y
@@ -69,3 +77,15 @@ def LuminanceSquareCrop(LDR_path,sun_x,sun_y,crop_dim):
 
     return(date,time,LDRLuminance)
 
+
+
+def main():
+    try:
+
+
+    except Exception as e:
+       print('MAIN: {}'.format(e))
+
+
+if __name__ == '__main__':
+    main()
