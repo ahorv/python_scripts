@@ -185,7 +185,6 @@ class Config(object):
     databaseName = '?'
     databaseDirectory = '?'
     allFilesProcessed_path = '?'
-    processed_dirs_list = '?'
 
     def __init__(self, state_map={}):
 
@@ -196,7 +195,6 @@ class Config(object):
         self.databaseName = state_map.get('databaseName','sky_db')
         self.databaseDirectory = state_map.get('databaseDirectory', '?')
         self.allFilesProcessed_path = state_map.get('allFilesProcessed_path', '?')
-        self.processed_dirs_list = state_map.get('processed_dirs_list', '?')
 
         Config.NAS_IP = self.NAS_IP
         Config.sourceDirectory = self.sourceDirectory
@@ -205,7 +203,6 @@ class Config(object):
         Config.databaseName = self.databaseName
         Config.databaseDirectory = self.databaseDirectory
         Config.allFilesProcessed_path = self.allFilesProcessed_path
-        Config.processed_dirs_list = self.processed_dirs_list
 
 class Logger:
     def __init__(self):
@@ -370,8 +367,9 @@ class DB_handler:
                 myDB = db_con.cursor()
                 myDB.execute("CREATE DATABASE IF NOT EXISTS {} DEFAULT CHARACTER SET 'utf8'".format(db_name))
                 self.commit_close()
-                ok_table = self.create_data_camera_table()
-                if(not ok_table): raise IOError
+                ok_table_1 = self.create_data_camera_table()
+                ok_table_2 = self.create_dir_table()
+                if(not (ok_table_1 or ok_table_2)): raise IOError
             else:
                 raise IOError
 
@@ -410,6 +408,39 @@ class DB_handler:
         except Exception as e:
             self.commit_close()
             logger.error('DB  : Error creating data_camera Table: ' + str(e))
+            return success
+
+    def create_dir_table(self):
+        '''
+        This table holds all processed directories. Used to check if
+        current directory was not allready processed.
+        :return: if operation successful
+        '''
+        try:
+            s = Logger()
+            root_logger = s.getLogger()
+            success = False
+            table_name = 'dir_table'
+            con = self.connect2DB()
+            con.reconnect(attempts=2, delay=0)
+            curs = con.cursor()
+            sql = """CREATE TABLE IF NOT EXISTS %s
+                 (
+                   ID INT(20) PRIMARY KEY AUTO_INCREMENT,                  
+                   dir_name VARCHAR(100),
+                   cam_id INTEGER,
+                   sw_vers INTEGER,
+                   UNIQUE (dir_name, cam_id, sw_vers)
+                  )
+               """ % table_name
+
+            curs.execute(sql)
+            self.commit_close()
+            success = True
+            return success
+        except Exception as e:
+            self.commit_close()
+            root_logger.error('create_image_table: ' + str(e))
             return success
 
     def create_new_image_table(self):
@@ -505,6 +536,103 @@ class DB_handler:
             self.commit_close()
             logger.error('insert_image_data ' + str(e))
             return success
+
+    def insert_dir_data(self, data_list):
+        try:
+            success = False
+            s = Logger()
+            logger = s.getLogger()
+            table_name = 'dir_table'
+            con = self.connect2DB()
+            curs = con.cursor()
+            param_list = 'dir_name, cam_id, sw_vers'
+            format_strings = ','.join(['%s'] * len(data_list))
+
+            sql = "INSERT IGNORE INTO {} ".format(table_name) + \
+                  "("+ param_list +") " \
+                  "VALUES (%s)" % format_strings
+
+            curs.execute(sql, data_list)
+
+            self.commit_close()
+            success = True
+            return success
+
+        except Exception as e:
+            self.commit_close()
+            logger.error('insert_image_data: {} '.format(e))
+            return success
+
+    def object_exists(self, data_list):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            exists = False
+            table_name = 'dir_table'
+            con = self.connect2DB()
+            curs = con.cursor()
+
+            sql = "SELECT EXISTS(SELECT * FROM {} ".format(table_name) + \
+                  "WHERE dir_name = '{}' ".format(data_list[0]) + \
+                  "AND cam_id = '{}' ".format(data_list[1]) + \
+                  "AND sw_vers = '{}' LIMIT 1)".format(data_list[2])
+
+            exists = curs.execute(sql)
+            result = curs.fetchone()[0]
+
+            if result == 1:
+                exists = True
+
+            return exists
+
+        except Exception as e:
+            self.commit_close()
+            logger.error('object_exists: {} '.format(e))
+            return exists
+
+    def addProcessedDir2DB(self, dirName):
+        '''
+        Extract all information from direcory title and
+        save it to database.
+        Information needed to check if a directory was already
+        successfully processed.
+        :param titleOfDir:
+        :return:
+        '''
+        h = Helpers()
+
+        dir_name, sw_vers, camera_ID = h.strip_name_swvers_camid(dirName)
+
+        #print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
+
+        data_list = [dir_name, sw_vers, camera_ID]
+
+        self.insert_dir_data(data_list)
+        succes = False
+
+        return succes
+
+    def getLastID_from_dir_data(self):
+        try:
+            last_id = 0
+            s = Logger()
+            logger = s.getLogger()
+            table_name = 'dir_table'
+            con = self.connect2DB()
+            curs = con.cursor()
+
+            sql = 'SELECT MAX(id) FROM {}'.format(table_name)
+
+            curs.execute(sql)
+            last_id = curs.fetchone()[0]
+
+            self.commit_close()
+            return last_id
+
+        except Exception as e:
+            self.commit_close()
+            logger.error('getLastID_from_dir_data: {} '.format(e))
+            return last_id
 
 class HDR:
     def make_hdr(self, path, listOfSS, img_type = 'jpg'):
@@ -1631,19 +1759,21 @@ class Helpers:
             formated_date,formated_time, e))
             return formated_date, formated_time
 
-    def strip_swvers_camid(self, path):
-        temp = (path.split('\\'))[-3]
-        temp = temp.split('_')
-
-        # sw version and camera ID
-        camera_ID = temp[1]
-        sw_vers = temp[-1]
+    def strip_name_swvers_camid(self, path):
+        path = path.lower()
+        path = path.rstrip('\\')
+        dir_name = (path.split('\\'))[-1]
+        temp = (path.split('\\cam_'))[-1]
+        temp = (temp.split('\\'))[0]
+        temp = (temp.split('_'))
+        camera_ID = temp[0]
+        sw_vers = temp[1]
         sw_vers = sw_vers.replace('vers', '')
 
         if camera_ID.isdigit(): camera_ID = int(camera_ID)
         if sw_vers.isdigit(): sw_vers = int(sw_vers)
 
-        return sw_vers, camera_ID
+        return dir_name, sw_vers, camera_ID
 
     def createNewFolder(self, thispath):
         try:
@@ -1847,6 +1977,12 @@ class Helpers:
                 for path in allCamDirectorys:
                     allDirs = self.getDirectories(path)
 
+                    ######################################
+                    #
+                    # PRUEFEN ob tatsächlich alle dirs durchlaufen werden !
+                    #
+                    ########################################
+
                     for raw_cam_dir in allDirs:
                         success = self.processOneDay(raw_cam_dir)
                         if success:
@@ -1945,7 +2081,7 @@ class Helpers:
             all_dirs = self.getDirectories(path)  # loeschen nur zu testzwecken !
 
             for dir in all_dirs:
-                if self.check_if_already_processed(dir):
+                if self.check_if_already_processed(dir.rstrip('\\')):
                     continue
                 else:
                     img_nr += 1
@@ -1955,28 +2091,21 @@ class Helpers:
                         success = self.writeImageData2DB()
                     if success:
                         success = self.addProcessedDir2DB(dir)
-
-                    #shutil.rmtree(path_to_unziped)
+                    #if success:
+                        #shutil.rmtree(path_to_unziped)
 
             return success
 
         except Exception as e:
-          logger.error('processOneDirectory: ' + str(e))
+          logger.error('processOneDay: ' + str(e))
           return success
 
     def check_if_already_processed(self, cur_dir):
-        found = False
+        db = DB_handler()
+        dir_name, sw_vers, cam_ID = self.strip_name_swvers_camid(cur_dir)
+        exists = db.object_exists([str(dir_name), str(sw_vers), str(cam_ID)])
 
-        list = Config.processed_dirs_list
-
-        if not any(list):
-            return found
-
-        for line in reversed(list):
-            if cur_dir in line:
-                found = True
-
-        return found
+        return exists
 
 def main():
     try:
