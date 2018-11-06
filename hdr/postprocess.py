@@ -64,6 +64,7 @@ class Image_Data(object):
     hdr = 0
     ldr_s = 0
     hdr_s = 0
+    thumb = 0
     rmap = 0
     resp = 0
 
@@ -84,6 +85,7 @@ class Image_Data(object):
         self.hdr = state_map.get('hdr', 0)
         self.ldr_s = state_map.get('ldr_s', 0)
         self.hdr_s = state_map.get('hdr_s', 0)
+        self.thumb = state_map.get('thumb', 0)
         self.rmap = state_map.get('rmap', 0)
         self.resp = state_map.get('resp', 0)
 
@@ -103,6 +105,7 @@ class Image_Data(object):
         Image_Data.hdr = self.hdr
         Image_Data.ldr_s = self.ldr_s
         Image_Data.hdr_s = self.hdr_s
+        Image_Data.thumb = self.thumb
         Image_Data.rmap = self.rmap
         Image_Data.resp = self.resp
 
@@ -124,6 +127,7 @@ class Image_Data(object):
             'hdr': Image_Data.hdr,
             'ldr_s': Image_Data.ldr_s,
             'hdr_s': Image_Data.hdr_s,
+            'thumb': Image_Data.thumb,
             'rmap': Image_Data.rmap,
             'resp': Image_Data.resp,
         }
@@ -469,6 +473,7 @@ class DB_handler:
                     hdr LONGBLOB,
                     ldr_s LONGBLOB,
                     hdr_s LONGBLOB,
+                    thumb LONGBLOB,
                     rmap LONGBLOB,
                     resp LONGBLOB,
                     UNIQUE KEY (time)
@@ -517,7 +522,7 @@ class DB_handler:
             table_name = 'images_' + (Image_Data.date).replace('-','_')
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'img_nr, shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, ldr_s, hdr_s, rmap, resp'
+            param_list = 'img_nr, shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, ldr_s, hdr_s, thumb, rmap, resp'
             imagedata = Image_Data.to_dict(None)
             del imagedata['date']
             values = list(imagedata.values())
@@ -636,9 +641,9 @@ class HDR:
             img_dir.sort(key=h.byInteger_keys)
 
             # Loading images channel - wise
-            img_list_b = self.load_exposures(img_dir, 0)
-            img_list_g = self.load_exposures(img_dir, 1)
-            img_list_r = self.load_exposures(img_dir, 2)
+            img_list_b = self.load_img_by_chn(img_dir, 0)
+            img_list_g = self.load_img_by_chn(img_dir, 1)
+            img_list_r = self.load_img_by_chn(img_dir, 2)
 
             # Solving response curves  (np.linalg.lstsq can be troublesome ! -> rcond=None )
             gb, _ = self.hdr_debvec(img_list_b, listOfSS)
@@ -806,7 +811,7 @@ class HDR:
 
         return raw.astype('uint16')
 
-    def load_exposures(self, dir_list, channel=0):
+    def load_img_by_chn(self, dir_list, channel=0):
         '''
         nedded by make_hdr
         Reads either of jpg or raw depending on file extension
@@ -923,7 +928,7 @@ class HDR:
             k += 1
 
         # Solve the system using SVD
-        x = np.linalg.lstsq(A, b, rcond=None)[0]  # rcond=None
+        x = np.linalg.lstsq(A, b)[0]  # rcond=None
         g = x[:256]
         lE = x[256:]
 
@@ -1025,6 +1030,30 @@ class HDR:
             logger.error('hdr_to_blob ' + str(e))
             return None
 
+    def load_img_as_blob(self, path):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            img = cv2.imread(path)
+            w, h, d = img.shape
+            img_s = cv2.resize(img, (int(h / 3), int(w / 3)))
+
+            fig, ax = plt.subplots(figsize=plt.figaspect(img_s))
+            fig.subplots_adjust(0, 0, 1, 1)
+            ax.set_axis_off()
+            ax.imshow(img_s)
+            byte_str = io.BytesIO()
+            fig.savefig(byte_str, format='jpg')
+            byte_str.seek(0)
+            blob = byte_str.read()
+            plt.close()
+
+            return blob
+
+        except Exception as e:
+            logger.error('save_thumb ' + str(e))
+            return None
+
     def save_hdr(self, hdr, filename):
         '''
         LOESCHEN
@@ -1055,7 +1084,7 @@ class HDR:
         rgbe.flatten().tofile(f)
         f.close()
 
-    def mask_sat(self,img_list, comb_I):
+    def mask_sat(self, img_list, comb_I):
         '''
         # This function is used to mask the pixels of any image comb_I; given three
         # LDR images I1, I2, I3. If a pixel > 240, in all the three LDR images
@@ -1098,6 +1127,30 @@ class HDR:
         except Exception as e:
             print('Error in mask_sat: {}'.format(e))
             return mask_I
+
+    def make_thumb(self, path):
+        try:
+            success = False
+            s = Logger()
+            logger = s.getLogger()
+            h = Helpers()
+            name, sw_vers, cam_id = h.strip_name_swvers_camid(path)
+
+            if sw_vers == 1:
+                Image_Data.thumb = self.load_img_as_blob(join(path, 'raw_img5.jpg'))
+
+            if sw_vers == 2:
+                Image_Data.thumb = self.load_img_as_blob(join(path, 'raw_img5.jpg'))
+
+            if sw_vers == 3:
+                Image_Data.thumb = self.load_img_as_blob(join(path, 'raw_img0.jpg'))
+
+            success = True
+            return success
+
+        except Exception as e:
+            logger.error('save_thumb ' + str(e))
+            return success
 
 class COLORBALANCE:
 
@@ -1958,7 +2011,6 @@ class Helpers:
         except Exception as e:
             logger.error('collectCamData: ' + str(e))
 
-
     def collectImageData(self, path):
         try:
             s = Logger()
@@ -1988,10 +2040,11 @@ class Helpers:
             Image_Data.awb_red = awb_red_to_db
             Image_Data.awb_blue = awb_blue_to_db
 
+            thumb_ok = hdr.make_thumb(path)
             hdr_dat_ok = hdr.make_hdr(path, listOfSS, 'data')
             hdr_jpg_ok = hdr.make_hdr(path, listOfSS ,'jpg')
 
-            if(hdr_dat_ok and hdr_jpg_ok):
+            if(hdr_dat_ok and hdr_jpg_ok and thumb_ok):
                 success = True
 
             return success
@@ -2055,11 +2108,15 @@ class Helpers:
                     img_nr += 1
                     Image_Data.img_nr = img_nr
                     success = self.collectImageData(dir)
+                    print('collectImageDate: {}'.format(success))
                     if success:
                         success = self.writeImageData2DB()
+                        print('writeImageData2DB: {}'.format(success))
                     if success:
                         success = self.addProcessedDir2DB(dir)
+                        print('addProcessedDir2DB: {}'.format(success))
                     if success:
+                        print('trying to delete: {}'.format(path_to_temp))
                         shutil.rmtree(path_to_temp)
             return success
 
@@ -2094,10 +2151,8 @@ def main():
         db.createDB()
 
         #h.load_images2DB()
-        path1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1\temp'  # alte vers 1
-        path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1\temp'  # mittlere vers 2
-        #path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1\temp'  # neuste vers 3
-
+        path1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1'  # alte vers 1
+        path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1'  # mittlere vers 2
         path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1'  # neuste vers 3
 
         logger.info('STARTED file processing.')
