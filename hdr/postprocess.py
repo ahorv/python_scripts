@@ -640,7 +640,7 @@ class HDR:
             img_list_g = self.load_exposures(img_dir, 1)
             img_list_r = self.load_exposures(img_dir, 2)
 
-            # Solving response curves
+            # Solving response curves  (np.linalg.lstsq can be troublesome ! -> rcond=None )
             gb, _ = self.hdr_debvec(img_list_b, listOfSS)
             gg, _ = self.hdr_debvec(img_list_g, listOfSS)
             gr, _ = self.hdr_debvec(img_list_r, listOfSS)
@@ -923,7 +923,7 @@ class HDR:
             k += 1
 
         # Solve the system using SVD
-        x = np.linalg.lstsq(A, b, rcond=None)[0]
+        x = np.linalg.lstsq(A, b, rcond=None)[0]  # rcond=None
         g = x[:256]
         lE = x[256:]
 
@@ -1945,16 +1945,8 @@ class Helpers:
             s = Logger()
             logger = s.getLogger()
 
-            temp = (path.split('\\'))[-3]
-            temp = temp.split('_')
-
             # sw version and camera ID
-            camera_ID = temp[1]
-            sw_vers = temp[-1]
-            sw_vers = sw_vers.replace('vers', '')
-
-            if camera_ID.isdigit(): camera_ID = int(camera_ID)
-            if sw_vers.isdigit(): sw_vers = int(sw_vers)
+            name, sw_vers, camera_ID = self.strip_name_swvers_camid(path)
 
             Camera_Data.cam_id = camera_ID
             Camera_Data.sw_vers = sw_vers
@@ -1965,6 +1957,7 @@ class Helpers:
 
         except Exception as e:
             logger.error('collectCamData: ' + str(e))
+
 
     def collectImageData(self, path):
         try:
@@ -1995,10 +1988,12 @@ class Helpers:
             Image_Data.awb_red = awb_red_to_db
             Image_Data.awb_blue = awb_blue_to_db
 
-            hdr.make_hdr(path, listOfSS, 'data')
-            hdr.make_hdr(path, listOfSS ,'jpg')
+            hdr_dat_ok = hdr.make_hdr(path, listOfSS, 'data')
+            hdr_jpg_ok = hdr.make_hdr(path, listOfSS ,'jpg')
 
-            success = True
+            if(hdr_dat_ok and hdr_jpg_ok):
+                success = True
+
             return success
 
         except Exception as e:
@@ -2009,8 +2004,11 @@ class Helpers:
         success = False
 
         db = DB_handler()
-        success = db.create_new_image_table()
-        success = db.insert_image_data()
+        ok_1 = db.create_new_image_table()
+        ok_2 = db.insert_image_data()
+
+        if(ok_1 and ok_2):
+            success = True
 
         if success:
             success = db.insert_camera_data()
@@ -2030,7 +2028,7 @@ class Helpers:
 
         dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(dirName)
 
-        print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
+        # print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
 
         data_list = [dir_name, sw_vers, camera_ID]
 
@@ -2079,7 +2077,7 @@ class Helpers:
 def main():
     try:
         CFG = {
-            'NAS_IP'            : r'192.168.1.10',
+            'NAS_IP'            : r'192.168.2.102',            # @ Home: '192.168.1.10'
             'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
             'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
             'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
