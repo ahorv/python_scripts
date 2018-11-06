@@ -928,7 +928,7 @@ class HDR:
             k += 1
 
         # Solve the system using SVD
-        x = np.linalg.lstsq(A, b)[0]  # rcond=None
+        x = np.linalg.lstsq(A, b,rcond=None)[0]  # rcond=None
         g = x[:256]
         lE = x[256:]
 
@@ -2078,15 +2078,11 @@ class Helpers:
         :return:
         '''
         db = DB_handler()
-
-        dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(dirName)
-
-        # print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
-
-        data_list = [dir_name, sw_vers, camera_ID]
-
-        db.insert_dir_data(data_list)
         succes = False
+        dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(dirName)
+        # print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
+        data_list = [dir_name, sw_vers, camera_ID]
+        succes = db.insert_dir_data(data_list)
 
         return succes
 
@@ -2105,6 +2101,7 @@ class Helpers:
                 if self.check_if_already_processed(dir.rstrip('\\')):
                     continue
                 else:
+                    print('path_to_temp: {}'.format(path_to_temp))
                     img_nr += 1
                     Image_Data.img_nr = img_nr
                     success = self.collectImageData(dir)
@@ -2134,7 +2131,7 @@ class Helpers:
 def main():
     try:
         CFG = {
-            'NAS_IP'            : r'192.168.2.102',            # @ Home: '192.168.1.10'
+            'NAS_IP'            : r'192.168.1.10',            # @ Home: '192.168.1.10'
             'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
             'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
             'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
