@@ -1355,6 +1355,7 @@ class Helpers:
                 if os.stat(file).st_size == 0:
                     ss_to_db = '0,0,0,0,0,0,0,0,0,0'
                     logger.error('Empty camstat - file: {}'.format(file))
+                    Camera_Data.dont_use = 1
                     return listOfSS, ss_to_db
 
                 logfile.pop(0)  # remove non relevant lines
@@ -1376,7 +1377,8 @@ class Helpers:
 
                 if os.stat(file).st_size == 0:
                     ss_to_db = '0,0,0'
-                    logger.error('Empty camstat.log - file: {}'.format(file))
+                    logger.error('Empty camstat - file: {}'.format(file))
+                    Camera_Data.dont_use = 1
                     return listOfSS, ss_to_db
 
                 if sw_vers == 2:
@@ -1471,7 +1473,7 @@ class Helpers:
             return   listOfAWB, awb_red_to_db_str.rstrip(','), awb_blue_to_db_str.rstrip(',')
 
         except Exception as e:
-            print('Error in getAWB_Gains: ' + str(e))
+            logger.error('getAWB_Gains: ' + str(e))
 
     def getISO(self, path):
         try:
@@ -2101,7 +2103,6 @@ class Helpers:
                 if self.check_if_already_processed(dir.rstrip('\\')):
                     continue
                 else:
-                    print('path_to_temp: {}'.format(path_to_temp))
                     img_nr += 1
                     Image_Data.img_nr = img_nr
                     success = self.collectImageData(dir)
@@ -2159,7 +2160,7 @@ def main():
         ###########################################
         # FEHLER in collectCamData -> sw wird nicht korrekt gelesen !
         ##########################################
-        h.load_images2DB(path3) # LOESCHEN NUR FUER TESTS
+        h.load_images2DB(path1) # LOESCHEN NUR FUER TESTS
 
         logger.info('STOPPED file processing.')
 
