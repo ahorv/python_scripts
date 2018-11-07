@@ -9,11 +9,13 @@ import os
 import cv2
 import sys
 import math
+import pandas as pd
 import exifread
 from glob import glob
 import zipfile
 import shutil
 import io
+from pathlib import Path
 from os.path import join
 import numpy as np
 from fractions import Fraction
@@ -32,10 +34,18 @@ print('Version opencv: ' + cv2.__version__)
 ######################################################################
 ## Hoa: 18.10.2018 Version 1 : postprocess.py
 ######################################################################
-# Reads all images from FTP - server. Creates HDR images. Data and
-# Images are stored in SQLite database.
+# Reads all images from FTP - server. Create HDR images. Camera data
+# and images are stored in MySQL database.
+#
 # Remarks:
-# - use phpmyadmin to see contents of database#
+# - File structure is as follows:
+#   \\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1\
+#   where:
+#   camera_1 resp camera_2: distinguishes between the two camereras in use
+#   cam_1_vers1: stands for camera 1 with software version 1. 3 different
+#   camera software version where in use.
+#   20180117_raw_cam1: designates year, month, day
+# - use phpmyadmin to see database contents
 #
 # New /Changes:
 # ----------------------------------------------------------------------
@@ -189,6 +199,7 @@ class Config(object):
     databaseName = '?'
     databaseDirectory = '?'
     allFilesProcessed_path = '?'
+    rainy_days_path = '?'
 
     def __init__(self, state_map={}):
 
@@ -199,6 +210,7 @@ class Config(object):
         self.databaseName = state_map.get('databaseName','sky_db')
         self.databaseDirectory = state_map.get('databaseDirectory', '?')
         self.allFilesProcessed_path = state_map.get('allFilesProcessed_path', '?')
+        self.rainy_days_path = state_map.get('rainy_days_path', '?')
 
         Config.NAS_IP = self.NAS_IP
         Config.sourceDirectory = self.sourceDirectory
@@ -207,6 +219,7 @@ class Config(object):
         Config.databaseName = self.databaseName
         Config.databaseDirectory = self.databaseDirectory
         Config.allFilesProcessed_path = self.allFilesProcessed_path
+        Config.rainy_days_path = self.rainy_days_path
 
 class Logger:
     def __init__(self):
@@ -1679,6 +1692,19 @@ class Helpers:
         except Exception as e:
             print('Error in get_dg: ' + str(e))
 
+    def getDateSring(self, path):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            date = ''
+            temp = path.rpartition('\\')[-1]
+            date = temp.rpartition('_raw')[0]
+            return date
+
+        except Exception as e:
+            logger.error('getDateSring:{}').format(e)
+            return date
+
     def getFstops(self, path):
         try:
             '''
@@ -1832,7 +1858,7 @@ class Helpers:
             for dirs in sorted(glob(os.path.join(pathToDirectories, "*", ""))):
                 if os.path.isdir(dirs):
                     if dirs.rstrip('\\').rpartition('\\')[-1]:
-                        allDirs.append(dirs)
+                        allDirs.append(dirs.rstrip('\\'))
                         img_cnt +=1
             return allDirs
 
@@ -1981,7 +2007,12 @@ class Helpers:
 
             # write only one day to database
             if path_to_one_dir:
-                success = self.processOneDay(path_to_one_dir)
+                date = self.getDateSring(path_to_one_dir)
+                if self.is_rainy_day(date):  # check if it was a rainy day
+                    logger.info('Skipped {} was a rainy day.'.format(date))
+                    return
+                else:
+                    success = self.processOneDay(path_to_one_dir)
 
             # write everything to database
             else:
@@ -1990,7 +2021,12 @@ class Helpers:
                     allDirs = self.getDirectories(path)
 
                     for raw_cam_dir in allDirs:
-                        success = self.processOneDay(raw_cam_dir)
+                        date = self.getDateSring(raw_cam_dir)
+                        if self.is_rainy_day(date):  # check if it was a rainy day
+                            logger.info('Skipped {} was a rainy day.'.format(date))
+                            continue
+                        else:
+                            success = self.processOneDay(raw_cam_dir)
 
         except Exception as e:
             logger.error('load_images2DB: ' + str(e))
@@ -2103,19 +2139,17 @@ class Helpers:
                 if self.check_if_already_processed(dir.rstrip('\\')):
                     continue
                 else:
+                    print('processing: {}'.format(dir))
                     img_nr += 1
                     Image_Data.img_nr = img_nr
                     success = self.collectImageData(dir)
-                    print('collectImageDate: {}'.format(success))
                     if success:
                         success = self.writeImageData2DB()
-                        print('writeImageData2DB: {}'.format(success))
                     if success:
                         success = self.addProcessedDir2DB(dir)
-                        print('addProcessedDir2DB: {}'.format(success))
                     if success:
-                        print('trying to delete: {}'.format(path_to_temp))
                         shutil.rmtree(path_to_temp)
+                    print('\n')
             return success
 
         except Exception as e:
@@ -2129,6 +2163,34 @@ class Helpers:
 
         return exists
 
+    def load_rainy_days(self):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            success = False
+
+            my_file = Path(Config.rainy_days_path)
+            if my_file.is_file():
+                df = pd.read_csv(Config.rainy_days_path)
+            else:
+                logger.error('Missing rainy_days.csv file.')
+
+        except Exception as e:
+            logger.error('load_rainy_days: ' + str(e))
+            return success
+
+    def is_rainy_day(self, date):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            rainy = False
+            df = pd.read_csv(Config.rainy_days_path, index_col=False, squeeze=True, header=0)
+            rainy = int(date) in df.values
+            return rainy
+        except Exception as e:
+            logger.error('is_rainy_day: ' + str(e))
+            return rainy
+
 def main():
     try:
         CFG = {
@@ -2137,6 +2199,7 @@ def main():
             'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
             'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
             'camera_2_Directory': r'\\HOANAS\HOA_SKYCam\camera_2',
+            'rainy_days_path'   : r'..\assessment\rainy_days.csv',
         }
 
         config = Config(CFG)
@@ -2147,23 +2210,10 @@ def main():
 
         db = DB_handler()
         db.createDB()
-
-        #h.load_images2DB()
-        path1 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1'  # alte vers 1
-        path2 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers2\20200505_raw_cam1'  # mittlere vers 2
-        path3 = r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3\20200505_raw_cam1'  # neuste vers 3
-
+        h.load_rainy_days()
         logger.info('STARTED file processing.')
-
-        #h.load_images2DB()        # Durchlauft alles auf dem NAS
-
-        ###########################################
-        # FEHLER in collectCamData -> sw wird nicht korrekt gelesen !
-        ##########################################
-        h.load_images2DB(path1) # LOESCHEN NUR FUER TESTS
-
+        h.load_images2DB()        # if only one day to be processed, provide path to directory
         logger.info('STOPPED file processing.')
-
 
     except Exception as e:
         logger.error('MAIN: {}'.format(e))
