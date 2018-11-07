@@ -2172,6 +2172,8 @@ class Helpers:
             my_file = Path(Config.rainy_days_path)
             if my_file.is_file():
                 df = pd.read_csv(Config.rainy_days_path)
+                success = True
+                return success
             else:
                 logger.error('Missing rainy_days.csv file.')
 
@@ -2208,12 +2210,17 @@ def main():
         s = Logger()
         logger = s.getLogger()
 
-        db = DB_handler()
-        db.createDB()
-        h.load_rainy_days()
-        logger.info('STARTED file processing.')
-        h.load_images2DB()        # if only one day to be processed, provide path to directory
-        logger.info('STOPPED file processing.')
+        start = h.load_rainy_days()
+
+        if start:
+            db = DB_handler()
+            db.createDB()
+
+            logger.info('STARTED file processing.')
+            h.load_images2DB()        # if only one day to be processed, provide path to directory
+            logger.info('STOPPED file processing.')
+        else:
+            print('Missing rainy_days.csv file.')
 
     except Exception as e:
         logger.error('MAIN: {}'.format(e))

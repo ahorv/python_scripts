@@ -18,7 +18,7 @@ from scipy import ndimage
 
 print('Started Luminance')
 
-path_img = r'C:\Users\tahorvat\Desktop\HDR-imaging-master\sky_2\output_hdr\LDR.jpg'
+path_img = r'C:\Users\ati\Desktop\LuminanceHDR-master\sky_2\output_hdr\sat_masked_hdr.jpg'
 
 def calculate_sun_centre(path_to_img):
     complete_x = []
@@ -31,7 +31,7 @@ def calculate_sun_centre(path_to_img):
     red = im[:, :, 2]
     green = im[:, :, 1]
     blue = im[:, :, 0]
-    all_coord = np.where(red > threshold_value)
+    all_coord = np.where(blue > threshold_value)
     all_coord = np.asarray(all_coord)
     length = np.shape(all_coord)[1]
     sum_x = np.sum(all_coord[0, :])
@@ -43,8 +43,6 @@ def calculate_sun_centre(path_to_img):
     else:
         centroid_x = int(sum_x / length)
         centroid_y = int(sum_y / length)
-
-    print('calculated all x/y= {}/{} values'.format(centroid_x, centroid_y))
 
     #interpolate the sun's location in the missing places
     s1 = pd.Series(centroid_x)
@@ -73,10 +71,8 @@ def calculate_sun_centre(path_to_img):
         a[:first] = a[first]
         a[last + 1:] = a[last]
 
-    print('done calculating sun\'s position')
-
-    return (complete_x, complete_y)
-
+    print('calculated all x/y= {}/{} values {}/{}'.format(centroid_x, centroid_y,complete_x[0], complete_y[0]))
+    return (centroid_x, centroid_y, complete_x, complete_y)
 
 def cmask(index, radius, array):
     a, b = index
@@ -143,9 +139,15 @@ def LuminanceSquareCrop(LDR_path, sun_x, sun_y, crop_dim):
 
 def main():
     try:
+        global path_img
 
-        complete_x, complete_y = calculate_sun_centre(path_img)
+        centroid_x, centroid_y, complete_x, complete_y = calculate_sun_centre(path_img)
+        img = cv2.imread(path_img)
+        cv2.circle(img, (centroid_y, centroid_x), 30, (0,0,255), thickness=10, lineType=8, shift=0)
 
+        w,h,d = img.shape
+        img_s = cv2.resize(img, (int(h/3), int(w/3)))
+        cv2.imshow('centre of sun',img_s)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
         print('All processes finished.')
