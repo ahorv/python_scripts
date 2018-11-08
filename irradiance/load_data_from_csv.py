@@ -1,5 +1,9 @@
 import pandas as pd
 
+import numpy as np
+import csv
+import datetime
+from datetime import timedelta
 
 ######################################################################
 ## Hoa: 08.11.2018 Version 1 : load_data_from_csv.py
@@ -23,27 +27,31 @@ import pandas as pd
 #
 ######################################################################
 
-path_data = r'irradiation_luz_2017_2018.csv'
+path_luz = r'irradiation_luz_2017_2018.csv'
+path_soda = r'irradiation_soda_2017_2018.csv'
 
 
 def process_LUZ(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
     df['time'] = pd.to_datetime(df['time'], format='%Y%m%d%H%M')
-    #print(df.head(n=20))
+
     return df
 
 def process_SODA(csv_file):
-    df = pd.read_csv(csv_file, sep=';',index_col = False, header=37)
-    period = df['Observation period']
-    print(period.head(n=20))
-    #df['time'] = pd.to_datetime(df['time'], format='%Y%m%d%H%M')
-    #print(df.head(n=20))
+    df = pd.read_csv(csv_file, sep=';',index_col = False, header=36)
+    # muss den zweiten nehmen
+    df['Observation period'] = df['Observation period'].map(lambda x: (((x.split('/')[1]).replace('T',' ')).replace('.0','')))
+    df['Observation period'] = pd.to_datetime(df['Observation period'], format='%Y-%m-%d %H:%M:%S')
+    df.rename(columns={'Observation period': 'time'}, inplace=True)
+
     return df
 
 '''
 def main():
     try:
-        process_LUZ(path_data)
+        #process_LUZ(path_luz)
+        process_SODA(path_soda)
+
         print('done')
 
     except Exception as e:
