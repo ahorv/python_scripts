@@ -200,7 +200,6 @@ class Config(object):
     databaseDirectory = '?'
     allFilesProcessed_path = '?'
     rainy_days_path = '?'
-    rainy_days = '?'
 
     def __init__(self, state_map={}):
 
@@ -212,7 +211,6 @@ class Config(object):
         self.databaseDirectory = state_map.get('databaseDirectory', '?')
         self.allFilesProcessed_path = state_map.get('allFilesProcessed_path', '?')
         self.rainy_days_path = state_map.get('rainy_days_path', '?')
-        self.rainy_days = state_map.get('rainy_days', '?')
 
         Config.NAS_IP = self.NAS_IP
         Config.sourceDirectory = self.sourceDirectory
@@ -222,7 +220,6 @@ class Config(object):
         Config.databaseDirectory = self.databaseDirectory
         Config.allFilesProcessed_path = self.allFilesProcessed_path
         Config.rainy_days_path = self.rainy_days_path
-        Config.rainy_days = self.rainy_days
 
 class Logger:
     def __init__(self):
@@ -2088,6 +2085,7 @@ class Helpers:
             if(hdr_dat_ok and hdr_jpg_ok and thumb_ok):
                 success = True
 
+
             return success
 
         except Exception as e:
@@ -2142,7 +2140,6 @@ class Helpers:
                 if self.check_if_already_processed(dir.rstrip('\\')):
                     continue
                 else:
-                    print('processing: {}'.format(dir))
                     img_nr += 1
                     Image_Data.img_nr = img_nr
                     success = self.collectImageData(dir)
@@ -2150,9 +2147,11 @@ class Helpers:
                         success = self.writeImageData2DB()
                     if success:
                         success = self.addProcessedDir2DB(dir)
-                    if success:
-                        shutil.rmtree(path_to_temp)
-                    print('\n')
+
+            if success:
+                shutil.rmtree(path_to_temp)
+                print('all files in temp deleted.')
+            print('\n')
             return success
 
         except Exception as e:
@@ -2175,7 +2174,6 @@ class Helpers:
             my_file = Path(Config.rainy_days_path)
             if my_file.is_file():
                 df = pd.read_csv(Config.rainy_days_path)
-                Config.rainy_days = df
                 success = True
                 return success
             else:
@@ -2190,7 +2188,7 @@ class Helpers:
             s = Logger()
             logger = s.getLogger()
             rainy = False
-            df = Config.rainy_days
+            df = pd.read_csv(Config.rainy_days_path, index_col=False, squeeze=True, header=0)
             rainy = int(date) in df.values
             return rainy
         except Exception as e:
@@ -2221,7 +2219,7 @@ def main():
             db.createDB()
 
             logger.info('STARTED file processing.')
-            h.load_images2DB(r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20171117_raw_cam1')        # if only one day to be processed, provide path to directory
+            h.load_images2DB()        # if only one day to be processed, provide path
             logger.info('STOPPED file processing.')
         else:
             print('Missing rainy_days.csv file.')
