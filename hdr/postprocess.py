@@ -2139,6 +2139,7 @@ class Helpers:
                 if self.check_if_already_processed(dir.rstrip('\\')):
                     continue
                 else:
+                    print('Processing: {}'.format(dir))
                     img_nr += 1
                     Image_Data.img_nr = img_nr
                     success = self.collectImageData(dir)
