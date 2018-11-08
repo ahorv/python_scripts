@@ -59,7 +59,6 @@ class Image_Data(object):
     """Container class for image data.
     """
     date =  '?'
-    img_nr = 0
     shots = 0
     time = '?'
     fstop ='?'
@@ -80,7 +79,6 @@ class Image_Data(object):
 
     def __init__(self, state_map={}):
         self.date = state_map.get('date', 0)
-        self.img_nr = state_map.get('img_nr',0)
         self.shots = state_map.get('shots', 0)
         self.time = state_map.get('time','?' )
         self.fstop = state_map.get('fstop', '?')
@@ -100,7 +98,6 @@ class Image_Data(object):
         self.resp = state_map.get('resp', 0)
 
         Image_Data.date = self.date
-        Image_Data.img_nr = self.img_nr
         Image_Data.shots = self.shots
         Image_Data.time = self.time
         Image_Data.fstop = self.fstop
@@ -122,7 +119,6 @@ class Image_Data(object):
     def to_dict(self):
         return {
             'date':   Image_Data.date,
-            'img_nr': Image_Data.img_nr,
             'shots': Image_Data.shots,
             'time':   Image_Data.time,
             'fstop':  Image_Data.fstop,
@@ -471,7 +467,7 @@ class DB_handler:
             curs = con.cursor()
             sql = """CREATE TABLE IF NOT EXISTS %s
                  (
-                    img_nr INTEGER NOT NULL,
+                    ID INT(20) PRIMARY KEY AUTO_INCREMENT,
                     shots INTEGER NOT NULL,     
                     time VARCHAR(10) NOT NULL,
                     fstop VARCHAR(25),
@@ -535,7 +531,7 @@ class DB_handler:
             table_name = 'images_' + (Image_Data.date).replace('-','_')
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'img_nr, shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, ldr_s, hdr_s, thumb, rmap, resp'
+            param_list = 'shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, ldr_s, hdr_s, thumb, rmap, resp'
             imagedata = Image_Data.to_dict(None)
             del imagedata['date']
             values = list(imagedata.values())
@@ -687,7 +683,8 @@ class HDR:
                 byte_str.seek(0)
                 blob = byte_str.read()
                 Image_Data.ldr_s = blob
-                plt.close()
+                plt.cla()       # Hoa neu
+                plt.close(fig)  # Hoa neu
 
             if img_type is 'data':
                 # Create and plot response curve
@@ -703,6 +700,8 @@ class HDR:
                 respc.seek(0)
                 resp_blob = respc.read()
                 Image_Data.resp = resp_blob
+                plt.cla()      # Hoa neu
+                plt.close(fig) # Hoa neu
 
                 # make the HDR
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
@@ -724,7 +723,8 @@ class HDR:
                 byte_str.seek(0)
                 blob = byte_str.read()
                 Image_Data.hdr_s = blob
-                plt.close()
+                plt.cla()        # Hoa neu
+                plt.close(fig)   # Hoa neu
 
                 # Create radiance map
                 plt.figure(figsize=(12, 8))
@@ -736,6 +736,8 @@ class HDR:
                 rmap.seek(0)
                 rmap_blob = rmap.read()
                 Image_Data.rmap = rmap_blob
+                plt.cla()       # Hoa neu
+                plt.close(fig)  # Hoa neu
 
             success = True
             return success
