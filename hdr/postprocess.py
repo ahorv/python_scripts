@@ -2079,12 +2079,11 @@ class Helpers:
             Image_Data.awb_blue = awb_blue_to_db
 
             thumb_ok = hdr.make_thumb(path)
-            hdr_dat_ok = hdr.make_hdr(path, listOfSS, 'data')
-            hdr_jpg_ok = hdr.make_hdr(path, listOfSS ,'jpg')
+            hdr_dat_ok = hdr.make_hdr(path, listOfSS,'data')
+            hdr_jpg_ok = hdr.make_hdr(path, listOfSS,'jpg')
 
             if(hdr_dat_ok and hdr_jpg_ok and thumb_ok):
                 success = True
-
 
             return success
 
