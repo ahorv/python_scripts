@@ -2131,7 +2131,6 @@ class Helpers:
             s = Logger()
             logger = s.getLogger()
             success = False
-            img_nr = 0
 
             path_to_temp = self.unzipall(path)
             self.collectCamData(path)
@@ -2142,8 +2141,6 @@ class Helpers:
                     continue
                 else:
                     print('Processing: {}'.format(dir))
-                    img_nr += 1
-                    Image_Data.img_nr = img_nr
                     success = self.collectImageData(dir)
                     if success:
                         success = self.writeImageData2DB()
