@@ -1931,13 +1931,13 @@ class Helpers:
 
             allzipDirs = self.getZipDirs(path_to_extract)
 
-            for dirs in allzipDirs:
-                path = dirs.lower().replace('.zip', '')
+            for dir in allzipDirs:
+                path = dir.lower().replace('.zip', '')
                 dirName = (path.rstrip('\\').rpartition('\\')[-1])
                 new_temp_path = join(temp_path, dirName)
 
                 if path:
-                    zipfilepath = os.path.join(dirs)
+                    zipfilepath = os.path.join(dir)
                     zf = zipfile.ZipFile(zipfilepath, "r")
                     zf.extractall(os.path.join(new_temp_path))
                     zf.close()
@@ -1946,32 +1946,6 @@ class Helpers:
 
         except Exception as e:
             logger.error('unzipall: ' + str(e))
-
-    def delAllZIP(self,path_to_extract):
-        try:
-            allzipDirs = self.getZipDirs(path_to_extract)
-            numb_to_unzip = len(allzipDirs)
-            cnt = 0
-
-            for zipdir in allzipDirs:
-                # delete unzipped directory
-                print('deleting: '+str(zipdir))
-                os.remove(zipdir)
-
-            print('deleted all ZIP files.')
-
-        except Exception as e:
-            print('delAllZIP: Error: ' + str(e))
-
-    def delUnzipedDir(self, pathtoDir):
-        try:
-            s = Logger()
-            logger = s.getLogger()
-            shutil.rmtree(pathtoDir)
-            logger.info('deleted {} folder.'.format(pathtoDir))
-
-        except Exception as e:
-            logger.error('delUnzipedDir: {}'.format(e))
 
     def search_list(self, myList, search_str):
         matching = None
