@@ -234,43 +234,6 @@ class Logger:
     def __init__(self):
         self.logger = None
 
-    def getFileLogger(self):
-        try:
-            PATH = Config.databaseDirectory
-
-            FILEPATH = os.path.join(PATH, 'allFilesProcessed.log')
-            LOGFILEPATH = join(r'\\',FILEPATH)
-            Config.allFilesProcessed_path = LOGFILEPATH
-
-            logFormatter = logging.Formatter('%(message)s')
-            fileHandler = logging.FileHandler(LOGFILEPATH)
-            name = 'filesProcessedLogger'
-
-            # configure file handler
-            fileHandler.setFormatter(logFormatter)
-
-            # configure stream handler
-            consoleHandler = logging.StreamHandler()
-            consoleHandler.setFormatter(logFormatter)
-
-            # get the logger instance
-            self.logger = logging.getLogger(name)
-
-            # set the logging level
-            self.logger.setLevel(logging.INFO)
-
-            if not len(self.logger.handlers):
-                self.logger.addHandler(fileHandler)
-                self.logger.addHandler(consoleHandler)
-
-            helper = Helpers()
-            if sys.platform == "linux":
-                helper.setOwnerAndPermission(LOGFILEPATH)
-            return self.logger
-
-        except Exception as e:
-            print('Error Filelogger:' + str(e))
-
     def getLogger(self, newLogPath=None):
 
         try:
