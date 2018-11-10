@@ -2128,7 +2128,7 @@ class Helpers:
             if success:
                 shutil.rmtree(path_to_temp)
                 print('all files in temp deleted.')
-            print('\n')
+    
             return success
 
         except Exception as e:
