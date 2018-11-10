@@ -1953,10 +1953,11 @@ class Helpers:
                 new_temp_path = join(temp_path, dirName)
 
                 if path:
-                    zipfilepath = os.path.join(dir)
-                    zf = zipfile.ZipFile(zipfilepath, "r")
-                    zf.extractall(os.path.join(new_temp_path))
-                    zf.close()
+                    if not os.path.exists(new_temp_path):
+                        zipfilepath = os.path.join(dir)
+                        zf = zipfile.ZipFile(zipfilepath, "r")
+                        zf.extractall(os.path.join(new_temp_path))
+                        zf.close()
 
             return temp_path
 
