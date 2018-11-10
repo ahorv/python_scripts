@@ -7,6 +7,7 @@ from mysql.connector import Error
 import re
 import os
 import cv2
+import socket
 import sys
 import math
 import pandas as pd
@@ -188,6 +189,7 @@ class Camera_Data(object):
 class Config(object):
     """Container class for configuration.
     """
+    HOST_NAME = '?'
     NAS_IP = '?'
     sourceDirectory = '?'
     camera_1_Directory = '?'
@@ -199,6 +201,7 @@ class Config(object):
 
     def __init__(self, state_map={}):
 
+        self.HOST_NAME = state_map.get('HOST_NAME', '?')
         self.NAS_IP = state_map.get('NAS_IP','?')
         self.sourceDirectory = state_map.get('sourceDirectory', '?')
         self.camera_1_Directory = state_map.get('camera_1_Directory', '?')
@@ -208,6 +211,7 @@ class Config(object):
         self.allFilesProcessed_path = state_map.get('allFilesProcessed_path', '?')
         self.rainy_days_path = state_map.get('rainy_days_path', '?')
 
+        Config.HOST_NAME = self.HOST_NAME
         Config.NAS_IP = self.NAS_IP
         Config.sourceDirectory = self.sourceDirectory
         Config.camera_1_Directory = self.camera_1_Directory
@@ -216,6 +220,15 @@ class Config(object):
         Config.databaseDirectory = self.databaseDirectory
         Config.allFilesProcessed_path = self.allFilesProcessed_path
         Config.rainy_days_path = self.rainy_days_path
+
+class AppFilter(logging.Filter):
+    '''
+    Needed by class Logger.
+    Sets additional field for logger message.
+    '''
+    def filter(self, record):
+        record.pc_name = Config.HOST_NAME
+        return True
 
 class Logger:
     def __init__(self):
@@ -267,7 +280,7 @@ class Logger:
                 FILEPATH = os.path.join(PATH, 'postprocessor.log')
                 LOGFILEPATH = join(r'\\',FILEPATH)
 
-                logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+                logFormatter = logging.Formatter('%(host_name)s %(asctime)s %(levelname)s %(message)s')
                 fileHandler = logging.FileHandler(LOGFILEPATH)
                 name = 'rootlogger'
             else:
@@ -285,6 +298,9 @@ class Logger:
 
             # get the logger instance
             self.logger = logging.getLogger(name)
+
+            # add new message field (host_name)
+            self.logger.addFilter(AppFilter())
 
             # set the logging level
             self.logger.setLevel(logging.INFO)
@@ -2170,7 +2186,9 @@ class Helpers:
 
 def main():
     try:
+        host_name = socket.gethostname()
         CFG = {
+            'HOST_NAME'         : host_name,
             'NAS_IP'            : r'192.168.1.10',            # @ Home: '192.168.1.10'
             'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
             'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
