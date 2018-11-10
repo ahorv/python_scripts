@@ -33,7 +33,7 @@ if sys.platform == "linux":
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 18.10.2018 Version 1 : postprocess.py
+## Hoa: 10.11.2018 Version 2 : postprocess.py
 ######################################################################
 # Reads all images from FTP - server. Create HDR images. Camera data
 # and images are stored in MySQL database.
@@ -47,11 +47,15 @@ print('Version opencv: ' + cv2.__version__)
 #   camera software version where in use.
 #   20180117_raw_cam1: designates year, month, day
 # - use phpmyadmin to see database contents
+# - in CFG set only one path to process single directory eg. :
+#        'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3',
+#        'camera_2_Directory': r'',
 #
 # New /Changes:
 # ----------------------------------------------------------------------
 #
 # 18.10.2018 : first implemented
+# 10.11.2018 : added host detection, updated logger, improved path retrieval
 #
 ######################################################################
 
@@ -1834,13 +1838,15 @@ class Helpers:
     def getDirectories(self,pathToDirectories):
         try:
             allDirs = []
-            img_cnt = 1
 
-            for dirs in sorted(glob(os.path.join(pathToDirectories, "*", ""))):
-                if os.path.isdir(dirs):
-                    if dirs.rstrip('\\').rpartition('\\')[-1]:
-                        allDirs.append(dirs.rstrip('\\'))
-                        img_cnt +=1
+            dir_name = pathToDirectories.rpartition('\\')[-1]
+            if 'raw' in dir_name:
+                allDirs = pathToDirectories
+            else:
+                for dirs in sorted(glob(os.path.join(pathToDirectories, "*", ""))):
+                    if os.path.isdir(dirs):
+                        if dirs.rstrip('\\').rpartition('\\')[-1]:
+                            allDirs.append(dirs.rstrip('\\'))
             return allDirs
 
         except Exception as e:
@@ -1938,11 +1944,15 @@ class Helpers:
         all_cam2_vers = self.getDirectories(Config.camera_2_Directory)
         all_cam_vers = []
 
-        for i, val in enumerate(all_cam1_vers):
-            all_cam_vers.append(val)
-            all_cam_vers.append(all_cam2_vers[i])
+        if all_cam1_vers and all_cam2_vers:
+            for i, val in enumerate(all_cam1_vers):
+                all_cam_vers.append(val)
+                all_cam_vers.append(all_cam2_vers[i])
 
-        return  all_cam_vers
+        else:
+            all_cam_vers = all_cam1_vers + all_cam2_vers
+
+        return all_cam_vers
 
     def getAll_previouslyProcessed(self):
         filename = Config.allFilesProcessed_path
@@ -1970,19 +1980,17 @@ class Helpers:
                 else:
                     success = self.processOneDay(path_to_one_dir)
 
-            # write everything to database
+            # write everything to database (within given directory)
             else:
                 allCamDirectorys = self.getAllCamDirectories()
                 for path in allCamDirectorys:
-                    allDirs = self.getDirectories(path)
 
-                    for raw_cam_dir in allDirs:
-                        date = self.getDateSring(raw_cam_dir)
-                        if self.is_rainy_day(date):  # check if it was a rainy day
-                            logger.info('Skipped {} was a rainy day.'.format(date))
-                            continue
-                        else:
-                            success = self.processOneDay(raw_cam_dir)
+                    all_dirs = self.getDirectories(path)
+
+                    if isinstance(all_dirs, (list, )):
+                        success = self.processDays(all_dirs)
+                    else:
+                        success = self.processOneDay(all_dirs)
 
         except Exception as e:
             logger.error('load_images2DB: ' + str(e))
@@ -2079,6 +2087,22 @@ class Helpers:
         succes = db.insert_dir_data(data_list)
 
         return succes
+
+    def processDays(self, all_dirs):
+        s = Logger()
+        logger = s.getLogger()
+        success = False
+
+        for raw_cam_dir in all_dirs:
+            date = self.getDateSring(raw_cam_dir)
+
+            if self.is_rainy_day(date):  # check if it was a rainy day
+                logger.info('Skipped {} was a rainy day.'.format(date))
+                continue
+            else:
+                success = self.processOneDay(raw_cam_dir)
+
+        return success
 
     def processOneDay(self, path):
         try:
