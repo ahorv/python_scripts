@@ -227,7 +227,7 @@ class AppFilter(logging.Filter):
     Sets additional field for logger message.
     '''
     def filter(self, record):
-        record.pc_name = Config.HOST_NAME
+        record.host_name = Config.HOST_NAME
         return True
 
 class Logger:
