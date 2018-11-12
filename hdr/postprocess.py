@@ -2118,7 +2118,8 @@ class Helpers:
                 if self.check_if_already_processed(dir.rstrip('\\')):
                     continue
                 else:
-                    print('Processing: {}'.format(dir))
+                    now = datetime.now()
+                    print('{} Processing: {}'.format(now.strftime("%H:%M:%S"),dir))
                     success = self.collectImageData(dir)
                     if success:
                         success = self.writeImageData2DB()
