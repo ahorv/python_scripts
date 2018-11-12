@@ -1,5 +1,4 @@
 import pandas as pd
-import pytz
 
 
 ######################################################################
@@ -25,10 +24,8 @@ import pytz
 ######################################################################
 
 path_luz = r'irradiation_luz_2017_2018.csv'
-path_soda = r'irradiation_soda_2017_2018.csv'
-
-utc = pytz.UTC
-cest = pytz.timezone('Europe/Zurich')
+path_soda = r'irradiation_soda_2017_2018_1min.csv'
+#path_soda = r'irradiation_soda_2017_2018.csv'
 
 
 def process_LUZ(csv_file):
@@ -47,10 +44,12 @@ def process_SODA(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=36)
     df['Observation period'] = df['Observation period'].map(lambda x: (((x.split('/')[1]).replace('T',' ')).replace('.0','')))
     df['Observation period'] = pd.to_datetime(df['Observation period'], format='%Y-%m-%d %H:%M:%S', utc=True)
-    df['Observation period'] = df['Observation period'] .dt.tz_localize('UTC')
-    df['Observation period'] = df['Observation period'] .dt.tz_convert('Europe/Zurich')
+    df['Observation period'] = df['Observation period'].dt.tz_localize('UTC')
+    #df['Observation period'] = df['Observation period'].dt.tz_convert('Europe/Zurich')
     df.set_index(pd.DatetimeIndex(df['Observation period']))
     df.rename(columns={'Observation period': 'datetime'}, inplace=True)
+    df = df.set_index(['datetime'])
+    df = df.loc[df.index.minute % 10 == 0]
 
     #df.to_csv('sodaout.csv')
 
@@ -61,10 +60,9 @@ def process_SODA(csv_file):
 '''
 def main():
     try:
-        process_LUZ(path_luz)
-        #process_SODA(path_soda)
+        #process_LUZ(path_luz)
+        df = process_SODA(path_soda)
 
-        print('done')
 
     except Exception as e:
        print('Error in MAIN: {}'.format(e))
