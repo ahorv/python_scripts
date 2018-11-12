@@ -33,9 +33,13 @@ cest = pytz.timezone('Europe/Zurich')
 
 def process_LUZ(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
+    df.set_index(pd.DatetimeIndex(df['time']))
     df['time'] = pd.to_datetime(df['time'], format='%Y%m%d%H%M', utc=True)
     df['time'] = df['time'].dt.tz_localize('UTC')
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
+    df.rename(columns={'time': 'datetime'}, inplace=True)
+
+    #df.to_csv('luzout.csv')
 
     return df
 
@@ -43,24 +47,27 @@ def process_SODA(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=36)
     df['Observation period'] = df['Observation period'].map(lambda x: (((x.split('/')[1]).replace('T',' ')).replace('.0','')))
     df['Observation period'] = pd.to_datetime(df['Observation period'], format='%Y-%m-%d %H:%M:%S', utc=True)
-    df.rename(columns={'Observation period': 'time'}, inplace=True)
-    df['time'] = df['time'].dt.tz_localize('UTC')
-    df['time'] = df['time'].dt.tz_convert('Europe/Zurich')
+    df['Observation period'] = df['Observation period'] .dt.tz_localize('UTC')
+    df['Observation period'] = df['Observation period'] .dt.tz_convert('Europe/Zurich')
+    df.set_index(pd.DatetimeIndex(df['Observation period']))
+    df.rename(columns={'Observation period': 'datetime'}, inplace=True)
 
-    df['time'].to_csv('SODA_out')
+    #df.to_csv('sodaout.csv')
 
     return df
+
+
 
 '''
 def main():
     try:
-        #process_LUZ(path_luz)
-        process_SODA(path_soda)
+        process_LUZ(path_luz)
+        #process_SODA(path_soda)
 
         print('done')
 
     except Exception as e:
-       print('MAIN: {}'.format(e))
+       print('Error in MAIN: {}'.format(e))
 
 if __name__ == '__main__':
     main()
