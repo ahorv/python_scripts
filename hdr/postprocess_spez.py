@@ -675,6 +675,8 @@ class HDR:
                 rhard_8bit = cv2.normalize(hdr_reinhard_s, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
 
                 cv2.imwrite(join(output_path, 'hdr_jpg.jpg'), rhard_8bit)
+                # clean up
+                del rhard_8bit; del hdr_reinhard; del hdr_reinhard_s
 
             if img_type is 'data':
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
@@ -689,7 +691,12 @@ class HDR:
                 rhard_8bit = cv2.normalize(hdr_reinhard_s, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
 
                 cv2.imwrite(join(output_path, 'hdr_data.jpg'),rhard_8bit)
+                #clean up
+                del hdr; del hdr_reinhard; del hdr_reinhard_s; del rhard_8bit
 
+            # clean up
+            del img_dir; del img_list_b; del img_list_g; del img_list_r; del listOfSS
+            del gb; del gr; del gg
 
             success = True
             return success
@@ -1975,6 +1982,8 @@ class Helpers:
                         date = self.getDateSring(raw_cam_dir)
                         success = self.processOneDay(raw_cam_dir)
 
+            gc.collect()
+
         except Exception as e:
             logger.error('load_images2DB: ' + str(e))
 
@@ -2081,7 +2090,8 @@ class Helpers:
             all_dirs = self.getDirectories(path_to_temp)
 
             for dir in all_dirs:
-                print('Processing: {}'.format(dir))
+                now = datetime.now()
+                print('{} Processing: {}'.format(now.strftime("%H:%M:%S"), dir))
                 success = self.collectImageData(dir)
 
             if success:
