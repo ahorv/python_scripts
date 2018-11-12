@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import mysql.connector
 from mysql.connector import Error
+import gc
 import re
 import os
 import cv2

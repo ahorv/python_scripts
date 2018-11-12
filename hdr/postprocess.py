@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import mysql.connector
 from mysql.connector import Error
+import gc
 import re
 import os
 import cv2
@@ -668,6 +669,8 @@ class HDR:
                 Image_Data.ldr_s = blob
                 plt.cla()       # Hoa neu
                 plt.close(fig)  # Hoa neu
+                # clean up
+                del byte_str; del blob; del rhard_rgb; del rhard_8bit; del hdr_reinhard; del hdr_reinhard_s
 
             if img_type is 'data':
                 # Create and plot response curve
@@ -721,6 +724,13 @@ class HDR:
                 Image_Data.rmap = rmap_blob
                 plt.cla()       # Hoa neu
                 plt.close(fig)  # Hoa neu
+                # clean up
+                del rmap; del rmap_blob; del hdr; del hdr_reinhard; del hdr_reinhard_s; del rhard_8bit; del byte_str
+                del respc; del resp_blob
+
+            # clean up
+            del img_dir; del img_list_b; del img_list_g; del img_list_r; del listOfSS
+            del gb; del gr; del gg
 
             success = True
             return success
@@ -1991,6 +2001,8 @@ class Helpers:
                         success = self.processDays(all_dirs)
                     else:
                         success = self.processOneDay(all_dirs)
+
+            gc.collect()
 
         except Exception as e:
             logger.error('load_images2DB: ' + str(e))
