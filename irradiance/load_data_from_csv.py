@@ -37,31 +37,26 @@ def process_LUZ(csv_file):
     df.rename(columns={'time': 'datetime'}, inplace=True)
 
     #df.to_csv('luzout.csv')
-
     return df
 
 def process_SODA(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=36)
-    df['Observation period'] = df['Observation period'].map(lambda x: (((x.split('/')[1]).replace('T',' ')).replace('.0','')))
-    df['Observation period'] = pd.to_datetime(df['Observation period'], format='%Y-%m-%d %H:%M:%S', utc=True)
-    df['Observation period'] = df['Observation period'].dt.tz_localize('UTC')
-    #df['Observation period'] = df['Observation period'].dt.tz_convert('Europe/Zurich')
-    df.set_index(pd.DatetimeIndex(df['Observation period']))
     df.rename(columns={'Observation period': 'datetime'}, inplace=True)
-    df = df.set_index(['datetime'])
+    df['datetime'] = df['datetime'].map(lambda x: (((x.split('/')[1]).replace('T',' ')).replace('.0','')))
+    df['datetime'] = pd.to_datetime(df['datetime'], format='%Y-%m-%d %H:%M:%S', utc=True)
+    df.set_index(pd.DatetimeIndex(df['datetime']).tz_localize('UTC').tz_convert('Europe/Zurich'), inplace=True)
     df = df.loc[df.index.minute % 10 == 0]
+    del df['datetime']
 
-    #df.to_csv('sodaout.csv')
-
+    #df.to_csv('sodaout_10min.csv')
     return df
-
-
 
 '''
 def main():
     try:
         #process_LUZ(path_luz)
         df = process_SODA(path_soda)
+        print(df.head(n=10))
 
 
     except Exception as e:
