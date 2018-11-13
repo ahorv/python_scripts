@@ -35,6 +35,7 @@ def process_LUZ(csv_file):
     df['time'] = df['time'].dt.tz_localize('UTC')
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'time': 'datetime'}, inplace=True)
+    df['gre000z0'] = pd.to_numeric(df['gre000z0'], errors='coerce')
 
     #df.to_csv('luzout.csv')
     return df
@@ -51,11 +52,12 @@ def process_SODA(csv_file):
     #df.to_csv('sodaout_10min.csv')
     return df
 
+
 '''
 def main():
     try:
-        #process_LUZ(path_luz)
-        df = process_SODA(path_soda)
+        df = process_LUZ(path_luz)
+        #df = process_SODA(path_soda)   
         print(df.head(n=10))
 
 
