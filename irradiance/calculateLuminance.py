@@ -93,11 +93,11 @@ def cmask(index, radius, array):
     image_mask[mask] = 1
     return (image_mask)
 
-def LuminanceSquareCrop(LDR_path, sun_x, sun_y, crop_dim):
+def LuminanceSquareCrop(LDR_path, sun_x, sun_y, crop_dim = 300):
     try:
         # LDR images
         image_path1 = LDR_path
-        print ('Processing ', image_path1)
+        print('Calculating luminance of: ', image_path1)
         f1 = open(image_path1, 'rb')
         im1 = cv2.imread(image_path1)
 
@@ -110,9 +110,6 @@ def LuminanceSquareCrop(LDR_path, sun_x, sun_y, crop_dim):
         lum = 0.2126*around_sun[:,:,0] + 0.7152*around_sun[:,:,1] + 0.0722*around_sun[:,:,2]
         lum = np.mean(lum)
 
-        date = im_date
-        time = im_time
-
         LDRLuminance = lum/exp_time1
         #print("Calculated luminance: " + LDRLuminance)
         print('End sol')
@@ -120,8 +117,7 @@ def LuminanceSquareCrop(LDR_path, sun_x, sun_y, crop_dim):
     except Exception as e:
         print("Error in sol: " + str(e))
 
-    return(date,time,LDRLuminance)
-
+    return(LDRLuminance)
 
 
 def main():
