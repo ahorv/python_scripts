@@ -6,7 +6,7 @@ import pandas as pd
 from glob import glob
 from fractions import Fraction
 from skimage import draw
-from skimage.draw import rectangle
+
 
 ######################################################################
 ## Hoa: 05.11.2018 Version 1 : LuminanceSquareCrop.py
@@ -310,13 +310,9 @@ def rectmask(corner, dimension, array):
 
     s = (nx, ny)
     image_mask = np.zeros(s)
-    #y, x = np.ogrid[-a:nx - a, -b:ny - b]
-    start = (50,50)
-    end = (250,250)
-    rr, cc = draw.rectangle(start, end,array.shape)
-    #y, x = np.mgrid[-a:nx-a,-b:ny-b]
-    #mask = (x-a <= w) & (y <= h)
-    image_mask[rr,cc] = 1
+    y, x = np.mgrid[-a:nx-a,-b:ny-b]
+    mask = (x<a)&(x-a<=w)&(y>b)&(y-b<=h)
+    image_mask[~mask] = 1
 
     return (image_mask)
 
@@ -402,8 +398,8 @@ def mask_array(data, cam='vers1', show_mask=False ):
     if cam == 'vers2':
         centre = [620,885]
         radius = 680
-        corner = [50,400]
-        dimension = [200,100]
+        corner = [0,520]
+        dimension = [0,100]
         #masked_img = maske_circle(data, [w, h, c], centre, radius, show_mask)
         masked_img = maske_rectangel(data, [w, h, c], corner, dimension, show_mask)
 
