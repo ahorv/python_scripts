@@ -21,8 +21,8 @@ from datetime import datetime
 #
 ######################################################################
 
-#path_img = r'C:\Users\ati\Desktop\teil_20181012\camera_1\cam_1_vers3\20181012_raw_cam1\temp'                # camera_1
-path_img = r'C:\Users\ati\Desktop\20181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp'              # camera_2
+path_img = r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers3\20181012_raw_cam1\temp'                # camera_1
+#path_img = r'C:\Users\ati\Desktop\20181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp'              # camera_2
 
 def calculate_sun_centre(LDR_low):
     """
@@ -142,7 +142,6 @@ def interpolate_missing_sun_pos(list_sun_CX, list_sun_CY):
         return (complete_x, complete_y)
         print('Error in interpolate_missing_sun_pos: {}'.format(e))
 
-
 def getDirectories(path_to_dirs):
     try:
         allDirs = []
@@ -161,8 +160,8 @@ def getDirectories(path_to_dirs):
 def getDateSring( path):
         try:
             date = ''
-            temp = path.rpartition('\\')[0]; print('{}'.format(temp))
-            temp = temp.rpartition('\\')[-1]; print('{}'.format(temp))
+            temp = path.rpartition('\\')[0]
+            temp = temp.rpartition('\\')[-1]
             date = temp.rpartition('_raw')[0]
             return date
 
@@ -577,7 +576,7 @@ def demonstrate():
 def main():
     try:
         global path_img
-        print('Started Luminance')
+        print('Started Luminance: {}'.format(path_img))
         #demonstrate()
         name, sw_vers, cam_id = strip_name_swvers_camid(path_img)
         timestamp = getDateSring(path_img)
@@ -632,7 +631,7 @@ def main():
         file_name = timestamp + '_luminance.csv'
         text_file = open(join(path_img,file_name), "w")
         text_file.write("####################################################################### \n")
-        text_file.write("# Datet Time: {} Camera ID: {} Softwareversion: {}.  \n".format(timestamp, sw_vers, cam_id ))
+        text_file.write("# Datet Time: {} Camera ID: {} Softwareversion: {}.  \n".format(timestamp,cam_id,sw_vers))
         text_file.write("####################################################################### \n")
         text_file.write("# sun_x, sun_y: position in pixels of sun.  \n")
         text_file.write("# lum_hdr:      luminance from HDR image  \n")
@@ -647,7 +646,6 @@ def main():
             sun_y = complete_sunY[i]
             lum_sqrcrpt = LuminanceSquareCrop(LDR_low, listOfAll_SS[i], sun_x, sun_y, 300, False)
             listOf_lum_sqrcrpt.append(str(round(lum_sqrcrpt,7)))
-            #print('From square cropped luminance:{}'.format(lum_sqrcrpt))
 
             values= dict(
                 no=str(i),
@@ -661,7 +659,7 @@ def main():
                 lsc=listOf_lum_sqrcrpt[i]
             )
             data_to_csv = '{no},{dt},{tm},{sx},{sy},{lh},{lhm},{lj},{lsc}\n'.format(**values)
-            print('{}'.format(data_to_csv))
+            print('{}'.format(str(i)))
             text_file.write(data_to_csv)
 
         text_file.close()
