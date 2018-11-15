@@ -9,7 +9,7 @@ from skimage import draw
 
 
 ######################################################################
-## Hoa: 05.11.2018 Version 1 : LuminanceSquareCrop.py
+## Hoa: 05.11.2018 Version 1 : calculateLuminance.py
 ######################################################################
 # Source : https://github.com/Soumyabrata/solar-irradiance-estimation
 #
@@ -20,109 +20,55 @@ from skimage import draw
 #
 ######################################################################
 
-print('Started Luminance')
+#path_img = r'C:\Users\ati\Desktop\teil_20181012\camera_1\cam_1_vers3\20181012_raw_cam1\temp' # camera1
+path_img = r'C:\Users\ati\Desktop\29181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp' # camera2
 
-path_img = r'C:\Users\ati\Desktop\teil_20181012\camera_1\cam_1_vers3\20181012_raw_cam1\temp' # camera1
-#path_img = r'C:\Users\ati\Desktop\29181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp' # camera2
+def calculate_sun_centre(LDR_low, show_sun=False):
+    """
+    usage:
+        centroid_x, centroid_y, complete_x, complete_y = calculate_sun_centre(path_img)
+        img = cv2.imread(path_img)
+        cv2.circle(img, (centroid_y, centroid_x), 30, (0,0,255), thickness=10, lineType=8, shift=0)
 
-def calculate_sun_centre(path_to_img):
-    complete_x = []
-    complete_y = []
-    all_images = []
-    im = cv2.imread(path_to_img)
+        w,h,d = img.shape
+        img_s = cv2.resize(img, (int(h/3), int(w/3)))
+        cv2.imshow('centre of sun',img_s)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    :param img:
+    :return:
+    """
 
-    # Finding the centroid of sun position polygon
-    threshold_value = 240
-    red = im[:, :, 2]
-    green = im[:, :, 1]
-    blue = im[:, :, 0]
-    all_coord = np.where(blue > threshold_value)
-    all_coord = np.asarray(all_coord)
-    length = np.shape(all_coord)[1]
-    sum_x = np.sum(all_coord[0, :])
-    sum_y = np.sum(all_coord[1, :])
-
-    if (sum_x == 0 or sum_y == 0):
-        centroid_x = np.nan
-        centroid_y = np.nan
-    else:
-        centroid_x = int(sum_x / length)
-        centroid_y = int(sum_y / length)
-
-    #interpolate the sun's location in the missing places
-    s1 = pd.Series(centroid_x)
-    s2 = pd.Series(centroid_y)
-
-    complete_x = s1.interpolate()
-    complete_y = s2.interpolate()
-
-    # Initially all computed values are NaN
-    if (np.isnan(complete_x).any()) or (np.isnan(complete_y).any()):
-        # print ('Skipping for ', match_string)
-        complete_x = np.array([])
-        complete_y = np.array([])
-    else:
-        # Replacing NaN s in the beginning with closest non-NaN value
-        a = complete_x
-        ind = np.where(~np.isnan(a))[0]
-        first, last = ind[0], ind[-1]
-        a[:first] = a[first]
-        a[last + 1:] = a[last]
-
-        # For y co-ordinate
-        a = complete_y
-        ind = np.where(~np.isnan(a))[0]
-        first, last = ind[0], ind[-1]
-        a[:first] = a[first]
-        a[last + 1:] = a[last]
-
-    print('calculated all x/y= {}/{} values {}/{}'.format(centroid_x, centroid_y,complete_x[0], complete_y[0]))
-    return (centroid_x, centroid_y, complete_x, complete_y)
-
-def cmask(index, radius, array):
-    a, b = index
-    is_rgb = len(array.shape)
-
-    if is_rgb == 3:
-        ash = array.shape
-        nx = ash[0]
-        ny = ash[1]
-
-    else:
-        nx, ny = array.shape
-
-    s = (nx, ny)
-    image_mask = np.zeros(s)
-    y, x = np.ogrid[-a:nx - a, -b:ny - b]
-    mask = x * x + y * y <= radius * radius
-    image_mask[mask] = 1
-    return (image_mask)
-
-def LuminanceSquareCrop(LDR_path, sun_x, sun_y, crop_dim = 300):
     try:
-        # LDR images
-        image_path1 = LDR_path
-        print('Calculating luminance of: ', image_path1)
-        f1 = open(image_path1, 'rb')
-        im1 = cv2.imread(image_path1)
+        # Finding the centroid of sun position polygon
+        threshold_value = 240
+        red = LDR_low[:, :, 2]
+        green = LDR_low[:, :, 1]
+        blue = LDR_low[:, :, 0]
+        all_coord = np.where(blue > threshold_value)
+        all_coord = np.asarray(all_coord)
+        length = np.shape(all_coord)[1]
+        sum_x = np.sum(all_coord[0, :])
+        sum_y = np.sum(all_coord[1, :])
 
-        centroid_x = sun_x
-        centroid_y = sun_y
+        if (sum_x == 0 or sum_y == 0):
+            centroid_x = 0
+            centroid_y = 0
+        else:
+            centroid_x = int(sum_x / length)
+            centroid_y = int(sum_y / length)
 
-        # Construct rectangle
-        around_sun = im1[(int(centroid_x - crop_dim/2)):(int(centroid_x + crop_dim/2)),(int(centroid_y - crop_dim/2)):(int(centroid_y + crop_dim/2))]
+        #interpolate the sun's location in the missing places (sobald die daten aus dem csv file gelesen werden)
+        # siehe im Orginal 'sun_positions_day_files'
 
-        lum = 0.2126*around_sun[:,:,0] + 0.7152*around_sun[:,:,1] + 0.0722*around_sun[:,:,2]
-        lum = np.mean(lum)
+        if show_sun:
+            cv2.circle(LDR_low, (centroid_y, centroid_x,), 30, (0, 0, 255), thickness=10, lineType=8, shift=0)
 
-        LDRLuminance = lum/exp_time1
-        #print("Calculated luminance: " + LDRLuminance)
-        print('End sol')
-
+        #print('Sun\'s centre: x/y= {}/{} '.format(str(centroid_x), str(centroid_y)))
+        return centroid_x, centroid_y
     except Exception as e:
+        return 0, 0
         print("Error in sol: " + str(e))
-
-    return(LDRLuminance)
 
 def getDirectories(path_to_dirs):
     try:
@@ -447,25 +393,64 @@ def mask_array(data, cam_id='1', type='', show_mask=False ):
 
     return masked_img
 
+def LuminanceSquareCrop(LDR_low_img, exp_low_time, sun_x, sun_y, crop_dim = 300, show_rect = False):
+    try:
+        centroid_x = sun_x
+        centroid_y = sun_y
+
+        # Construct rectangle
+        around_sun = LDR_low_img[(int(centroid_x - crop_dim/2)):(int(centroid_x + crop_dim/2)),(int(centroid_y - crop_dim/2)):(int(centroid_y + crop_dim/2))]
+
+        if show_rect:
+            x_1 = int(centroid_x - crop_dim/2)
+            y_1 = int(centroid_y - crop_dim/2)
+            x_2 = int(centroid_x + crop_dim/2)
+            y_2 = int(centroid_y + crop_dim/2)
+            cv2.rectangle(LDR_low_img, ( x_1,y_1), (x_2, y_2 ), (255, 255, 255), 3)
+
+        lum = 0.2126*around_sun[:,:,0] + 0.7152*around_sun[:,:,1] + 0.0722*around_sun[:,:,2]
+        lum = np.mean(lum)
+
+        LDRLuminance = lum/exp_low_time
+
+    except Exception as e:
+        print("Error in sol: " + str(e))
+
+    return LDRLuminance
 
 def main():
     try:
         global path_img
-
-
+        print('Started Luminance')
         all_dirs = getDirectories(path_img)
-        # ok durchläuft alle dirs
-        # nun jeweils aus output imgs holen
-        # aus log data die shutter zeiten parsen
-        # resultate in csv liste
+
         for dir in all_dirs:
 
             listOfSS, _ = getShutterTimes(dir)
-            print(' {}  SS:{}'.format(dir,listOfSS))
+            exp_low_time = listOfSS[2]
+            LDR_low = cv2.imread(join(dir,'raw_img-4.jpg'))
+            sun_y, sun_x  = calculate_sun_centre(LDR_low, True)
+            lum_sqrcrpt = LuminanceSquareCrop(LDR_low, exp_low_time, sun_x, sun_y,300, True)
+
+            print('lum_sqrcrpt = {}'.format(lum_sqrcrpt))
+
+            w, h, d = LDR_low.shape
+            img_s = cv2.resize(LDR_low, (int(h / 3), int(w / 3)))
+            cv2.imshow('centre of sun', img_s)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+            return
+            ##############################################
 
             # Calculate luminance from raw  HDR
             cam_id, type, arr_hdr = getNumpyArray(join(dir,'output','hdr_data.dat'))
+            lum_hdr= np.mean(arr_hdr)
+            print('mean hdr       : {}'.format(lum_hdr))
+
             arr_hdr_m = mask_array(arr_hdr, cam_id, type, False)
+            lum_hdr_m = np.mean(arr_hdr_m)
+            print('mean hdr masked: {}'.format(lum_hdr_m))
 
 
             # Calculate luminance from jpg HDR
@@ -474,10 +459,10 @@ def main():
 
 
 
-            show_image('hdr', arr_hdr_m)
-            show_image('original', arr_jpg_m)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+            #show_image('hdr', arr_hdr_m)
+            #show_image('original', arr_jpg_m)
+            #cv2.waitKey(0)
+            #cv2.destroyAllWindows()
             break
 
     except Exception as e:
