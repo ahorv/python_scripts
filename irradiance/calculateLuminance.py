@@ -22,8 +22,8 @@ from skimage import draw
 
 print('Started Luminance')
 
-#path_img = r'C:\Users\ati\Desktop\teil_20181012\camera_1\cam_1_vers3\20181012_raw_cam1\temp' # camera1
-path_img = r'C:\Users\ati\Desktop\29181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp' # camera2
+path_img = r'C:\Users\ati\Desktop\teil_20181012\camera_1\cam_1_vers3\20181012_raw_cam1\temp' # camera1
+#path_img = r'C:\Users\ati\Desktop\29181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp' # camera2
 
 def calculate_sun_centre(path_to_img):
     complete_x = []
@@ -153,6 +153,30 @@ def strip_name_swvers_camid(path):
     if camera_ID.isdigit(): camera_ID = int(camera_ID)
     if sw_vers.isdigit(): sw_vers = int(sw_vers)
 
+    return dir_name, sw_vers, camera_ID
+
+def strip_img_type(path):
+    type = ''
+    temp = path.rpartition('\\')[-1]
+    temp = temp.rpartition('_')[-1]
+    type = temp.rpartition('.')[0]
+
+    return str(type)
+
+def strip_name_swvers_camid(path):
+    path = path.lower()
+    path = path.rstrip('\\')
+    dir_name = (path.split('\\'))[-1]
+    temp = (path.split('\\cam_'))[-1]
+    temp = (temp.split('\\'))[0]
+    temp = (temp.split('_'))
+    camera_ID = temp[0]
+    sw_vers = temp[1]
+    sw_vers = sw_vers.replace('vers', '')
+
+    if camera_ID.isdigit(): camera_ID = int(camera_ID)
+    if sw_vers.isdigit(): sw_vers = int(sw_vers)
+
     return (dir_name, sw_vers, camera_ID)
 
 def getShutterTimes(path):
@@ -225,22 +249,25 @@ def getShutterTimes(path):
         except Exception as e:
             print('Error in getShutterTimes: ' + str(e))
 
-def getNumpyArray(path, type=None):
+def getNumpyArray(path):
     try:
         data = np.fromfile(path, dtype='uint16')
         img = None
 
-        if type is 'jpg':
+        dir_name, sw_vers, cam_ID = strip_name_swvers_camid(path)
+        type = strip_img_type(path)
+
+        if type == 'jpg':
             image_arr = np.frombuffer(data, dtype=np.float32)
             img = image_arr.reshape(1944, 2592, 3)
-        if type is 'data':
+        if type == 'data':
             image_arr = np.frombuffer(data, dtype=np.float32)
             img = image_arr.reshape(1232, 1648, 3)
 
-        return img
+        return int(cam_ID), type, img
 
     except Exception as e:
-       print('Error getNumpyArDB: {}'.format(e))
+       print('Error getNumpyArray: {}'.format(e))
 
 def tonemap(hdr):
     hdr = np.float32(hdr)
@@ -383,7 +410,7 @@ def maske_rectangel(input_image, size=[0, 0, 3], corner=[0, 0], dim=[0, 0], show
 
     return output_img
 
-def mask_array(data, cam='vers1', show_mask=False ):
+def mask_array(data, cam_id='1', type='', show_mask=False ):
 
     masked_img=None
 
@@ -391,17 +418,32 @@ def mask_array(data, cam='vers1', show_mask=False ):
     h = data.shape[1]
     c = data.shape[2]
 
-    if cam == 'vers1':
-        centre = [505,746] # [y,x] !
-        radius = 680
+    if cam_id == 1:
+        if type == 'data':
+            centre = [505,746] # [y,x] !
+            radius = 680
+
+        if type == 'jpg':
+            centre = [795, 1190]  # [y,x] !
+            radius = 1050
+
         masked_img = maske_circle(data, [w, h, c], centre, radius, show_mask)
-    if cam == 'vers2':
-        centre = [620,885]
-        radius = 680
-        corner = [0,520]
-        dimension = [0,100]
-        #masked_img = maske_circle(data, [w, h, c], centre, radius, show_mask)
-        masked_img = maske_rectangel(data, [w, h, c], corner, dimension, show_mask)
+
+    if cam_id == 2:
+        if type == 'data':
+            centre = [620,885]  # [y,x] !
+            radius = 680
+            corner = [0,520]
+            dimension = [0,100]
+
+        if type == 'jpg':
+            centre = [1080, 1300]  # [y,x] !
+            radius = 1065  #1065
+            corner = [0, 822]
+            dimension = [0, 168]
+
+        masked_img = maske_circle(data, [w, h, c], centre, radius, show_mask)
+        masked_img = maske_rectangel(masked_img, [w, h, c], corner, dimension, show_mask)
 
     return masked_img
 
@@ -410,28 +452,33 @@ def main():
     try:
         global path_img
 
+
         all_dirs = getDirectories(path_img)
         # ok durchläuft alle dirs
         # nun jeweils aus output imgs holen
         # aus log data die shutter zeiten parsen
         # resultate in csv liste
         for dir in all_dirs:
+
             listOfSS, _ = getShutterTimes(dir)
             print(' {}  SS:{}'.format(dir,listOfSS))
 
-            arr_hdr = getNumpyArray(join(dir,'output','hdr_data.dat'),'data')
-            hdr = mask_array(arr_hdr,'vers2',True)
-            show_image('hdr', hdr)
+            # Calculate luminance from raw  HDR
+            cam_id, type, arr_hdr = getNumpyArray(join(dir,'output','hdr_data.dat'))
+            arr_hdr_m = mask_array(arr_hdr, cam_id, type, False)
+
+
+            # Calculate luminance from jpg HDR
+            cam_id, type, arr_jpg = getNumpyArray(join(dir,'output','hdr_jpg.dat'))
+            arr_jpg_m = mask_array(arr_jpg, cam_id, type, False)
+
+
+
+            show_image('hdr', arr_hdr_m)
+            show_image('original', arr_jpg_m)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
             break
-
-
-            print('min: {}'.format(arr_hdr.min()))
-            print('{}'.format(join(dir,'output','hdr_data.dat')))
-
-            #arr_jpg = getNumpyArray(join('output', 'hdr_jpg.dat'))
-
 
     except Exception as e:
        print('MAIN: {}'.format(e))
