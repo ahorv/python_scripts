@@ -1,12 +1,13 @@
 import numpy as np
 import os
+import sys
+import os.path
 from os.path import join
 import cv2
 import pandas as pd
 from glob import glob
 from fractions import Fraction
-from skimage import draw
-
+from datetime import datetime
 
 ######################################################################
 ## Hoa: 05.11.2018 Version 1 : calculateLuminance.py
@@ -20,10 +21,50 @@ from skimage import draw
 #
 ######################################################################
 
-#path_img = r'C:\Users\ati\Desktop\teil_20181012\camera_1\cam_1_vers3\20181012_raw_cam1\temp' # camera1
-path_img = r'C:\Users\ati\Desktop\29181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp' # camera2
+#path_img = r'C:\Users\ati\Desktop\teil_20181012\camera_1\cam_1_vers3\20181012_raw_cam1\temp'                # camera_1
+path_img = r'C:\Users\ati\Desktop\20181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp'              # camera_2
 
-def calculate_sun_centre(LDR_low, show_sun=False):
+def calculate_sun_centre(LDR_low):
+    """
+    usage:
+        centroid_x, centroid_y, complete_x, complete_y = calculate_sun_centre(path_img)
+        img = cv2.imread(path_img)
+        cv2.circle(img, (centroid_y, centroid_x), 30, (0,0,255), thickness=10, lineType=8, shift=0)
+
+        w,h,d = img.shape
+        img_s = cv2.resize(img, (int(h/3), int(w/3)))
+        cv2.imshow('centre of sun',img_s)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    :param img:
+    :return:
+    """
+
+    try:
+        # Finding the centroid of sun position polygon
+        threshold_value = 240
+        red = LDR_low[:, :, 2]
+        green = LDR_low[:, :, 1]
+        blue = LDR_low[:, :, 0]
+        all_coord = np.where(blue > threshold_value)
+        all_coord = np.asarray(all_coord)
+        length = np.shape(all_coord)[1]
+        sum_x = np.sum(all_coord[0, :])
+        sum_y = np.sum(all_coord[1, :])
+
+        if (sum_x == 0 or sum_y == 0):
+            centroid_x = np.nan
+            centroid_y = np.nan
+        else:
+            centroid_x = int(sum_x / length)
+            centroid_y = int(sum_y / length)
+
+        return centroid_x, centroid_y
+    except Exception as e:
+        return 0, 0
+        print("Error in sol: " + str(e))
+
+def demo_calculate_sun_centre(LDR_low, show_sun=False):
     """
     usage:
         centroid_x, centroid_y, complete_x, complete_y = calculate_sun_centre(path_img)
@@ -58,17 +99,49 @@ def calculate_sun_centre(LDR_low, show_sun=False):
             centroid_x = int(sum_x / length)
             centroid_y = int(sum_y / length)
 
-        #interpolate the sun's location in the missing places (sobald die daten aus dem csv file gelesen werden)
-        # siehe im Orginal 'sun_positions_day_files'
-
         if show_sun:
             cv2.circle(LDR_low, (centroid_y, centroid_x,), 30, (0, 0, 255), thickness=10, lineType=8, shift=0)
 
-        #print('Sun\'s centre: x/y= {}/{} '.format(str(centroid_x), str(centroid_y)))
         return centroid_x, centroid_y
     except Exception as e:
         return 0, 0
         print("Error in sol: " + str(e))
+
+def interpolate_missing_sun_pos(list_sun_CX, list_sun_CY):
+    try:
+        # Interpolate the sun's location in the missing places
+        s1 = pd.Series(list_sun_CX)
+        s2 = pd.Series(list_sun_CY)
+
+        complete_x = s1.interpolate()
+        complete_y = s2.interpolate()
+
+        # All computed values are NaN
+        if (np.isnan(complete_x).any()) or (np.isnan(complete_y).any()):
+            complete_x = np.array([])
+            complete_y = np.array([])
+        else:
+            # Replacing NaN s in the beginning with closest non-NaN value
+            # For x coordinate
+            a = complete_x
+            ind = np.where(~np.isnan(a))[0]
+            first, last = ind[0], ind[-1]
+            a[:first] = a[first]
+            a[last + 1:] = a[last]
+
+            # For y coordinate
+            a = complete_y
+            ind = np.where(~np.isnan(a))[0]
+            first, last = ind[0], ind[-1]
+            a[:first] = a[first]
+            a[last + 1:] = a[last]
+
+        return (complete_x, complete_y)
+
+    except Exception as e:
+        return (complete_x, complete_y)
+        print('Error in interpolate_missing_sun_pos: {}'.format(e))
+
 
 def getDirectories(path_to_dirs):
     try:
@@ -84,6 +157,48 @@ def getDirectories(path_to_dirs):
 
     except Exception as e:
         print('getDirectories: Error: ' + str(e))
+
+def getDateSring( path):
+        try:
+            date = ''
+            temp = path.rpartition('\\')[0]; print('{}'.format(temp))
+            temp = temp.rpartition('\\')[-1]; print('{}'.format(temp))
+            date = temp.rpartition('_raw')[0]
+            return date
+
+        except Exception as e:
+            print('Error getDateSring:{}').format(e)
+            return date
+
+def strip_date_and_time(path):
+    try:
+        formated_date = '0000-00-00'
+        formated_time = datetime.now().strftime('%H:%M:%S')
+
+        date = (path.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[0]
+        time = (path.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[-1]
+
+        year  = date[:4]
+        month = date[4:6]
+        day   = date[6:8]
+        hour  = time[:2]
+        min   = time[2:4]
+        sec   = time[4:6]
+
+        check = [year,month,day,hour,min,sec]
+
+        for item in check:
+            if not item or not item.isdigit():
+                logger.error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
+                formated_date, formated_time))
+                return formated_date, formated_time
+
+        formated_date = '{}-{}-{}'.format(year,month,day)
+        formated_time = '{}:{}:{}'.format(hour,min,sec)
+
+        return formated_date, formated_time
+    except Exception as e:
+        return formated_date, formated_time
 
 def strip_name_swvers_camid(path):
     path = path.lower()
@@ -221,12 +336,17 @@ def tonemap(hdr):
     ldrReinhard = tonemapReinhard.process(hdr)
     return  ldrReinhard * 255
 
-def show_image(title, hdr):
+def show_hdr_image(title, hdr, resize=2):
     img_tonemp = tonemap(hdr)
     img_8bit = cv2.normalize(img_tonemp, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
     w, h, d = img_8bit.shape
-    img_8bit_s = cv2.resize(img_8bit, (int(h / 2), int(w / 2)))
+    img_8bit_s = cv2.resize(img_8bit, (int(h / resize), int(w / resize)))
     cv2.imshow(title, img_8bit_s)
+
+def show_ldr_image(title, ldr, resize=3):
+    w, h, d = ldr.shape
+    img_s = cv2.resize(ldr, (int(h / resize), int(w / resize)))
+    cv2.imshow(title, img_s)
 
 def cmask(index, radius, array):
     """Generates the mask for a given input image.
@@ -414,56 +534,137 @@ def LuminanceSquareCrop(LDR_low_img, exp_low_time, sun_x, sun_y, crop_dim = 300,
         LDRLuminance = lum/exp_low_time
 
     except Exception as e:
-        print("Error in sol: " + str(e))
+        print("Error in LuminanceSquareCrop: " + str(e))
 
     return LDRLuminance
+
+def demonstrate():
+
+    dir = r'I:\SkY_CAM_IMGS\camera_2\cam_2_vers3\29181012_raw_cam2\temp\20181012_145034'
+    if not os.path.isdir(dir):
+        print('Could not finde file!')
+        sys.exit(0)
+    else:
+        listOfSS, _ = getShutterTimes(dir)
+        exp_low_time = listOfSS[2]
+        LDR_low = cv2.imread(join(dir, 'raw_img-4.jpg'))
+        sun_y, sun_x = demo_calculate_sun_centre(LDR_low, False)
+        lum_sqrcrpt = LuminanceSquareCrop(LDR_low, exp_low_time, sun_x, sun_y, 300, False)
+        print('From square cropped luminance:{}'.format(lum_sqrcrpt))
+
+        cam_id, type, arr_hdr = getNumpyArray(join(dir, 'output', 'hdr_data.dat'))
+        lum_hdr = np.mean(arr_hdr)
+        print('mean relat lum hdr unmasked:  {}'.format(lum_hdr))
+
+        arr_hdr_m = mask_array(arr_hdr, cam_id, type, False)
+        lum_hdr_m = np.mean(arr_hdr_m)
+        print('mean relat lum hdr masked:    {}'.format(lum_hdr_m))
+
+        cam_id, type, arr_jpg = getNumpyArray(join(dir, 'output', 'hdr_jpg.dat'))
+        arr_jpg_m = mask_array(arr_jpg, cam_id, type, False)
+        lum_jpg_m = np.mean(arr_jpg_m)
+        print('mean relat lum jpg masked:    {}'.format(lum_jpg_m))
+
+        show_ldr_image('centre of sun', LDR_low)
+        show_hdr_image('hdr', arr_hdr_m)
+        show_hdr_image('original', arr_jpg_m, 4)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        print('Done demonstrate.')
+        sys.exit(0)
 
 def main():
     try:
         global path_img
         print('Started Luminance')
+        #demonstrate()
+        name, sw_vers, cam_id = strip_name_swvers_camid(path_img)
+        timestamp = getDateSring(path_img)
         all_dirs = getDirectories(path_img)
+        listOfAll_SS = []
+        listOfAll_date = []
+        listOffAll_time = []
+        listOfAll_LDRs = []
+        listOf_lum_hdr = []
+        listOf_lum_hdr_m = []
+        listOf_lum_jpg_m = []
+        listOf_lum_sqrcrpt = []
 
         for dir in all_dirs:
-
+            formated_date, formated_time = strip_date_and_time(dir)
+            listOfAll_date.append(formated_date)
+            listOffAll_time.append(formated_time)
             listOfSS, _ = getShutterTimes(dir)
-            exp_low_time = listOfSS[2]
-            LDR_low = cv2.imread(join(dir,'raw_img-4.jpg'))
-            sun_y, sun_x  = calculate_sun_centre(LDR_low, True)
-            lum_sqrcrpt = LuminanceSquareCrop(LDR_low, exp_low_time, sun_x, sun_y,300, True)
+            listOfAll_SS.append(listOfSS[2])
+            LDR_low = cv2.imread(join(dir, 'raw_img-4.jpg'))
+            listOfAll_LDRs.append(LDR_low)
 
-            print('lum_sqrcrpt = {}'.format(lum_sqrcrpt))
-
-            w, h, d = LDR_low.shape
-            img_s = cv2.resize(LDR_low, (int(h / 3), int(w / 3)))
-            cv2.imshow('centre of sun', img_s)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-
-            return
-            ##############################################
-
-            # Calculate luminance from raw  HDR
+            # Calculate relative luminance from raw HDR
             cam_id, type, arr_hdr = getNumpyArray(join(dir,'output','hdr_data.dat'))
-            lum_hdr= np.mean(arr_hdr)
-            print('mean hdr       : {}'.format(lum_hdr))
+            lum_hdr = np.mean(arr_hdr)
+            listOf_lum_hdr.append(str(round(lum_hdr,7)))
 
+            # Calculate relative luminance from masked raw HDR
             arr_hdr_m = mask_array(arr_hdr, cam_id, type, False)
             lum_hdr_m = np.mean(arr_hdr_m)
-            print('mean hdr masked: {}'.format(lum_hdr_m))
+            listOf_lum_hdr_m.append(str(round(lum_hdr_m,7)))
 
-
-            # Calculate luminance from jpg HDR
+            # Calculate relative luminance from jpg HDR
             cam_id, type, arr_jpg = getNumpyArray(join(dir,'output','hdr_jpg.dat'))
             arr_jpg_m = mask_array(arr_jpg, cam_id, type, False)
+            lum_jpg_m = np.mean(arr_jpg_m)
+            listOf_lum_jpg_m.append(str(round(lum_jpg_m,7)))
 
+        # Calculate luminance from jpg, as elaborated by Soumyabrata Dev (see in header)
+        list_sun_X = []
+        list_sun_Y = []
 
+        for i, ldr_low in enumerate(listOfAll_LDRs):
+            sun_y, sun_x = calculate_sun_centre(ldr_low)
+            list_sun_X.append(sun_x)
+            list_sun_Y.append(sun_y)
 
-            #show_image('hdr', arr_hdr_m)
-            #show_image('original', arr_jpg_m)
-            #cv2.waitKey(0)
-            #cv2.destroyAllWindows()
-            break
+        # Interpolate missing sun positions
+        complete_sunX, complete_sunY = interpolate_missing_sun_pos(list_sun_X, list_sun_Y)
+
+        # Header of *.csv file.
+        file_name = timestamp + '_luminance.csv'
+        text_file = open(join(path_img,file_name), "w")
+        text_file.write("####################################################################### \n")
+        text_file.write("# Datet Time: {} Camera ID: {} Softwareversion: {}.  \n".format(timestamp, sw_vers, cam_id ))
+        text_file.write("####################################################################### \n")
+        text_file.write("# sun_x, sun_y: position in pixels of sun.  \n")
+        text_file.write("# lum_hdr:      luminance from HDR image  \n")
+        text_file.write("# lum_hdr_m:    luminance from masked HDR image  \n")
+        text_file.write("# lum_jpg_m:    luminance from masked and tone mapped HDR image  \n")
+        text_file.write("# lum_sqrcrpt:  luminance from cropped square of low_LDR image  \n")
+        text_file.write("####################################################################### \n")
+        text_file.write("no, date, time, sun_x, sun_y, lum_hdr, lum_hdr_m, lum_jpg_m, lum_sqrcrpt \n")
+
+        for i, ldr_low in enumerate(listOfAll_LDRs):
+            sun_x = complete_sunX[i]
+            sun_y = complete_sunY[i]
+            lum_sqrcrpt = LuminanceSquareCrop(LDR_low, listOfAll_SS[i], sun_x, sun_y, 300, False)
+            listOf_lum_sqrcrpt.append(str(round(lum_sqrcrpt,7)))
+            #print('From square cropped luminance:{}'.format(lum_sqrcrpt))
+
+            values= dict(
+                no=str(i),
+                dt=listOfAll_date[i],
+                tm=listOffAll_time[i],
+                sx=str(sun_x),
+                sy=str(sun_y),
+                lh=listOf_lum_hdr[i],
+                lhm=listOf_lum_hdr_m[i],
+                lj=listOf_lum_jpg_m[i],
+                lsc=listOf_lum_sqrcrpt[i]
+            )
+            data_to_csv = '{no},{dt},{tm},{sx},{sy},{lh},{lhm},{lj},{lsc}\n'.format(**values)
+            print('{}'.format(data_to_csv))
+            text_file.write(data_to_csv)
+
+        text_file.close()
 
     except Exception as e:
        print('MAIN: {}'.format(e))
