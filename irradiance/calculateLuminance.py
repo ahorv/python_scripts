@@ -21,7 +21,7 @@ from datetime import datetime
 #
 ######################################################################
 
-path_img = r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers3\20181012_raw_cam1\temp'                # camera_1
+path_img = r'E:\SkY_CAM_IMGS\camera_1\cam_1_vers3\20181012_raw_cam1\temp'                # camera_1
 #path_img = r'C:\Users\ati\Desktop\20181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp'              # camera_2
 
 def calculate_sun_centre(LDR_low):
@@ -539,7 +539,7 @@ def LuminanceSquareCrop(LDR_low_img, exp_low_time, sun_x, sun_y, crop_dim = 300,
 
 def demonstrate():
 
-    dir = r'I:\SkY_CAM_IMGS\camera_2\cam_2_vers3\29181012_raw_cam2\temp\20181012_145034'
+    dir = r'E:\SkY_CAM_IMGS\camera_2\cam_2_vers3\29181012_raw_cam2\temp\20181012_145034'
     if not os.path.isdir(dir):
         print('Could not finde file!')
         sys.exit(0)
@@ -547,26 +547,26 @@ def demonstrate():
         listOfSS, _ = getShutterTimes(dir)
         exp_low_time = listOfSS[2]
         LDR_low = cv2.imread(join(dir, 'raw_img-4.jpg'))
-        sun_y, sun_x = demo_calculate_sun_centre(LDR_low, False)
-        lum_sqrcrpt = LuminanceSquareCrop(LDR_low, exp_low_time, sun_x, sun_y, 300, False)
+        sun_y, sun_x = demo_calculate_sun_centre(LDR_low, True)
+        lum_sqrcrpt = LuminanceSquareCrop(LDR_low, exp_low_time, sun_x, sun_y, 300, True)
         print('From square cropped luminance:{}'.format(lum_sqrcrpt))
 
         cam_id, type, arr_hdr = getNumpyArray(join(dir, 'output', 'hdr_data.dat'))
         lum_hdr = np.mean(arr_hdr)
         print('mean relat lum hdr unmasked:  {}'.format(lum_hdr))
 
-        arr_hdr_m = mask_array(arr_hdr, cam_id, type, False)
+        arr_hdr_m = mask_array(arr_hdr, cam_id, type, True)
         lum_hdr_m = np.mean(arr_hdr_m)
         print('mean relat lum hdr masked:    {}'.format(lum_hdr_m))
 
         cam_id, type, arr_jpg = getNumpyArray(join(dir, 'output', 'hdr_jpg.dat'))
-        arr_jpg_m = mask_array(arr_jpg, cam_id, type, False)
+        arr_jpg_m = mask_array(arr_jpg, cam_id, type, True)
         lum_jpg_m = np.mean(arr_jpg_m)
         print('mean relat lum jpg masked:    {}'.format(lum_jpg_m))
 
-        show_ldr_image('centre of sun', LDR_low)
-        show_hdr_image('hdr', arr_hdr_m)
-        show_hdr_image('original', arr_jpg_m, 4)
+        show_ldr_image('Low exposure with cropped square', LDR_low,5)
+        show_hdr_image('HDR from raw image', arr_hdr_m, 4)
+        show_hdr_image('HDR from jpg image', arr_jpg_m, 5)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -590,6 +590,7 @@ def main():
         listOf_lum_jpg_m = []
         listOf_lum_sqrcrpt = []
 
+        cnt = 0
         for dir in all_dirs:
             formated_date, formated_time = strip_date_and_time(dir)
             listOfAll_date.append(formated_date)
@@ -614,18 +615,31 @@ def main():
             arr_jpg_m = mask_array(arr_jpg, cam_id, type, False)
             lum_jpg_m = np.mean(arr_jpg_m)
             listOf_lum_jpg_m.append(str(round(lum_jpg_m,7)))
+            cnt +=1
+
+            print('{}'.format(cnt))
+
+        print('Done loading images, starting to calculate cropped square iluminance.')
 
         # Calculate luminance from jpg, as elaborated by Soumyabrata Dev (see in header)
         list_sun_X = []
         list_sun_Y = []
 
-        for i, ldr_low in enumerate(listOfAll_LDRs):
+        for ldr_low in listOfAll_LDRs:
             sun_y, sun_x = calculate_sun_centre(ldr_low)
             list_sun_X.append(sun_x)
             list_sun_Y.append(sun_y)
 
+        print('Found {} x-coords and {} y-coords'.format(len(list_sun_X), len(list_sun_Y)))  # -> ok: Found 381 x-coords and 381 y-coords
+
         # Interpolate missing sun positions
-        complete_sunX, complete_sunY = interpolate_missing_sun_pos(list_sun_X, list_sun_Y)
+        print('Interpolating missing sun\'s position')
+        complete_sunX, complete_sunY = interpolate_missing_sun_pos(list_sun_X, list_sun_Y) # Hier ist ein Fehler:
+        print('Done interpolating missing sun\'s position')                                # complete_sunX / Y sind leer !
+
+        # Debugging -> loeschen
+        print('len sunX:{}'.format(len(complete_sunX))) # diese sind leer !
+        print('len sunY:{}'.format(len(complete_sunY))) # diese sind leer !
 
         # Header of *.csv file.
         file_name = timestamp + '_luminance.csv'
@@ -641,10 +655,14 @@ def main():
         text_file.write("####################################################################### \n")
         text_file.write("no, date, time, sun_x, sun_y, lum_hdr, lum_hdr_m, lum_jpg_m, lum_sqrcrpt \n")
 
+
+        print('Calculating square cropped luminance')
         for i, ldr_low in enumerate(listOfAll_LDRs):
-            sun_x = complete_sunX[i]
-            sun_y = complete_sunY[i]
-            lum_sqrcrpt = LuminanceSquareCrop(LDR_low, listOfAll_SS[i], sun_x, sun_y, 300, False)
+            sun_x = complete_sunX[i]                    # Hier ist der Fehler:      sun_x = complete_sunX[i]
+            sun_y = complete_sunY[i]                    # IndexError: index 0 is out of bounds for axis 0 with size 0
+            ss = listOfAll_SS[i]
+            print('lumi: {}'.format(str(i)))
+            lum_sqrcrpt = LuminanceSquareCrop(ldr_low, ss , sun_x, sun_y, 300, False)
             listOf_lum_sqrcrpt.append(str(round(lum_sqrcrpt,7)))
 
             values= dict(
@@ -659,7 +677,6 @@ def main():
                 lsc=listOf_lum_sqrcrpt[i]
             )
             data_to_csv = '{no},{dt},{tm},{sx},{sy},{lh},{lhm},{lj},{lsc}\n'.format(**values)
-            print('{}'.format(str(i)))
             text_file.write(data_to_csv)
 
         text_file.close()
