@@ -117,7 +117,7 @@ def interpolate_missing_sun_pos(list_sun_CX, list_sun_CY):
         complete_y = s2.interpolate()
 
         # All computed values are NaN
-        if (np.isnan(complete_x).any()) or (np.isnan(complete_y).any()):
+        if (np.isnan(complete_x).any()) or (np.isnan(complete_y).any()):  # Sollte dies ueberspringen
             complete_x = np.array([])
             complete_y = np.array([])
         else:
