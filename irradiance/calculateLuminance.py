@@ -615,9 +615,11 @@ def main():
             arr_jpg_m = mask_array(arr_jpg, cam_id, type, False)
             lum_jpg_m = np.mean(arr_jpg_m)
             listOf_lum_jpg_m.append(str(round(lum_jpg_m,7)))
-            cnt +=1
 
+            cnt +=1
             print('{}'.format(cnt))
+            if cnt == 5:  # LOESCHEN
+                continue
 
         print('Done loading images, starting to calculate cropped square iluminance.')
 
