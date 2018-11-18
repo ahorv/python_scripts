@@ -681,7 +681,7 @@ def main():
         text_file.write("# lum_jpg_m:    luminance from masked and tone mapped HDR image  \n")
         text_file.write("# lum_sqrcrpt:  luminance from cropped square of low_LDR image  \n")
         text_file.write("####################################################################### \n")
-        text_file.write("no, date, time, sun_x, sun_y, lum_hdr, lum_hdr_m, lum_jpg_m, lum_sqrcrpt \n")
+        text_file.write("no,date,time,sun_x,sun_y,lum_hdr,lum_hdr_m,lum_jpg_m,lum_sqrcrpt \n")
 
 
         print('Calculating square cropped luminance')
