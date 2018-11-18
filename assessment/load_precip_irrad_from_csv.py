@@ -38,7 +38,7 @@ def process_LUZ_Precip(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
     df.set_index(pd.DatetimeIndex(df['time']))
     df['time'] = pd.to_datetime(df['time'], format='%Y%m%d', utc=True)
-    df['time'] = df['time'].dt.tz_localize('UTC')
+    #df['time'] = df['time'].dt.tz_localize('UTC')
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'time': 'datetime'}, inplace=True)
     df['rka150d0'] = pd.to_numeric(df['rka150d0'], errors='coerce')
@@ -50,14 +50,13 @@ def process_LUZ_Irrad(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
     df.set_index(pd.DatetimeIndex(df['time']))
     df['time'] = pd.to_datetime(df['time'], format='%Y%m%d%H%M', utc=True)
-    df['time'] = df['time'].dt.tz_localize('UTC')
+    #df['time'] = df['time'].dt.tz_localize('UTC')
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'time': 'datetime'}, inplace=True)
     df['gre000z0'] = pd.to_numeric(df['gre000z0'], errors='coerce')
 
     #df.to_csv('sodaout_10min.csv')
     return df
-
 
 '''
 def main():
