@@ -21,10 +21,15 @@ from datetime import datetime
 #
 ######################################################################
 
-path_img = r'E:\SkY_CAM_IMGS\camera_1\cam_1_vers3\20181012_raw_cam1\temp'                # camera_1
+path_img = r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers3\20181012_raw_cam1\temp'                # camera_1
 #path_img = r'C:\Users\ati\Desktop\20181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp'              # camera_2
 
-def calculate_sun_centre(LDR_low):
+
+
+global len_interpolated
+len_interpolated = 0
+
+def calculate_sun_centre(LDR_low, img_numb):
     """
     usage:
         centroid_x, centroid_y, complete_x, complete_y = calculate_sun_centre(path_img)
@@ -55,9 +60,12 @@ def calculate_sun_centre(LDR_low):
         if (sum_x == 0 or sum_y == 0):
             centroid_x = np.nan
             centroid_y = np.nan
+            print('img {} NO CENTRE'.format(img_numb))
         else:
             centroid_x = int(sum_x / length)
             centroid_y = int(sum_y / length)
+            #Loeschen
+            print(' FOUND CENTRE in {} at: {}/{}:'.format(img_numb,centroid_x,centroid_y))
 
         return centroid_x, centroid_y
     except Exception as e:
@@ -109,15 +117,28 @@ def demo_calculate_sun_centre(LDR_low, show_sun=False):
 
 def interpolate_missing_sun_pos(list_sun_CX, list_sun_CY):
     try:
+        #loeschen
+        print('interpolating -> len list cx: {}'.format(len(list_sun_CX)))
+        print('interpolating -> len list cy: {}'.format(len(list_sun_CY)))
+
         # Interpolate the sun's location in the missing places
         s1 = pd.Series(list_sun_CX)
         s2 = pd.Series(list_sun_CY)
 
+        #loeschen
+        print('before interpolating -> length of s1: {}  # values: {} # nans: {}'.format(s1.size, pd.isnull(s1).sum(),(~pd.isnull(s1)).sum() ))
+        print('before interpolating -> length of s2: {}  # values: {} # nans: {}'.format(s2.size, pd.isnull(s2).sum(),(~pd.isnull(s2)).sum() ))
+
         complete_x = s1.interpolate()
         complete_y = s2.interpolate()
 
+        # loeschen
+        print('after  interpolating -> length of s1: {} # values: {} # nans: {}'.format(complete_x.size, pd.isnull(complete_x).sum(),(~pd.isnull(complete_x)).sum() ))
+        print('after  interpolating -> length of s2: {} # values: {} # nans: {}'.format(complete_y.size, pd.isnull(complete_y).sum(),(~pd.isnull(complete_y)).sum() ))
+
         # All computed values are NaN
         if (np.isnan(complete_x).any()) or (np.isnan(complete_y).any()):  # Sollte dies ueberspringen
+            print('interpolating -> All computed values are NaN')
             complete_x = np.array([])
             complete_y = np.array([])
         else:
@@ -139,8 +160,9 @@ def interpolate_missing_sun_pos(list_sun_CX, list_sun_CY):
         return (complete_x, complete_y)
 
     except Exception as e:
-        return (complete_x, complete_y)
         print('Error in interpolate_missing_sun_pos: {}'.format(e))
+        return (0, 0)
+
 
 def getDirectories(path_to_dirs):
     try:
@@ -618,8 +640,8 @@ def main():
 
             cnt +=1
             print('{}'.format(cnt))
-            if cnt == 5:  # LOESCHEN
-                continue
+            #if cnt == 5:  # LOESCHEN
+            #    break
 
         print('Done loading images, starting to calculate cropped square iluminance.')
 
@@ -627,21 +649,25 @@ def main():
         list_sun_X = []
         list_sun_Y = []
 
+        # loeschen
+        count = 0
+
         for ldr_low in listOfAll_LDRs:
-            sun_y, sun_x = calculate_sun_centre(ldr_low)
+            count +=1
+            sun_y, sun_x = calculate_sun_centre(ldr_low, count)
             list_sun_X.append(sun_x)
             list_sun_Y.append(sun_y)
 
-        print('Found {} x-coords and {} y-coords'.format(len(list_sun_X), len(list_sun_Y)))  # -> ok: Found 381 x-coords and 381 y-coords
+        print('Len(list_sun) x/y sun centre: {} x-coords and {} y-coords'.format(len(list_sun_X), len(list_sun_Y)))  # -> ok: Found 381 x-coords and 381 y-coords
 
         # Interpolate missing sun positions
-        print('Interpolating missing sun\'s position')
-        complete_sunX, complete_sunY = interpolate_missing_sun_pos(list_sun_X, list_sun_Y) # Hier ist ein Fehler:
-        print('Done interpolating missing sun\'s position')                                # complete_sunX / Y sind leer !
+        #print('Interpolating missing sun\'s position')
+        #complete_sunX, complete_sunY = interpolate_missing_sun_pos(list_sun_X, list_sun_Y) # Hier ist ein Fehler:
+        #print('Done interpolating missing sun\'s position')                                # complete_sunX / Y sind leer !
 
         # Debugging -> loeschen
-        print('len sunX:{}'.format(len(complete_sunX))) # diese sind leer !
-        print('len sunY:{}'.format(len(complete_sunY))) # diese sind leer !
+        #print('complete_sunX:{}'.format(len(complete_sunX))) # diese sind leer !
+        #print('complete_sunY:{}'.format(len(complete_sunY))) # diese sind leer !
 
         # Header of *.csv file.
         file_name = timestamp + '_luminance.csv'
@@ -660,12 +686,13 @@ def main():
 
         print('Calculating square cropped luminance')
         for i, ldr_low in enumerate(listOfAll_LDRs):
-            sun_x = complete_sunX[i]                    # Hier ist der Fehler:      sun_x = complete_sunX[i]
-            sun_y = complete_sunY[i]                    # IndexError: index 0 is out of bounds for axis 0 with size 0
+            #sun_x = complete_sunX[i]                    # Hier ist der Fehler:      sun_x = complete_sunX[i]
+            #sun_y = complete_sunY[i]                    # IndexError: index 0 is out of bounds for axis 0 with size 0
+            sun_x = list_sun_X[i]                       # ohne interpolation
+            sun_y = list_sun_Y[i]                       # ohne interpolation
             ss = listOfAll_SS[i]
-            print('lumi: {}'.format(str(i)))
-            lum_sqrcrpt = LuminanceSquareCrop(ldr_low, ss , sun_x, sun_y, 300, False)
-            listOf_lum_sqrcrpt.append(str(round(lum_sqrcrpt,7)))
+            #lum_sqrcrpt = LuminanceSquareCrop(ldr_low, ss , sun_x, sun_y, 300, False)
+            #listOf_lum_sqrcrpt.append(str(round(lum_sqrcrpt,7)))
 
             values= dict(
                 no=str(i),
@@ -676,10 +703,14 @@ def main():
                 lh=listOf_lum_hdr[i],
                 lhm=listOf_lum_hdr_m[i],
                 lj=listOf_lum_jpg_m[i],
-                lsc=listOf_lum_sqrcrpt[i]
+                lsc=0
             )
+
+            # lsc=listOf_lum_sqrcrpt[i]
+
             data_to_csv = '{no},{dt},{tm},{sx},{sy},{lh},{lhm},{lj},{lsc}\n'.format(**values)
             text_file.write(data_to_csv)
+            print('Calculating luminance done.')
 
         text_file.close()
 
