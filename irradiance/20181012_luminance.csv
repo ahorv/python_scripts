@@ -7,7 +7,7 @@
 # lum_jpg_m:    luminance from masked and tone mapped HDR image  
 # lum_sqrcrpt:  luminance from cropped square of low_LDR image  
 ####################################################################### 
-no, date, time, sun_x, sun_y, lum_hdr, lum_hdr_m, lum_jpg_m, lum_sqrcrpt 
+no,date,time,sun_x,sun_y,lum_hdr,lum_hdr_m,lum_jpg_m,lum_sqrcrpt 
 0,2018-10-12,09:00:32,nan,nan,1776.205,1559.4404759,10155.8953133,0
 1,2018-10-12,09:01:10,nan,nan,1748.1163,1533.7746441,9889.2430855,0
 2,2018-10-12,09:01:46,nan,nan,1795.4769,1572.999367,9965.4901477,0
