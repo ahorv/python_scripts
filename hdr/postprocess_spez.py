@@ -1974,7 +1974,7 @@ class Helpers:
 
             # write only one day to database
             if path_to_one_dir:
-                date = self.getDateSring(path_to_one_dir)
+                #date = self.getDateSring(path_to_one_dir)
                 success = self.processOneDay(path_to_one_dir)
 
             # write everything to database
@@ -1984,7 +1984,7 @@ class Helpers:
                     allDirs = self.getDirectories(path)
 
                     for raw_cam_dir in allDirs:
-                        date = self.getDateSring(raw_cam_dir)
+                        #date = self.getDateSring(raw_cam_dir)
                         success = self.processOneDay(raw_cam_dir)
 
             gc.collect()
@@ -2095,9 +2095,13 @@ class Helpers:
             all_dirs = self.getDirectories(path_to_temp)
 
             for dir in all_dirs:
-                now = datetime.now()
-                print('{} Processing: {}'.format(now.strftime("%H:%M:%S"), dir))
-                success = self.collectImageData(dir)
+                if os.path.exists(join(dir,'output')):  # check if already processed
+                    if not (os.listdir(join(dir, 'output')) == []):
+                        continue
+                else:
+                    now = datetime.now()
+                    print('{} Processing: {}'.format(now.strftime("%H:%M:%S"), dir))
+                    success = self.collectImageData(dir)
 
             if success:
                 #shutil.rmtree(path_to_temp)
@@ -2172,7 +2176,7 @@ def main():
         logger = s.getLogger()
 
         logger.info('STARTED file processing.')
-        h.load_images2DB(r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers3\20181012_raw_cam1')
+        h.load_images2DB(r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers3\20181013_raw_cam1')
         logger.info('STOPPED file processing.')
 
     except Exception as e:
