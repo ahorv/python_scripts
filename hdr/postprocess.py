@@ -433,6 +433,8 @@ class DB_handler:
                    dir_name VARCHAR(100),
                    cam_id INTEGER,
                    sw_vers INTEGER,
+                   lock BOOLEAN,
+                   done BOOLEAN,                   
                    UNIQUE (dir_name, cam_id, sw_vers)
                   )
                """ % table_name
@@ -567,6 +569,34 @@ class DB_handler:
             logger.error('insert_image_data: {} '.format(e))
             return success
 
+    def insert_dir_done_true(self, data_list):
+        try:
+            success = False
+            s = Logger()
+            logger = s.getLogger()
+            data_list.append(1)
+            data_list.append(1)
+            table_name = 'dir_table'
+            con = self.connect2DB()
+            curs = con.cursor()
+            param_list = 'dir_name, cam_id, sw_vers'
+            format_strings = ','.join(['%s'] * len(data_list))
+
+            sql = "INSERT IGNORE INTO {} ".format(table_name) + \
+                  "("+ param_list +") " \
+                  "VALUES (%s)" % format_strings
+
+            curs.execute(sql, data_list)
+
+            self.commit_close()
+            success = True
+            return success
+
+        except Exception as e:
+            self.commit_close()
+            logger.error('insert_dir_done_true: {} '.format(e))
+            return success
+
     def object_exists(self, data_list):
         try:
             s = Logger()
@@ -579,7 +609,9 @@ class DB_handler:
             sql = "SELECT EXISTS(SELECT * FROM {} ".format(table_name) + \
                   "WHERE dir_name = '{}' ".format(data_list[0]) + \
                   "AND cam_id = '{}' ".format(data_list[1]) + \
-                  "AND sw_vers = '{}' LIMIT 1)".format(data_list[2])
+                  "AND sw_vers = '{}' ".format(data_list[2]) + \
+                  "AND lock = TRUE " + \
+                  "AND done = TRUE LIMIT 1)"
 
             exists = curs.execute(sql)
             result = curs.fetchone()[0]
