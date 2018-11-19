@@ -2243,6 +2243,9 @@ def main():
         logger = s.getLogger()
 
         start = h.load_rainy_days()
+        # NOCH:
+        # in der Bild Table noch column hdr_lumi eintragen
+        # durchdenken ob sich das lohnt oder doch nicht separat ?
 
         if start:
             db = DB_handler()
