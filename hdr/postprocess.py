@@ -34,8 +34,14 @@ if sys.platform == "linux":
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 10.11.2018 Version 3 : postprocess.py
+## Hoa: 19.11.2018 Version: postprocess.py
 ######################################################################
+# Can be run as multiple simultaneous threads.
+# Database table 'dir_table' with two new columns 'lock', 'done'.
+# If a directory is processed, 'lock' is set True
+# If processing of directory is finished, 'done' is set true.
+# Initial values of 'lock' is true, 'done' is false.
+#
 # Reads all images from FTP - server. Create HDR images. Camera data
 # and images are stored in MySQL database.
 #
