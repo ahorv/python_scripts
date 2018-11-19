@@ -25,7 +25,6 @@ path_img = r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers3\20181012_raw_cam1\temp'       
 #path_img = r'C:\Users\ati\Desktop\20181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp'              # camera_2
 
 
-
 global len_interpolated
 len_interpolated = 0
 
@@ -162,7 +161,6 @@ def interpolate_missing_sun_pos(list_sun_CX, list_sun_CY):
     except Exception as e:
         print('Error in interpolate_missing_sun_pos: {}'.format(e))
         return (0, 0)
-
 
 def getDirectories(path_to_dirs):
     try:
