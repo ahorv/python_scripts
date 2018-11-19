@@ -34,7 +34,7 @@ if sys.platform == "linux":
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 10.11.2018 Version 2 : postprocess.py
+## Hoa: 10.11.2018 Version 3 : postprocess.py
 ######################################################################
 # Reads all images from FTP - server. Create HDR images. Camera data
 # and images are stored in MySQL database.
