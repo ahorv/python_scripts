@@ -36,9 +36,14 @@ print('Version opencv: ' + cv2.__version__)
 ## Hoa: 10.11.2018 Version 1 : postprocess_spez.py
 ######################################################################
 #
-# Sonderversion:
-# wie postprozess.py jedoch werden die HDR - Bilder
-# im Ursprungs - Ordner gespecheichert anstelle der MySQL Datenbank.
+# Special version:
+# Like postprozess.py but with the difference that the HDR - images
+# are not stored in a MySQL database but in their directories.
+# All unziped files are collected in the new directory 'temp'.
+# Resulting HDR images are saved to new 'output' directory located in
+# each unzipped directory.
+#
+# Used for preprocessing images for irradiance calculations.
 #
 # New /Changes:
 # ----------------------------------------------------------------------
