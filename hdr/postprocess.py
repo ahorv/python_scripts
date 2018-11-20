@@ -579,22 +579,18 @@ class DB_handler:
             logger.error('insert_image_data: {} '.format(e))
             return success
 
-    def insert_dir_done_true(self, data_list):
+    def insert_dirIsDoneAndLocked(self, data_list):
         try:
             success = False
             s = Logger()
             logger = s.getLogger()
-            data_list.append(1)
-            data_list.append(1)
-            table_name = 'dir_table'
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'dir_name, cam_id, sw_vers'
-            format_strings = ','.join(['%s'] * len(data_list))
 
-            sql = "INSERT IGNORE INTO {} ".format(table_name) + \
-                  "("+ param_list +") " \
-                  "VALUES (%s)" % format_strings
+            sql = "UPDATE dir_table SET done = 1 " + \
+                  "WHERE dir_name = %s " + \
+                  "AND cam_id = %s " + \
+                  "AND sw_vers = %s"
 
             curs.execute(sql, data_list)
 
@@ -2116,7 +2112,7 @@ class Helpers:
 
         return success
 
-    def addProcessedDir2DB(self, dirName):
+    def addNewDir2BeProcessed(self, dirName):
         '''
         Extract all information from direcory title and
         save it to database.
@@ -2131,6 +2127,24 @@ class Helpers:
         # print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
         data_list = [dir_name, sw_vers, camera_ID, True, False]
         succes = db.insert_dir_data(data_list)
+
+        return succes
+
+    def setDirIsDoneAndLocked(self, dirName):
+        '''
+        Extract all information from direcory title and
+        save it to database.
+        Information needed to check if a directory was already
+        successfully processed.
+        :param titleOfDir:
+        :return:
+        '''
+        db = DB_handler()
+        succes = False
+        dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(dirName)
+        # print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
+        data_list = [dir_name, camera_ID, sw_vers]
+        succes = db.insert_dirIsDoneAndLocked(data_list)
 
         return succes
 
@@ -2164,13 +2178,15 @@ class Helpers:
                 if self.check_if_already_processed(dir.rstrip('\\')):
                     continue
                 else:
-                    now = datetime.now()
-                    print('{} Processing: {}'.format(now.strftime("%H:%M:%S"),dir))
-                    success = self.collectImageData(dir)
+                    success = self.addNewDir2BeProcessed(dir)
+                    if success:
+                        now = datetime.now()
+                        print('{} Processing: {}'.format(now.strftime("%H:%M:%S"),dir))
+                        success = self.collectImageData(dir)
                     if success:
                         success = self.writeImageData2DB()
                     if success:
-                        success = self.addProcessedDir2DB(dir)
+                        success = self.insert_dir_done_true(dir)
 
             if success:
                 shutil.rmtree(path_to_temp)
