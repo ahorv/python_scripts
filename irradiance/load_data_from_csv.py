@@ -34,7 +34,7 @@ import pandas as pd
 path_luz = r'irradiation_luz_2017_2018.csv'
 path_soda = r'irradiation_soda_2017_2018_1min.csv'
 path_calc = r'20181012_luminance.csv'
-path_dur = r'sunnshine_duration_2017_2018.csv'
+path_dur = r'sunshine_duration_2017_2018.csv'
 
 
 def process_LUZ(csv_file):
