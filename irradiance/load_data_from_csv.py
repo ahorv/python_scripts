@@ -34,6 +34,7 @@ import pandas as pd
 path_luz = r'irradiation_luz_2017_2018.csv'
 path_soda = r'irradiation_soda_2017_2018_1min.csv'
 path_calc = r'20181012_luminance.csv'
+path_dur = r'sunnshine_duration_2017_2018.csv'
 
 
 def process_LUZ(csv_file):
@@ -44,6 +45,17 @@ def process_LUZ(csv_file):
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'time': 'datetime'}, inplace=True)
     df['gre000z0'] = pd.to_numeric(df['gre000z0'], errors='coerce')
+
+    #df.to_csv('luzout.csv')
+    return df
+
+def process_LUZ_dur(csv_file):
+    df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
+    df.set_index(pd.DatetimeIndex(df['time']))
+    df['time'] = pd.to_datetime(df['time'], format='%Y%m%d', utc=True)
+    df['time'] = df['time'].dt.tz_localize('UTC')
+    df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
+    df.rename(columns={'time': 'datetime'}, inplace=True)
 
     #df.to_csv('luzout.csv')
     return df
@@ -82,22 +94,12 @@ def process_CALC(csv_file):
 def main():
     try:
         #df = process_LUZ(path_luz)
-        df = process_SODA(path_soda)
+        #df = process_SODA(path_soda)
         #df = process_CALC(path_calc)
 
+        df = process_LUZ_dur(path_dur)
         print(df.head(n=10))
 
-        return
-
-        day = '2018-10-12'  # day of observation ('2018-10-12' : camera 2, sw-vers. 3)
-        s_time = ' 07:40:00'  # beginning of observation
-        e_time = ' 07:50:00'  # end of observation
-        start = day + s_time
-        end = day + e_time
-
-        df.set_index(df.datetime, inplace=True)
-        df_lu = df['gre000z0']
-        print(df_lu.loc[start:end])
 
     except Exception as e:
        print('Error in MAIN: {}'.format(e))
