@@ -88,6 +88,8 @@ class Image_Data(object):
     thumb = 0
     rmap = 0
     resp = 0
+    lum_hdr = 0
+    lum_jpg = 0
 
     def __init__(self, state_map={}):
         self.date = state_map.get('date', 0)
@@ -108,6 +110,8 @@ class Image_Data(object):
         self.thumb = state_map.get('thumb', 0)
         self.rmap = state_map.get('rmap', 0)
         self.resp = state_map.get('resp', 0)
+        self.lum_hdr = state_map.get('lum_hdr', 0)
+        self.lum_jpg = state_map.get('lum_jpg', 0)
 
         Image_Data.date = self.date
         Image_Data.shots = self.shots
@@ -127,6 +131,8 @@ class Image_Data(object):
         Image_Data.thumb = self.thumb
         Image_Data.rmap = self.rmap
         Image_Data.resp = self.resp
+        Image_Data.lum_hdr = self.lum_hdr
+        Image_Data.lum_jpg = self.lum_jpg
 
     def to_dict(self):
         return {
@@ -148,6 +154,8 @@ class Image_Data(object):
             'thumb': Image_Data.thumb,
             'rmap': Image_Data.rmap,
             'resp': Image_Data.resp,
+            'lum_hdr': Image_Data.lum_hdr,
+            'lum_jpg': Image_Data.lum_jpg,
         }
 
 class Camera_Data(object):
@@ -477,6 +485,8 @@ class DB_handler:
                     thumb LONGBLOB,
                     rmap LONGBLOB,
                     resp LONGBLOB,
+                    lum_hdr FLOAT DEFAULT '0.0000',
+                    lum_jpg FLOAT DEFAULT '0.0000',
                     UNIQUE KEY (time)
                   )
                """ % table_name
