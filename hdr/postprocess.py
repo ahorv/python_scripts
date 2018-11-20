@@ -695,6 +695,7 @@ class HDR:
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
                 byte_str = hdr.tobytes()
                 Image_Data.ldr = byte_str
+                Image_Data.lum_jpg = np.mean(hdr)
 
                 # cb = COLORBALANCE() # not clear if luminace information will be preserved
 
@@ -741,6 +742,7 @@ class HDR:
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
                 byte_str = hdr.tobytes()
                 Image_Data.hdr = byte_str
+                Image_Data.lum_hdr = np.mean(hdr)
 
                 # create thumbnails image
                 hdr_reinhard = self.tonemapReinhard(hdr)
@@ -2143,7 +2145,7 @@ class Helpers:
         succes = False
         dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(dirName)
         # print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
-        data_list = [dir_name, sw_vers, camera_ID]
+        data_list = [dir_name, sw_vers, camera_ID, True, False]
         succes = db.insert_dir_data(data_list)
 
         return succes
@@ -2253,9 +2255,8 @@ def main():
         logger = s.getLogger()
 
         start = h.load_rainy_days()
-        # NOCH:
-        # in der Bild Table noch column hdr_lumi eintragen
-        # durchdenken ob sich das lohnt oder doch nicht separat ?
+
+        # MASKEN aus calculateLuminance.py übernehmen für lumi berechnungen !!!!
 
         if start:
             db = DB_handler()
