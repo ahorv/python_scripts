@@ -208,7 +208,7 @@ def strip_date_and_time(path):
 
         for item in check:
             if not item or not item.isdigit():
-                logger.error('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
+                print('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
                 formated_date, formated_time))
                 return formated_date, formated_time
 
