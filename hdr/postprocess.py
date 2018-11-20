@@ -659,6 +659,36 @@ class DB_handler:
             return last_id
 
 class HDR:
+    def cmask(self, index, radius, array):
+        """Generates the mask for a given input image.
+        The generated mask is needed to remove occlusions during post-processing steps.
+
+        Args:
+            index (numpy array): Array containing the x- and y- co-ordinate of the center of the circular mask.
+            radius (float): Radius of the circular mask.
+            array (numpy array): Input sky/cloud image for which the mask is generated.
+
+        Returns:
+            numpy array: Generated mask image."""
+
+        a, b = index
+        is_rgb = len(array.shape)
+
+        if is_rgb == 3:
+            ash = array.shape
+            nx = ash[0]
+            ny = ash[1]
+        else:
+            nx, ny = array.shape
+
+        s = (nx, ny)
+        image_mask = np.zeros(s)
+        y, x = np.ogrid[-a:nx - a, -b:ny - b]
+        mask = x * x + y * y <= radius * radius
+        image_mask[mask] = 1
+
+        return (image_mask)
+
     def make_hdr(self, path, listOfSS, img_type = 'jpg'):
         try:
             h = Helpers()
@@ -695,9 +725,9 @@ class HDR:
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
                 byte_str = hdr.tobytes()
                 Image_Data.ldr = byte_str
-                Image_Data.lum_jpg = np.mean(hdr)
 
-                # cb = COLORBALANCE() # not clear if luminace information will be preserved
+                jpg_hdr_m = self.mask_array(hdr, img_type)
+                Image_Data.lum_jpg = np.mean(jpg_hdr_m)
 
                 # create thumbnails image
                 hdr_reinhard = self.tonemapReinhard(hdr)
@@ -1210,108 +1240,66 @@ class HDR:
             logger.error('save_thumb ' + str(e))
             return success
 
-class COLORBALANCE:
+    def mask_array(self, data, type=''):
+        try:
+                cam_id = Camera_Data.cam_id
+                s = Logger()
+                logger = s.getLogger()
 
-    def apply_mask(self, matrix, mask, fill_value):
-        masked = np.ma.array(matrix, mask=mask, fill_value=fill_value)
-        return masked.filled()
+                masked_img = None
 
-    def apply_threshold(self, matrix, low_value, high_value):
-        low_mask = matrix < low_value
-        matrix = self.apply_mask(matrix, low_mask, low_value)
+                w = data.shape[0]
+                h = data.shape[1]
+                c = data.shape[2]
 
-        high_mask = matrix > high_value
-        matrix = self.apply_mask(matrix, high_mask, high_value)
+                if cam_id == 1:
+                    if type == 'data':
+                        centre = [505, 746]  # [y,x] !
+                        radius = 680
 
-        return matrix
+                    if type == 'jpg':
+                        centre = [795, 1190]  # [y,x] !
+                        radius = 1050
 
-    def simplest_cb(self, img, percent):
-        assert img.shape[2] == 3
-        assert percent > 0 and percent < 100
-        half_percent = percent / 200.0
-        channels = cv2.split(img)
+                    masked_img = self.maske_circle(data, [w, h, c], centre, radius)
 
-        out_channels = []
-        for channel in channels:
-            assert len(channel.shape) == 2
-            # find the low and high precentile values (based on the input percentile)
-            height, width = channel.shape
-            vec_size = width * height
-            flat = channel.reshape(vec_size)
+                if cam_id == 2:
+                    if type == 'data':
+                        centre = [620, 885]  # [y,x] !
+                        radius = 680
+                        corner = [0, 520]
+                        dimension = [0, 100]
 
-            assert len(flat.shape) == 1
-            flat = np.sort(flat)
-            n_cols = flat.shape[0]
+                    if type == 'jpg':
+                        centre = [1080, 1300]  # [y,x] !
+                        radius = 1065  # 1065
+                        corner = [0, 822]
+                        dimension = [0, 168]
 
-            low_val = flat[math.floor(n_cols * half_percent)]
-            high_val = flat[math.ceil(n_cols * (1.0 - half_percent))]
+                    masked_img = self.maske_circle(data, [w, h, c], centre, radius)
+                    masked_img = self.maske_rectangel(masked_img, [w, h, c], corner, dimension)
 
-            # saturate below the low percentile and above the high percentile
-            thresholded = self.apply_threshold(channel, low_val, high_val)
-            # scale the channel
-            normalized = cv2.normalize(thresholded, thresholded.copy(), 0, 255, cv2.NORM_MINMAX)
-            out_channels.append(normalized)
+                return masked_img
 
-        return cv2.merge(out_channels)
+        except Exception as e:
+            logger.error('mask_array ' + str(e))
+            return masked_img
 
-class IMAGEPROC:
-    def __init__(self, cam_data=None):
+    def maske_circle(self, input_image, size=[0, 0, 3], centre=[0, 0], radius=0):
 
-        if cam_data == None:
-            print('Empty camera data !')
-
-        self.cam_data = cam_data
-
-        CAM = cam_data.cam_id
-
-        # Create image mask
-        size = 1944, 2592, 3
         empty_img = np.zeros(size, dtype=np.uint8)
-        if CAM is '1':
-            self.mask = self.cmask([880, 1190], 1117, empty_img)
-        if CAM is '2':
-            self.mask = self.cmask([950, 1340], 1117, empty_img)
+        mask = self.cmask(centre, radius, empty_img)
 
-    def cmask(self, index, radius, array):
-        """Generates the mask for a given input image.
-        The generated mask is needed to remove occlusions during post-processing steps.
-        Args:
-            index (numpy array): Array containing the x- and y- co-ordinate of the center of the circular mask.
-            radius (float): Radius of the circular mask.
-            array (numpy array): Input sky/cloud image for which the mask is generated.
-        Returns:
-            numpy array: Generated mask image."""
-
-        a, b = index
-        is_rgb = len(array.shape)
-
-        if is_rgb == 3:
-            ash = array.shape
-            nx = ash[0]
-            ny = ash[1]
-        else:
-            nx, ny = array.shape
-
-        s = (nx, ny)
-        image_mask = np.zeros(s)
-        y, x = np.ogrid[-a:nx - a, -b:ny - b]
-        mask = x * x + y * y <= radius * radius
-        image_mask[mask] = 1
-
-        return (image_mask)
-
-    def maske_jpg_Image(self, input_image):
-
-        red   = input_image[:, :, 0]
+        red = input_image[:, :, 0]
         green = input_image[:, :, 1]
-        blue  = input_image[:, :, 2]
+        blue = input_image[:, :, 2]
 
-        r_img = red.astype(float)   * self.mask
-        g_img = green.astype(float) * self.mask
-        b_img = blue.astype(float) * self.mask
+        r_img = red.astype(float) * mask
+        g_img = green.astype(float) * mask
+        b_img = blue.astype(float) * mask
 
         dimension = (input_image.shape[0], input_image.shape[1], 3)
-        output_img = np.zeros(dimension, dtype=np.uint8)
+        output_img = np.zeros(dimension, dtype=float)
 
         output_img[..., 0] = r_img[:, :]
         output_img[..., 1] = g_img[:, :]
@@ -1319,38 +1307,71 @@ class IMAGEPROC:
 
         return output_img
 
-    def write2img(self,input_image,text, xy):
-
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        bottomLeftCornerOfText = xy
-        fontScale = 2
-        fontColor = (255, 255, 255)
-        lineType = 3
-
-        output_image = cv2.putText(input_image, text,
-                    bottomLeftCornerOfText,
-                    font,
-                    fontScale,
-                    fontColor,
-                    lineType)
-
-        return output_image
-
-    def image2binary(self, path_to_binary):
-
+    def mask_rectangle(self, input_image, size=[0, 0, 3], corner=[0, 0], dim=[0, 0]):
         try:
-            image_bytes = None
-            s = Logger()
-            logger = s.getLogger()
+                s = Logger()
+                logger = s.getLogger()
+                empty_img = np.zeros(size, dtype=np.uint8)
+                mask = self.rectmask(corner, dim, empty_img)
 
-            with open(path_to_binary, 'rb') as f:
-                image_bytes = f.read()
-            f.close()
+                red = input_image[:, :, 0]
+                green = input_image[:, :, 1]
+                blue = input_image[:, :, 2]
 
-            return image_bytes
+                r_img = red.astype(float) * mask
+                g_img = green.astype(float) * mask
+                b_img = blue.astype(float) * mask
+
+                dimension = (input_image.shape[0], input_image.shape[1], 3)
+                output_img = np.zeros(dimension, dtype=float)
+
+                output_img[..., 0] = r_img[:, :]
+                output_img[..., 1] = g_img[:, :]
+                output_img[..., 2] = b_img[:, :]
+
+                return output_img
 
         except Exception as e:
-            logger.error('read_image_as_binarry: {}'.format(e))
+            logger.error('mask_rectangle ' + str(e))
+            return output_img
+
+    def rectmask(self, corner, dimension, array):
+        """Generates the mask for a given input image.
+        The generated mask is needed to remove occlusions during post-processing steps.
+
+        Args:
+            index (numpy array): Array containing the x- and y- co-ordinate of the center of the circular mask.
+            radius (float): Radius of the circular mask.
+            array (numpy array): Input sky/cloud image for which the mask is generated.
+
+        Returns:
+            numpy array: Generated mask image."""
+        try:
+                s = Logger()
+                logger = s.getLogger()
+
+                w, h = dimension  # width and height
+                a, b = corner
+                is_rgb = len(array.shape)
+
+                if is_rgb == 3:
+                    ash = array.shape
+                    nx = ash[0]
+                    ny = ash[1]
+                else:
+                    nx, ny = array.shape
+
+                s = (nx, ny)
+                image_mask = np.zeros(s)
+                y, x = np.mgrid[-a:nx - a, -b:ny - b]
+                mask = (x < a) & (x - a <= w) & (y > b) & (y - b <= h)
+                image_mask[~mask] = 1
+
+                return (image_mask)
+
+        except Exception as e:
+            logger.error('rectmask ' + str(e))
+            return image_mask
 
 class Helpers:
 
@@ -1928,43 +1949,6 @@ class Helpers:
 
         return allZipFiles
 
-    def copyAndMaskAll_img5(self, list_alldirs):
-
-        try:
-            imgproc = IMAGEPROC()
-            global Path_to_copy_img5s
-            global CAM
-            cnt = 1
-
-            if not os.path.exists(Path_to_copy_img5s):
-                os.makedirs(Path_to_copy_img5s)
-
-            for next_dir in list_alldirs:
-                newimg = join(next_dir,'raw_img5.jpg')
-                masked_img = imgproc.maske_jpg_Image(cv2.imread(newimg))
-                dateAndTime = (next_dir.rstrip('\\').rpartition('\\')[-1]).replace('_',' ')
-                prefix = '{0:04d}'.format(cnt)
-                year  = dateAndTime[:4]
-                month = dateAndTime[4:6]
-                day   = dateAndTime[6:8]
-                hour  = dateAndTime[9:11]
-                min   = dateAndTime[11:13]
-                sec   = dateAndTime[13:15]
-
-                img_txt = imgproc.write2img(masked_img, 'cam ' + CAM, (30, 70))
-                img_txt = imgproc.write2img(masked_img,year+" "+month+" "+day,(30,1720))
-                img_txt = imgproc.write2img(masked_img, '#: ' + str(cnt), (30,1800))
-                img_txt = imgproc.write2img(masked_img, hour+":"+min+":"+sec, (30, 1880))
-                new_img_path = join(Path_to_copy_img5s, '{}.jpg'.format(prefix))
-
-                cv2.imwrite(new_img_path,masked_img)
-                cnt += 1
-
-            print('Masked {} images and copyied to imgs5.'.format(cnt))
-
-        except Exception as e:
-            print('Error in copyAndMaskAll_img5: {}'.format(e))
-
     def unzipall(self, path_to_extract):
         try:
             s = Logger()
@@ -2256,7 +2240,8 @@ def main():
 
         start = h.load_rainy_days()
 
-        # MASKEN aus calculateLuminance.py übernehmen für lumi berechnungen !!!!
+        # MASKEN aus calculateLuminance.py übernehmen für lumi berechnungen !
+        # Kontrolle ob alles da ist !
 
         if start:
             db = DB_handler()
