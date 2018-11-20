@@ -2166,7 +2166,7 @@ def main():
             'databaseDirectory' : r'I:\SkY_CAM_IMGS',
             'camera_1_Directory': r'',
             'camera_2_Directory': r'',
-            'rainy_days_path'   : r'assessment\rainy_days.csv',
+            'rainy_days_path'   : r'precipitation\rainy_days.csv',
         }
 
         config = Config(CFG)
