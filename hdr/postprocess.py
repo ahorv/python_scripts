@@ -8,6 +8,7 @@ import gc
 import re
 import os
 import cv2
+import time
 import socket
 import sys
 import math
@@ -577,10 +578,10 @@ class DB_handler:
 
         except Exception as e:
             self.commit_close()
-            logger.error('insert_image_data: {} '.format(e))
+            logger.error('insert_dir_data: {} '.format(e))
             return success
 
-    def insert_dirIsDoneAndLocked(self, data_list):
+    def insert_dir_is_done_and_unlocked(self, data_list):
         try:
             success = False
             s = Logger()
@@ -588,7 +589,7 @@ class DB_handler:
             con = self.connect2DB()
             curs = con.cursor()
 
-            sql = "UPDATE dir_table SET done = 1 " + \
+            sql = "UPDATE dir_table SET block = 0, done = 1 " + \
                   "WHERE dir_name = %s " + \
                   "AND cam_id = %s " + \
                   "AND sw_vers = %s"
@@ -601,10 +602,37 @@ class DB_handler:
 
         except Exception as e:
             self.commit_close()
-            logger.error('insert_dirIsDoneAndLocked: {} '.format(e))
+            logger.error('insert_dir_is_done_and_unlocked: {} '.format(e))
             return success
 
-    def object_exists(self, data_list):
+    def listed_in_dirtable(self, data_list):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            exists = False
+            table_name = 'dir_table'
+            con = self.connect2DB()
+            curs = con.cursor()
+
+            sql = "SELECT EXISTS(SELECT * FROM {} ".format(table_name) + \
+                  "WHERE dir_name = '{}' ".format(data_list[0]) + \
+                  "AND cam_id = '{}' ".format(data_list[1]) + \
+                  "AND sw_vers = '{}' LIMIT 1)".format(data_list[2])
+
+            curs.execute(sql)
+            result = curs.fetchone()[0]
+
+            if result == 1:
+                exists = True
+
+            return exists
+
+        except Exception as e:
+            self.commit_close()
+            logger.error('listed_in_dirtable: {} '.format(e))
+            return exists
+
+    def check_if_dir_done(self, data_list):
         try:
             s = Logger()
             logger = s.getLogger()
@@ -617,10 +645,9 @@ class DB_handler:
                   "WHERE dir_name = '{}' ".format(data_list[0]) + \
                   "AND cam_id = '{}' ".format(data_list[1]) + \
                   "AND sw_vers = '{}' ".format(data_list[2]) + \
-                  "AND block = TRUE " + \
                   "AND done = TRUE LIMIT 1)"
 
-            exists = curs.execute(sql)
+            curs.execute(sql)
             result = curs.fetchone()[0]
 
             if result == 1:
@@ -630,7 +657,35 @@ class DB_handler:
 
         except Exception as e:
             self.commit_close()
-            logger.error('object_exists: {} '.format(e))
+            logger.error('check_if_dir_done: {} '.format(e))
+            return exists
+
+    def check_if_dir_locked(self, data_list):
+        try:
+            s = Logger()
+            logger = s.getLogger()
+            exists = False
+            table_name = 'dir_table'
+            con = self.connect2DB()
+            curs = con.cursor()
+
+            sql = "SELECT EXISTS(SELECT * FROM {} ".format(table_name) + \
+                  "WHERE dir_name = '{}' ".format(data_list[0]) + \
+                  "AND cam_id = '{}' ".format(data_list[1]) + \
+                  "AND sw_vers = '{}' ".format(data_list[2]) + \
+                  "AND block = TRUE LIMIT 1)"
+
+            curs.execute(sql)
+            result = curs.fetchone()[0]
+
+            if result == 1:
+                exists = True
+
+            return exists
+
+        except Exception as e:
+            self.commit_close()
+            logger.error('check_if_dir_locked: {} '.format(e))
             return exists
 
     def getLastID_from_dir_data(self):
@@ -2145,7 +2200,7 @@ class Helpers:
         dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(dirName)
         # print('name: {} sw: {} id: {}'.format(dir_name, sw_vers, camera_ID))
         data_list = [dir_name, camera_ID, sw_vers]
-        succes = db.insert_dirIsDoneAndLocked(data_list)
+        succes = db.insert_dir_is_done_and_unlocked(data_list)
 
         return succes
 
@@ -2187,7 +2242,7 @@ class Helpers:
                     if success:
                         success = self.writeImageData2DB()
                     if success:
-                        success = self.insert_dirIsDoneAndLocked(dir)
+                        success = self.insert_done_and_unlocked(dir)
 
             if success:
                 shutil.rmtree(path_to_temp)
@@ -2202,15 +2257,26 @@ class Helpers:
     def check_if_already_processed(self, cur_dir):
         db = DB_handler()
         dir_name, sw_vers, cam_ID = self.strip_name_swvers_camid(cur_dir)
-        exists = db.object_exists([str(dir_name), str(sw_vers), str(cam_ID)])
+        is_listed = db.listed_in_dirtable([str(dir_name), str(sw_vers), str(cam_ID)])
 
-        return exists
+        if is_listed:
+            locked = db.check_if_dir_locked([str(dir_name), str(sw_vers), str(cam_ID)])
+            if locked:
+                skip_dir = True
+            else:
+                done = db.check_if_dir_done([str(dir_name), str(sw_vers), str(cam_ID)])
+                if not done:
+                    skip_dir = False
+        else:
+            skip_dir = False
 
-    def insert_dirIsDoneAndLocked(self, cur_dir):
+        return skip_dir
+
+    def insert_done_and_unlocked(self, cur_dir):
         success = False
         db = DB_handler()
         dir_name, sw_vers, cam_ID = self.strip_name_swvers_camid(cur_dir)
-        success = db.insert_dirIsDoneAndLocked([str(dir_name), str(cam_ID), str(sw_vers)])
+        success = db.insert_dir_is_done_and_unlocked([str(dir_name), str(cam_ID), str(sw_vers)])
         return success
 
     def load_rainy_days(self):
@@ -2263,9 +2329,6 @@ def main():
         logger = s.getLogger()
 
         start = h.load_rainy_days()
-
-        # MASKEN aus calculateLuminance.py übernehmen für lumi berechnungen !
-        # Kontrolle ob alles da ist !
 
         if start:
             db = DB_handler()
