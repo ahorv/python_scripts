@@ -544,8 +544,6 @@ class DB_handler:
                   "("+ param_list +") " \
                   "VALUES (%s)" % format_strings
 
-            print('insert_image_data sql : {}'.format(sql))
-
             curs.execute(sql,values)
 
             self.commit_close()
@@ -603,7 +601,7 @@ class DB_handler:
 
         except Exception as e:
             self.commit_close()
-            logger.error('insert_dir_done_true: {} '.format(e))
+            logger.error('insert_dirIsDoneAndLocked: {} '.format(e))
             return success
 
     def object_exists(self, data_list):
@@ -2189,7 +2187,7 @@ class Helpers:
                     if success:
                         success = self.writeImageData2DB()
                     if success:
-                        success = self.insert_dir_done_true(dir)
+                        success = self.insert_dirIsDoneAndLocked(dir)
 
             if success:
                 shutil.rmtree(path_to_temp)
@@ -2207,6 +2205,13 @@ class Helpers:
         exists = db.object_exists([str(dir_name), str(sw_vers), str(cam_ID)])
 
         return exists
+
+    def insert_dirIsDoneAndLocked(self, cur_dir):
+        success = False
+        db = DB_handler()
+        dir_name, sw_vers, cam_ID = self.strip_name_swvers_camid(cur_dir)
+        success = db.insert_dirIsDoneAndLocked([str(dir_name), str(cam_ID), str(sw_vers)])
+        return success
 
     def load_rainy_days(self):
         try:
