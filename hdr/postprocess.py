@@ -37,10 +37,10 @@ print('Version opencv: ' + cv2.__version__)
 ## Hoa: 19.11.2018 Version: postprocess.py
 ######################################################################
 # Can be run as multiple simultaneous threads.
-# Database table 'dir_table' with two new columns 'lock', 'done'.
-# If a directory is processed, 'lock' is set True
+# Database table 'dir_table' with two new columns 'block', 'done'.
+# If a directory is processed, 'block' is set True
 # If processing of directory is finished, 'done' is set true.
-# Initial values of 'lock' is true, 'done' is false.
+# Initial values of 'block' is true, 'done' is false.
 #
 # Reads all images from FTP - server. Create HDR images. Camera data
 # and images are stored in MySQL database.
@@ -441,7 +441,7 @@ class DB_handler:
                    dir_name VARCHAR(100),
                    cam_id INTEGER,
                    sw_vers INTEGER,
-                   lock BOOLEAN,
+                   block BOOLEAN,
                    done BOOLEAN,                   
                    UNIQUE (dir_name, cam_id, sw_vers)
                   )
@@ -533,7 +533,8 @@ class DB_handler:
             table_name = 'images_' + (Image_Data.date).replace('-','_')
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, ldr_s, hdr_s, thumb, rmap, resp'
+            param_list = 'shots, time, fstop, ss, exp, iso, ag, dg, awb_red, awb_blue, ldr, hdr, ldr_s, hdr_s, ' \
+                         'thumb, rmap, resp, lum_hdr, lum_jpg'
             imagedata = Image_Data.to_dict(None)
             del imagedata['date']
             values = list(imagedata.values())
@@ -542,6 +543,8 @@ class DB_handler:
             sql = "INSERT IGNORE INTO {} ".format(table_name) + \
                   "("+ param_list +") " \
                   "VALUES (%s)" % format_strings
+
+            print('insert_image_data sql : {}'.format(sql))
 
             curs.execute(sql,values)
 
@@ -561,7 +564,7 @@ class DB_handler:
             table_name = 'dir_table'
             con = self.connect2DB()
             curs = con.cursor()
-            param_list = 'dir_name, cam_id, sw_vers'
+            param_list = 'dir_name, cam_id, sw_vers, block, done'
             format_strings = ','.join(['%s'] * len(data_list))
 
             sql = "INSERT IGNORE INTO {} ".format(table_name) + \
@@ -616,7 +619,7 @@ class DB_handler:
                   "WHERE dir_name = '{}' ".format(data_list[0]) + \
                   "AND cam_id = '{}' ".format(data_list[1]) + \
                   "AND sw_vers = '{}' ".format(data_list[2]) + \
-                  "AND lock = TRUE " + \
+                  "AND block = TRUE " + \
                   "AND done = TRUE LIMIT 1)"
 
             exists = curs.execute(sql)
@@ -723,7 +726,7 @@ class HDR:
                 Image_Data.ldr = byte_str
 
                 jpg_hdr_m = self.mask_array(hdr, img_type)
-                Image_Data.lum_jpg = np.mean(jpg_hdr_m)
+                Image_Data.lum_jpg = float(np.mean(jpg_hdr_m))     # float() und round ?
 
                 # create thumbnails image
                 hdr_reinhard = self.tonemapReinhard(hdr)
@@ -768,7 +771,7 @@ class HDR:
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
                 byte_str = hdr.tobytes()
                 Image_Data.hdr = byte_str
-                Image_Data.lum_hdr = np.mean(hdr)
+                Image_Data.lum_hdr = float(np.mean(hdr))
 
                 # create thumbnails image
                 hdr_reinhard = self.tonemapReinhard(hdr)
@@ -2243,9 +2246,9 @@ def main():
             'NAS_IP'            : r'192.168.1.10',            # @ Home: '192.168.1.10'
             'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
             'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
-            'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
-            'camera_2_Directory': r'\\HOANAS\HOA_SKYCam\camera_2',
-            'rainy_days_path'   : r'..\assessment\rainy_days.csv',
+            'camera_1_Directory': r'', # r'\\HOANAS\HOA_SKYCam\camera_1'
+            'camera_2_Directory': r'',
+            'rainy_days_path'   : r'..\precipitation\rainy_days.csv',
         }
 
         config = Config(CFG)
@@ -2264,7 +2267,7 @@ def main():
             db.createDB()
 
             logger.info('STARTED file processing.')
-            h.load_images2DB()        # if only one day to be processed, provide path
+            h.load_images2DB(r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers1\20171124_raw_cam1')        # if only one day to be processed, provide path
             logger.info('STOPPED file processing.')
         else:
             print('Missing rainy_days.csv file.')
