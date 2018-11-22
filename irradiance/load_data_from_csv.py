@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 ######################################################################
 ## Hoa: 20.11.2018 Version 2 : load_data_from_csv.py
 ######################################################################
@@ -35,13 +34,25 @@ path_luz = r'irradiation_luz_2017_2018.csv'
 path_soda = r'irradiation_soda_2017_2018_1min.csv'
 path_calc = r'20181012_luminance.csv'
 path_dur = r'sunshine_duration_2017_2018.csv'
+path_hslu = r'CH_LU_Horw_HSLU_SolarIrradiation-2017.csv'
 
+def process_HSLU(csv_file):
+    df = pd.read_csv(csv_file, sep=',',index_col = False, header=3)
+    df.set_index(pd.DatetimeIndex(df['TIMESTAMP']))
+    df['TIMESTAMP'] = pd.to_datetime(df['TIMESTAMP'], format='%Y-%m-%d %H:%M:%S', utc=True)
+    #df['TIMESTAMP'] = df['TIMESTAMP'].dt.tz_localize('UTC')           # einkommentieren für laptop
+    df['TIMESTAMP'] = df['TIMESTAMP'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
+    df.rename(columns={'TIMESTAMP': 'datetime'}, inplace=True)
+    df['GHI_Avg'] = pd.to_numeric(df['GHI_Avg'], errors='coerce')
+
+    #df.to_csv('luzout.csv')
+    return df
 
 def process_LUZ(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
     df.set_index(pd.DatetimeIndex(df['time']))
     df['time'] = pd.to_datetime(df['time'], format='%Y%m%d%H%M', utc=True)
-    df['time'] = df['time'].dt.tz_localize('UTC')
+    #df['time'] = df['time'].dt.tz_localize('UTC')           #  einkommentieren für laptop
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'time': 'datetime'}, inplace=True)
     df['gre000z0'] = pd.to_numeric(df['gre000z0'], errors='coerce')
@@ -53,7 +64,7 @@ def process_LUZ_dur(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
     df.set_index(pd.DatetimeIndex(df['time']))
     df['time'] = pd.to_datetime(df['time'], format='%Y%m%d', utc=True)
-    df['time'] = df['time'].dt.tz_localize('UTC')
+    #df['time'] = df['time'].dt.tz_localize('UTC')            # einkommentieren für laptop
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'time': 'datetime'}, inplace=True)
 
@@ -65,7 +76,7 @@ def process_SODA(csv_file):
     df.rename(columns={'Observation period': 'datetime'}, inplace=True)
     df['datetime'] = df['datetime'].map(lambda x: (((x.split('/')[1]).replace('T',' ')).replace('.0','')))
     df['datetime'] = pd.to_datetime(df['datetime'], format='%Y-%m-%d %H:%M:%S', utc=True)
-    df['datetime'] = df['datetime'].dt.tz_localize('UTC')
+    #df['datetime'] = df['datetime'].dt.tz_localize('UTC')           # einkommentieren für laptop
     df['datetime'] = df['datetime'].dt.tz_convert('Europe/Zurich')
     df.set_index(pd.DatetimeIndex(df['datetime']), inplace=True)
     df = df.loc[df.index.minute % 10 == 0]
@@ -96,8 +107,9 @@ def main():
         #df = process_LUZ(path_luz)
         #df = process_SODA(path_soda)
         #df = process_CALC(path_calc)
+        #df = process_LUZ_dur(path_dur)
+        df = process_HSLU(path_hslu)
 
-        df = process_LUZ_dur(path_dur)
         print(df.head(n=10))
 
 
