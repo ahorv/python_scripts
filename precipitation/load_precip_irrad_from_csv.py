@@ -32,13 +32,22 @@ import pandas as pd
 path_irradi = r'irradiation_luz_2017_2018.csv'
 path_precip = r'precipitation_luz_2017_2018.csv'
 
+def process_LUZ_dur(csv_file):
+    df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
+    df.set_index(pd.DatetimeIndex(df['time']))
+    df['time'] = pd.to_datetime(df['time'], format='%Y%m%d', utc=True)
+    df['time'] = df['time'].dt.tz_localize('UTC')
+    df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
+    df.rename(columns={'time': 'datetime'}, inplace=True)
 
+    #df.to_csv('luzout.csv')
+    return df
 
 def process_LUZ_Precip(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
     df.set_index(pd.DatetimeIndex(df['time']))
     df['time'] = pd.to_datetime(df['time'], format='%Y%m%d', utc=True)
-    #df['time'] = df['time'].dt.tz_localize('UTC')
+    df['time'] = df['time'].dt.tz_localize('UTC')
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'time': 'datetime'}, inplace=True)
     df['rka150d0'] = pd.to_numeric(df['rka150d0'], errors='coerce')
