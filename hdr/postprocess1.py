@@ -467,7 +467,7 @@ class HDR:
     def createHDRVideo(self):
         try:
             global Path_to_sourceDir
-            hdrpath = join(Path_to_raw, 'hdr')
+            hdrpath = join(Path_to_sourceDir, 'hdr')
             global Path_to_ffmpeg                                 # path to ffmpeg executable
             fsp = ' -r 10 '                                       # frame per sec images taken
             stnb = '-start_number 0001 '                          # what image to start at
@@ -581,7 +581,7 @@ def main():
 
         if not os.path.isdir(Path_to_sourceDir):
             print('\nError: Image directory does not exist! -> Aborting.')
-            return;
+            return
 
         help = Helpers()
         hdr = HDR()
