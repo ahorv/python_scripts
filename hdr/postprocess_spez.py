@@ -707,6 +707,7 @@ class HDR:
             return success
 
         except Exception as e:
+            shutil.rmtree(output_path, ignore_errors=True)
             logger.error('make_hdr ' + str(e))
             return success
 
