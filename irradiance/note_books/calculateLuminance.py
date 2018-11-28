@@ -668,7 +668,7 @@ def main():
         #print('complete_sunY:{}'.format(len(complete_sunY))) # diese sind leer !
 
         # Header of *.csv file.
-        file_name = timestamp + '_luminance.csv'
+        file_name = timestamp + '_cam' + str(cam_id)+'_luminance.csv'
         text_file = open(join(path_img,file_name), "w")
         text_file.write("####################################################################### \n")
         text_file.write("# Datet Time: {} Camera ID: {} Softwareversion: {}.  \n".format(timestamp,cam_id,sw_vers))

@@ -30,7 +30,7 @@ import pandas as pd
 ######################################################################
 
 path_irradi = r'irradiation_luz_2017_2018.csv'
-path_precip = r'precipitation_luz_2017_2018.csv'
+path_precip = r'../ddddweather_data/precipitation_luz_2017_2018.csv'
 
 def process_LUZ_dur(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)

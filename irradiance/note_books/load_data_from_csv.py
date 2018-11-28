@@ -32,7 +32,7 @@ import pandas as pd
 
 path_luz = r'irradiation_luz_2017_2018.csv'
 path_soda = r'irradiation_soda_2017_2018_1min.csv'
-path_calc = r'20181012_luminance.csv'
+path_lumi = r'../lumi_data/20181012_cam1_luminance.csv'
 path_dur = r'sunshine_duration_2017_2018.csv'
 path_hslu = r'CH_LU_Horw_HSLU_SolarIrradiation-2017.csv'
 
@@ -85,7 +85,7 @@ def process_SODA(csv_file):
     #df.to_csv('sodaout_10min.csv')
     return df
 
-def process_CALC(csv_file):
+def process_LUMI(csv_file):
     df = pd.read_csv(csv_file, sep=',',index_col = False, header=9)
     df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], utc=False)
     df['datetime'] = df['datetime'].dt.tz_localize(tz='Europe/Zurich')
@@ -104,9 +104,9 @@ def main():
     try:
         #df = process_LUZ(path_luz)
         #df = process_SODA(path_soda)
-        #df = process_CALC(path_calc)
+        #df = process_LUMI(path_lumi)
         #df = process_LUZ_dur(path_dur)
-        df = process_HSLU(path_hslu)
+        #df = process_HSLU(path_hslu)
 
         print(df.head(n=10))
 
