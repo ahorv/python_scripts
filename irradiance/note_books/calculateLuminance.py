@@ -21,7 +21,7 @@ from datetime import datetime
 #
 ######################################################################
 
-path_img = r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers3\20181012_raw_cam1\temp'                # camera_1
+path_img = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM_2\camera_1\cam_1_vers1\20180129_raw_cam1\temp'
 #path_img = r'C:\Users\ati\Desktop\20181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp'              # camera_2
 
 
@@ -167,11 +167,17 @@ def getDirectories(path_to_dirs):
         allDirs = []
         img_cnt = 1
 
-        for dirs in sorted(glob(join(path_to_dirs, "*", ""))):
-            if os.path.isdir(dirs):
-                if dirs.rstrip('\\').rpartition('\\')[-1]:
-                    allDirs.append(dirs.rstrip('\\'))
-                    img_cnt +=1
+        for dir in sorted(glob(join(path_to_dirs, "*", ""))):
+            if os.path.isdir(dir):
+                check_path = join(dir, 'output')
+                if not os.path.isdir(check_path):
+                    continue
+                if os.listdir(check_path) == []:
+                    continue
+                else:
+                    if dir.rstrip('\\').rpartition('\\')[-1]:
+                        allDirs.append(dir.rstrip('\\'))
+                        img_cnt +=1
         return allDirs
 
     except Exception as e:
@@ -637,11 +643,9 @@ def main():
             listOf_lum_jpg_m.append(str(round(lum_jpg_m,7)))
 
             cnt +=1
-            print('{}'.format(cnt))
+            print('processing img: {}'.format(cnt))
             #if cnt == 5:  # LOESCHEN
             #    break
-
-        print('Done loading images, starting to calculate cropped square iluminance.')
 
         # Calculate luminance from jpg, as elaborated by Soumyabrata Dev (see in header)
         list_sun_X = []
@@ -656,7 +660,7 @@ def main():
             list_sun_X.append(sun_x)
             list_sun_Y.append(sun_y)
 
-        print('Len(list_sun) x/y sun centre: {} x-coords and {} y-coords'.format(len(list_sun_X), len(list_sun_Y)))  # -> ok: Found 381 x-coords and 381 y-coords
+        print('Found x/y sun centre: {} x-coords and {} y-coords'.format(len(list_sun_X), len(list_sun_Y)))  # -> ok: Found 381 x-coords and 381 y-coords
 
         # Interpolate missing sun positions
         #print('Interpolating missing sun\'s position')
@@ -669,7 +673,8 @@ def main():
 
         # Header of *.csv file.
         file_name = timestamp + '_cam' + str(cam_id)+'_luminance.csv'
-        text_file = open(join(path_img,file_name), "w")
+        output_path = join(path_img,file_name)
+        text_file = open(output_path, "w")
         text_file.write("####################################################################### \n")
         text_file.write("# Datet Time: {} Camera ID: {} Softwareversion: {}.  \n".format(timestamp,cam_id,sw_vers))
         text_file.write("####################################################################### \n")
@@ -681,8 +686,6 @@ def main():
         text_file.write("####################################################################### \n")
         text_file.write("no,date,time,sun_x,sun_y,lum_hdr,lum_hdr_m,lum_jpg_m,lum_sqrcrpt \n")
 
-
-        print('Calculating square cropped luminance')
         for i, ldr_low in enumerate(listOfAll_LDRs):
             #sun_x = complete_sunX[i]                    # Hier ist der Fehler:      sun_x = complete_sunX[i]
             #sun_y = complete_sunY[i]                    # IndexError: index 0 is out of bounds for axis 0 with size 0
@@ -708,9 +711,11 @@ def main():
 
             data_to_csv = '{no},{dt},{tm},{sx},{sy},{lh},{lhm},{lj},{lsc}\n'.format(**values)
             text_file.write(data_to_csv)
-            print('Calculating luminance done.')
+
 
         text_file.close()
+        print('output_path: {}'.format(output_path))
+        print('Calculating luminance done.')
 
     except Exception as e:
        print('MAIN: {}'.format(e))
