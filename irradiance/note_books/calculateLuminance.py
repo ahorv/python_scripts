@@ -21,7 +21,7 @@ from datetime import datetime
 #
 ######################################################################
 
-path_img = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM_2\camera_1\cam_1_vers1\20180129_raw_cam1\temp'
+path_img = r'Z:\SKY_CAM_1\camera_1\cam_1_vers2\20180605_raw_cam1\temp'
 #path_img = r'C:\Users\ati\Desktop\20181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp'              # camera_2
 
 

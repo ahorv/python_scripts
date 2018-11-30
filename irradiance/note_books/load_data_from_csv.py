@@ -40,7 +40,7 @@ def process_HSLU(csv_file):
     df = pd.read_csv(csv_file, sep=',',index_col = False, header=3)
     df.set_index(pd.DatetimeIndex(df['TIMESTAMP']))
     df['TIMESTAMP'] = pd.to_datetime(df['TIMESTAMP'], format='%Y-%m-%d %H:%M:%S', utc=True)
-    #df['TIMESTAMP'] = df['TIMESTAMP'].dt.tz_localize('UTC')           # einkommentieren für laptop
+    df['TIMESTAMP'] = df['TIMESTAMP'].dt.tz_localize('UTC')           # Fuer HSLU Laptop einkommentieren
     df['TIMESTAMP'] = df['TIMESTAMP'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'TIMESTAMP': 'datetime'}, inplace=True)
     df['GHI_Avg'] = pd.to_numeric(df['GHI_Avg'], errors='coerce')
@@ -52,7 +52,7 @@ def process_LUZ(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
     df.set_index(pd.DatetimeIndex(df['time']))
     df['time'] = pd.to_datetime(df['time'], format='%Y%m%d%H%M', utc=True)
-    #df['time'] = df['time'].dt.tz_localize('UTC')          # PC_Home auskommentieren
+    df['time'] = df['time'].dt.tz_localize('UTC')           # Fuer HSLU Laptop einkommentieren
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'time': 'datetime'}, inplace=True)
     df['gre000z0'] = pd.to_numeric(df['gre000z0'], errors='coerce')
@@ -64,7 +64,7 @@ def process_LUZ_dur(csv_file):
     df = pd.read_csv(csv_file, sep=';',index_col = False, header=0)
     df.set_index(pd.DatetimeIndex(df['time']))
     df['time'] = pd.to_datetime(df['time'], format='%Y%m%d', utc=True)
-    #df['time'] = df['time'].dt.tz_localize('UTC')          # PC_Home auskommentieren
+    df['time'] = df['time'].dt.tz_localize('UTC')          # Fuer HSLU Laptop einkommentieren
     df['time'] = df['time'].dt.tz_convert('Europe/Zurich')  # converted to central europe time respecting daylight saving
     df.rename(columns={'time': 'datetime'}, inplace=True)
 
@@ -76,7 +76,7 @@ def process_SODA(csv_file):
     df.rename(columns={'Observation period': 'datetime'}, inplace=True)
     df['datetime'] = df['datetime'].map(lambda x: (((x.split('/')[1]).replace('T',' ')).replace('.0','')))
     df['datetime'] = pd.to_datetime(df['datetime'], format='%Y-%m-%d %H:%M:%S', utc=True)
-    #df['datetime'] = df['datetime'].dt.tz_localize('UTC')           # PC_Home auskommentieren
+    df['datetime'] = df['datetime'].dt.tz_localize('UTC')           # Fuer HSLU Laptop einkommentieren
     df['datetime'] = df['datetime'].dt.tz_convert('Europe/Zurich')
     df.set_index(pd.DatetimeIndex(df['datetime']), inplace=True)
     df = df.loc[df.index.minute % 10 == 0]
@@ -89,7 +89,7 @@ def process_LUMI(csv_file):
     df = pd.read_csv(csv_file, sep=',',index_col = False, header=9)
     df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['time'], utc=False)
     df['datetime'] = df['datetime'].dt.tz_localize(tz='Europe/Zurich')
-    #df['datetime'] = df['datetime'].dt.tz_convert(tz='UTC')              # PC_Home auskommentieren
+    df['datetime'] = df['datetime'].dt.tz_convert(tz='UTC')              # Fuer HSLU Laptop einkommentieren
     #df.set_index(pd.DatetimeIndex(df['datetime']).tz_localize('UTC').tz_convert('Europe/Zurich'), inplace=True)
     df.set_index(df['datetime'],inplace=True)
 
