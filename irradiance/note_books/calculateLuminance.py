@@ -10,20 +10,20 @@ from fractions import Fraction
 from datetime import datetime
 
 ######################################################################
-## Hoa: 05.11.2018 Version 1 : calculateLuminance.py
+## Hoa: 06.11.2018 Version 1 : calculateLuminance.py
 ######################################################################
 # Source : https://github.com/Soumyabrata/solar-irradiance-estimation
+# path_img needs to include \temp directory example:
+# r'\\192.168.1.8\SkyCam_FTP\SKY_CAM\camera_2\cam_2_vers3\20181013_raw_cam2\temp'
 #
 # New /Changes:
 # ----------------------------------------------------------------------
 #
 # 05.11.2018 : first add
-#
+# 06.11.2018 : added data integrity check
 ######################################################################
 
-path_img = r'Z:\SKY_CAM_1\camera_1\cam_1_vers2\20180605_raw_cam1\temp'
-#path_img = r'C:\Users\ati\Desktop\20181012_camera2\camera_2\cam_2_vers3\29181012_raw_cam2\temp'              # camera_2
-
+path_img = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM\camera_2\cam_2_vers3\20181013_raw_cam2\temp'
 
 global len_interpolated
 len_interpolated = 0
@@ -167,17 +167,11 @@ def getDirectories(path_to_dirs):
         allDirs = []
         img_cnt = 1
 
-        for dir in sorted(glob(join(path_to_dirs, "*", ""))):
-            if os.path.isdir(dir):
-                check_path = join(dir, 'output')
-                if not os.path.isdir(check_path):
-                    continue
-                if os.listdir(check_path) == []:
-                    continue
-                else:
-                    if dir.rstrip('\\').rpartition('\\')[-1]:
-                        allDirs.append(dir.rstrip('\\'))
-                        img_cnt +=1
+        for dirs in sorted(glob(join(path_to_dirs, "*", ""))):
+            if os.path.isdir(dirs):
+                if dirs.rstrip('\\').rpartition('\\')[-1]:
+                    allDirs.append(dirs.rstrip('\\'))
+                    img_cnt +=1
         return allDirs
 
     except Exception as e:
@@ -599,10 +593,42 @@ def demonstrate():
         print('Done demonstrate.')
         sys.exit(0)
 
+def check_data_integrity(path_img):
+    try:
+        timestamp = getDateSring(path_img)
+        all_dirs = getDirectories(path_img)
+        files_to_check = ['hdr_data.dat', 'hdr_data.jpg', 'hdr_jpg.dat', 'hdr_jpg.jpg']
+        result = []
+
+        for dir in all_dirs:
+            path_output = join(dir, 'output')
+            if not os.path.exists(path_output):
+                msg = 'missing output dir in : {}'.format(dir)
+                result.append(msg)
+                break
+            else:
+                for file in files_to_check:
+                    if not os.path.isfile(join(dir,'output', file)):
+                        msg = 'missing file in dir: {}'.format(dir)
+                        result.append(msg)
+                        break
+
+        print('Found {} missing data:'.format(len(result)))
+        for res in result:
+            print('{}'.format(res))
+
+    except Exception as e:
+       print('check_data_integrity: {}'.format(e))
+
+
 def main():
     try:
         global path_img
-        print('Started Luminance: {}'.format(path_img))
+        print('Processing: {}'.format(path_img))
+        print('Checking data integrity:')
+        check_data_integrity(path_img)
+        print('Data integrity check done.')
+        print('Started luminance calculation:')
         #demonstrate()
         name, sw_vers, cam_id = strip_name_swvers_camid(path_img)
         timestamp = getDateSring(path_img)
@@ -643,9 +669,11 @@ def main():
             listOf_lum_jpg_m.append(str(round(lum_jpg_m,7)))
 
             cnt +=1
-            print('processing img: {}'.format(cnt))
+            print('{}'.format(cnt))
             #if cnt == 5:  # LOESCHEN
             #    break
+
+        print('Done loading images, starting to calculate cropped square iluminance.')
 
         # Calculate luminance from jpg, as elaborated by Soumyabrata Dev (see in header)
         list_sun_X = []
@@ -660,7 +688,7 @@ def main():
             list_sun_X.append(sun_x)
             list_sun_Y.append(sun_y)
 
-        print('Found x/y sun centre: {} x-coords and {} y-coords'.format(len(list_sun_X), len(list_sun_Y)))  # -> ok: Found 381 x-coords and 381 y-coords
+        print('Len(list_sun) x/y sun centre: {} x-coords and {} y-coords'.format(len(list_sun_X), len(list_sun_Y)))  # -> ok: Found 381 x-coords and 381 y-coords
 
         # Interpolate missing sun positions
         #print('Interpolating missing sun\'s position')
@@ -672,9 +700,8 @@ def main():
         #print('complete_sunY:{}'.format(len(complete_sunY))) # diese sind leer !
 
         # Header of *.csv file.
-        file_name = timestamp + '_cam' + str(cam_id)+'_luminance.csv'
-        output_path = join(path_img,file_name)
-        text_file = open(output_path, "w")
+        file_name = timestamp + '_luminance.csv'
+        text_file = open(join(path_img,file_name), "w")
         text_file.write("####################################################################### \n")
         text_file.write("# Datet Time: {} Camera ID: {} Softwareversion: {}.  \n".format(timestamp,cam_id,sw_vers))
         text_file.write("####################################################################### \n")
@@ -686,6 +713,8 @@ def main():
         text_file.write("####################################################################### \n")
         text_file.write("no,date,time,sun_x,sun_y,lum_hdr,lum_hdr_m,lum_jpg_m,lum_sqrcrpt \n")
 
+
+        print('Calculating square cropped luminance')
         for i, ldr_low in enumerate(listOfAll_LDRs):
             #sun_x = complete_sunX[i]                    # Hier ist der Fehler:      sun_x = complete_sunX[i]
             #sun_y = complete_sunY[i]                    # IndexError: index 0 is out of bounds for axis 0 with size 0
@@ -711,11 +740,9 @@ def main():
 
             data_to_csv = '{no},{dt},{tm},{sx},{sy},{lh},{lhm},{lj},{lsc}\n'.format(**values)
             text_file.write(data_to_csv)
-
+            print('Calculating luminance done.')
 
         text_file.close()
-        print('output_path: {}'.format(output_path))
-        print('Calculating luminance done.')
 
     except Exception as e:
        print('MAIN: {}'.format(e))
