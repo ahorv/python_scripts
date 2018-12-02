@@ -1,10 +1,13 @@
 import numpy as np
 import os
+import re
 import sys
+import math
 import os.path
 from os.path import join
 import cv2
 import pandas as pd
+import matplotlib.pyplot as plt
 from glob import glob
 from fractions import Fraction
 from datetime import datetime
@@ -31,35 +34,10 @@ path_img = r'\\IHLNAS05\SkyCam_FTP\SKY_CAM\camera_1\cam_1_vers3\20181013_raw_cam
 global len_interpolated
 len_interpolated = 0
 
-class Camera_Data(object):
-    """Container class for camera data.
-    """
-    sw_vers = '?'
-    cam_id = '?'
-    image_date = '?'
-
-    def __init__(self, state_map={}):
-        self.sw_vers = state_map.get('sw_vers','?')
-        self.cam_id = state_map.get('cam_id','?' )
-        self.image_date = state_map.get('image_date', '?')
-
-        Camera_Data.sw_vers = self.sw_vers
-        Camera_Data.cam_id = self.cam_id
-        Camera_Data.image_date = self.image_date
-
-    def to_dict(self):
-        return {
-            'sw_vers'       :Camera_Data.sw_vers,
-            'cam_id'        :Camera_Data.cam_id,
-            'image_date'    :Camera_Data.image_date,
-        }
-
 class HDR:
-    def make_hdr(self, path, listOfSS, img_type = 'jpg'):
+    def make_hdr(self, path, listOfSS, img_type='jpg'):
         try:
             h = Helpers()
-            s = Logger()
-            logger = s.getLogger()
             success = False
             img_dir = []
             type = ''
@@ -106,12 +84,14 @@ class HDR:
                 # create thumbnails image
                 hdr_reinhard = self.tonemapReinhard(hdr)
                 w, h, d = hdr.shape
-                hdr_reinhard_s = cv2.resize(hdr_reinhard,(int(h/3),int(w/3)))
+                hdr_reinhard_s = cv2.resize(hdr_reinhard, (int(h / 3), int(w / 3)))
                 rhard_8bit = cv2.normalize(hdr_reinhard_s, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
 
                 cv2.imwrite(join(output_path, 'hdr_jpg.jpg'), rhard_8bit)
                 # clean up
-                del rhard_8bit; del hdr_reinhard; del hdr_reinhard_s
+                del rhard_8bit;
+                del hdr_reinhard;
+                del hdr_reinhard_s
 
             if img_type is 'data':
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
@@ -125,25 +105,34 @@ class HDR:
                 hdr_reinhard_s = cv2.resize(hdr_reinhard, (int(h / 3), int(w / 3)))
                 rhard_8bit = cv2.normalize(hdr_reinhard_s, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
 
-                cv2.imwrite(join(output_path, 'hdr_data.jpg'),rhard_8bit)
-                #clean up
-                del hdr; del hdr_reinhard; del hdr_reinhard_s; del rhard_8bit
+                cv2.imwrite(join(output_path, 'hdr_data.jpg'), rhard_8bit)
+                # clean up
+                del hdr;
+                del hdr_reinhard;
+                del hdr_reinhard_s;
+                del rhard_8bit
 
             # clean up
-            del img_dir; del img_list_b; del img_list_g; del img_list_r; del listOfSS
-            del gb; del gr; del gg
+            del img_dir;
+            del img_list_b;
+            del img_list_g;
+            del img_list_r;
+            del listOfSS
+            del gb;
+            del gr;
+            del gg
 
             success = True
             return success
 
         except Exception as e:
-            logger.error('make_hdr ' + str(e))
+            print('error: make_hdr ' + str(e))
             return success
 
     def tonemapReinhard(self, hdr):
         tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
         ldrReinhard = tonemapReinhard.process(hdr)
-        return  ldrReinhard * 255
+        return ldrReinhard * 255
 
     def demosaic1(self, mosaic, awb_gains=None):
         '''
@@ -234,7 +223,7 @@ class HDR:
             img_list = [img[:, :, channel] for img in img_list]
 
         if dir_list[0].endswith('.jpg'):
-            img_list = [cv2.imread(file, 1)for file in dir_list]
+            img_list = [cv2.imread(file, 1) for file in dir_list]
             img_list = [img[:, :, channel] for img in img_list]
 
         return img_list
@@ -337,7 +326,7 @@ class HDR:
             k += 1
 
         # Solve the system using SVD
-        x = np.linalg.lstsq(A, b,rcond=None)[0]  # rcond=None
+        x = np.linalg.lstsq(A, b, rcond=None)[0]  # rcond=None
         g = x[:256]
         lE = x[256:]
 
@@ -401,8 +390,6 @@ class HDR:
         :return:
         '''
         try:
-            s = Logger()
-            logger = s.getLogger()
             image = np.zeros((hdr.shape[0], hdr.shape[1], 3), 'float32')
             image[..., 0] = hdr[..., 2]
             image[..., 1] = hdr[..., 1]
@@ -436,13 +423,11 @@ class HDR:
             return blob
 
         except Exception as e:
-            logger.error('hdr_to_blob ' + str(e))
+            print('error in: hdr_to_blob ' + str(e))
             return None
 
     def load_img_as_blob(self, path):
         try:
-            s = Logger()
-            logger = s.getLogger()
             img = cv2.imread(path)
             w, h, d = img.shape
             img_s = cv2.resize(img, (int(h / 3), int(w / 3)))
@@ -460,7 +445,7 @@ class HDR:
             return blob
 
         except Exception as e:
-            logger.error('save_thumb ' + str(e))
+            print('error in save_thumb ' + str(e))
             return None
 
     def save_hdr(self, hdr, filename):
@@ -515,11 +500,11 @@ class HDR:
             I2_gray = cv2.cvtColor(I2, cv2.COLOR_BGR2GRAY)
             I3_gray = cv2.cvtColor(I3, cv2.COLOR_BGR2GRAY)
 
-            mask = np.ones((w,h))
+            mask = np.ones((w, h))
 
             for i in range(0, w - 1):
                 for j in range(0, h - 1):
-                    if (I1_gray[i][j] > 240)and (I2_gray[i][j] > 240) and (I3_gray[i][j] > 240):
+                    if (I1_gray[i][j] > 240) and (I2_gray[i][j] > 240) and (I3_gray[i][j] > 240):
                         mask[i][j] = 0
 
             mask_I = comb_I
@@ -536,30 +521,6 @@ class HDR:
         except Exception as e:
             print('Error in mask_sat: {}'.format(e))
             return mask_I
-
-    def make_thumb(self, path):
-        try:
-            success = False
-            s = Logger()
-            logger = s.getLogger()
-            h = Helpers()
-            name, sw_vers, cam_id = h.strip_name_swvers_camid(path)
-
-            if sw_vers == 1:
-                Image_Data.thumb = self.load_img_as_blob(join(path, 'raw_img5.jpg'))
-
-            if sw_vers == 2:
-                Image_Data.thumb = self.load_img_as_blob(join(path, 'raw_img5.jpg'))
-
-            if sw_vers == 3:
-                Image_Data.thumb = self.load_img_as_blob(join(path, 'raw_img0.jpg'))
-
-            success = True
-            return success
-
-        except Exception as e:
-            logger.error('save_thumb ' + str(e))
-            return success
 
 class Helpers:
     def calculate_sun_centre(self, LDR_low, img_numb):
@@ -597,8 +558,8 @@ class Helpers:
             else:
                 centroid_x = int(sum_x / length)
                 centroid_y = int(sum_y / length)
-                #Loeschen
-                print(' FOUND CENTRE in {} at: {}/{}:'.format(img_numb,centroid_x,centroid_y))
+                # Loeschen
+                print(' FOUND CENTRE in {} at: {}/{}:'.format(img_numb, centroid_x, centroid_y))
 
             return centroid_x, centroid_y
         except Exception as e:
@@ -650,7 +611,7 @@ class Helpers:
 
     def interpolate_missing_sun_pos(self, list_sun_CX, list_sun_CY):
         try:
-            #loeschen
+            # loeschen
             print('interpolating -> len list cx: {}'.format(len(list_sun_CX)))
             print('interpolating -> len list cy: {}'.format(len(list_sun_CY)))
 
@@ -658,16 +619,26 @@ class Helpers:
             s1 = pd.Series(list_sun_CX)
             s2 = pd.Series(list_sun_CY)
 
-            #loeschen
-            print('before interpolating -> length of s1: {}  # values: {} # nans: {}'.format(s1.size, pd.isnull(s1).sum(),(~pd.isnull(s1)).sum() ))
-            print('before interpolating -> length of s2: {}  # values: {} # nans: {}'.format(s2.size, pd.isnull(s2).sum(),(~pd.isnull(s2)).sum() ))
+            # loeschen
+            print(
+                'before interpolating -> length of s1: {}  # values: {} # nans: {}'.format(s1.size, pd.isnull(s1).sum(),
+                                                                                           (~pd.isnull(s1)).sum()))
+            print(
+                'before interpolating -> length of s2: {}  # values: {} # nans: {}'.format(s2.size, pd.isnull(s2).sum(),
+                                                                                           (~pd.isnull(s2)).sum()))
 
             complete_x = s1.interpolate()
             complete_y = s2.interpolate()
 
             # loeschen
-            print('after  interpolating -> length of s1: {} # values: {} # nans: {}'.format(complete_x.size, pd.isnull(complete_x).sum(),(~pd.isnull(complete_x)).sum() ))
-            print('after  interpolating -> length of s2: {} # values: {} # nans: {}'.format(complete_y.size, pd.isnull(complete_y).sum(),(~pd.isnull(complete_y)).sum() ))
+            print('after  interpolating -> length of s1: {} # values: {} # nans: {}'.format(complete_x.size,
+                                                                                            pd.isnull(complete_x).sum(),
+                                                                                            (~pd.isnull(
+                                                                                                complete_x)).sum()))
+            print('after  interpolating -> length of s2: {} # values: {} # nans: {}'.format(complete_y.size,
+                                                                                            pd.isnull(complete_y).sum(),
+                                                                                            (~pd.isnull(
+                                                                                                complete_y)).sum()))
 
             # All computed values are NaN
             if (np.isnan(complete_x).any()) or (np.isnan(complete_y).any()):  # Sollte dies ueberspringen
@@ -696,6 +667,12 @@ class Helpers:
             print('Error in interpolate_missing_sun_pos: {}'.format(e))
             return (0, 0)
 
+    def get_int(self, text):
+        return int(text) if text.isdigit() else text
+
+    def byInteger_keys(self, text):
+        return [self.get_int(c) for c in re.split('(\d+)', text)]
+
     def getDirectories(self, path_to_dirs):
         try:
             avoid_this_Dirs = ['imgs', 'hdr']
@@ -706,23 +683,23 @@ class Helpers:
                 if os.path.isdir(dirs):
                     if dirs.rstrip('\\').rpartition('\\')[-1] not in avoid_this_Dirs:
                         allDirs.append(dirs.rstrip('\\'))
-                        img_cnt +=1
+                        img_cnt += 1
             return allDirs
 
         except Exception as e:
             print('getDirectories: Error: ' + str(e))
 
     def getDateSring(self, path):
-            try:
-                date = ''
-                temp = path.rpartition('\\')[0]
-                temp = temp.rpartition('\\')[-1]
-                date = temp.rpartition('_raw')[0]
-                return date
+        try:
+            date = ''
+            temp = path.rpartition('\\')[0]
+            temp = temp.rpartition('\\')[-1]
+            date = temp.rpartition('_raw')[0]
+            return date
 
-            except Exception as e:
-                print('Error getDateSring:{}').format(e)
-                return date
+        except Exception as e:
+            print('Error getDateSring:{}').format(e)
+            return date
 
     def strip_date_and_time(self, path):
         try:
@@ -732,23 +709,23 @@ class Helpers:
             date = (path.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[0]
             time = (path.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[-1]
 
-            year  = date[:4]
+            year = date[:4]
             month = date[4:6]
-            day   = date[6:8]
-            hour  = time[:2]
-            min   = time[2:4]
-            sec   = time[4:6]
+            day = date[6:8]
+            hour = time[:2]
+            min = time[2:4]
+            sec = time[4:6]
 
-            check = [year,month,day,hour,min,sec]
+            check = [year, month, day, hour, min, sec]
 
             for item in check:
                 if not item or not item.isdigit():
                     print('strip_date_and_time: could not read date and time  used {} {} instead !{}'.format(
-                    formated_date, formated_time))
+                        formated_date, formated_time))
                     return formated_date, formated_time
 
-            formated_date = '{}-{}-{}'.format(year,month,day)
-            formated_time = '{}:{}:{}'.format(hour,min,sec)
+            formated_date = '{}-{}-{}'.format(year, month, day)
+            formated_time = '{}:{}:{}'.format(hour, min, sec)
 
             return formated_date, formated_time
         except Exception as e:
@@ -795,74 +772,74 @@ class Helpers:
         return (dir_name, sw_vers, camera_ID)
 
     def getShutterTimes(self, path):
-            try:
-                '''
-                returns shutter_time in microseconds as np.float32 type
-                '''
-                dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(path)
-                types = ('*.txt', '*.log')
-                ss_to_db = []
+        try:
+            '''
+            returns shutter_time in microseconds as np.float32 type
+            '''
+            dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(path)
+            types = ('*.txt', '*.log')
+            ss_to_db = []
 
-                for typ in types:
-                    for file in sorted(glob(os.path.join(path,typ))):
-                        logfile = file
+            for typ in types:
+                for file in sorted(glob(os.path.join(path, typ))):
+                    logfile = file
 
-                f = open(join(logfile), 'r')
-                logfile = f.readlines()
+            f = open(join(logfile), 'r')
+            logfile = f.readlines()
 
-                if sw_vers == 1:
-                    listOfSS = np.empty(10, dtype=np.float32)
+            if sw_vers == 1:
+                listOfSS = np.empty(10, dtype=np.float32)
 
-                    if os.stat(file).st_size == 0:
-                        ss_to_db = '0,0,0,0,0,0,0,0,0,0'
-                        print('Empty camstat - file: {}'.format(file))
-                        return listOfSS, ss_to_db
+                if os.stat(file).st_size == 0:
+                    ss_to_db = '0,0,0,0,0,0,0,0,0,0'
+                    print('Empty camstat - file: {}'.format(file))
+                    return listOfSS, ss_to_db
 
-                    logfile.pop(0)  # remove non relevant lines
+                logfile.pop(0)  # remove non relevant lines
+                logfile.pop(0)
+                logfile.pop(0)
+                pos = 0
+                for line in logfile:
+                    value = line.split("camera shutter speed:", 1)[1].replace('[', '').replace(']', '')
+                    value = value.split('|', 1)[0]
+                    value = value.strip()
+                    ss_to_db.append(value + ",")
+                    value += '/1000000'
+                    val_float = np.float32(Fraction(str(value)))
+                    listOfSS[pos] = val_float
+                    pos += 1
+
+            else:
+                listOfSS = np.empty(3, dtype=np.float32)
+
+                if os.stat(file).st_size == 0:
+                    ss_to_db = '0,0,0'
+                    print('Empty camstat - file: {}'.format(file))
+                    return listOfSS, ss_to_db
+
+                if sw_vers == 2:
+                    logfile.pop(0)
+                if sw_vers == 3:
                     logfile.pop(0)
                     logfile.pop(0)
-                    pos = 0
-                    for line in logfile:
-                        value = line.split("camera shutter speed:", 1)[1].replace('[','').replace(']','')
-                        value = value.split('|', 1)[0]
-                        value = value.strip()
-                        ss_to_db.append(value + ",")
-                        value += '/1000000'
-                        val_float = np.float32(Fraction(str(value)))
-                        listOfSS[pos] = val_float
-                        pos +=1
 
-                else :
-                    listOfSS = np.empty(3, dtype=np.float32)
+                pos = 0
+                for line in logfile:
+                    value = line.split("ss:", 1)[1]
+                    value = value.split(',', 1)[0]
+                    value = value.strip()
+                    ss_to_db.append(value + ",")
+                    value += '/1000000'
+                    val_float = np.float32(Fraction(str(value)))
+                    listOfSS[pos] = val_float
+                    pos += 1
 
-                    if os.stat(file).st_size == 0:
-                        ss_to_db = '0,0,0'
-                        print('Empty camstat - file: {}'.format(file))
-                        return listOfSS, ss_to_db
+            ss_to_db_str = ''.join(ss_to_db)
 
-                    if sw_vers == 2:
-                        logfile.pop(0)
-                    if sw_vers == 3:
-                        logfile.pop(0)
-                        logfile.pop(0)
+            return listOfSS, ss_to_db_str.rstrip(',')
 
-                    pos = 0
-                    for line in logfile:
-                        value = line.split("ss:", 1)[1]
-                        value = value.split(',', 1)[0]
-                        value = value.strip()
-                        ss_to_db.append(value + ",")
-                        value += '/1000000'
-                        val_float = np.float32(Fraction(str(value)))
-                        listOfSS[pos] = val_float
-                        pos +=1
-
-                ss_to_db_str = ''.join(ss_to_db)
-
-                return listOfSS, ss_to_db_str.rstrip(',')
-
-            except Exception as e:
-                print('Error in getShutterTimes: ' + str(e))
+        except Exception as e:
+            print('Error in getShutterTimes: ' + str(e))
 
     def getNumpyArray(self, path):
         try:
@@ -882,13 +859,13 @@ class Helpers:
             return int(cam_ID), type, img
 
         except Exception as e:
-           print('Error getNumpyArray: {}'.format(e))
+            print('Error getNumpyArray: {}'.format(e))
 
     def tonemap(self, hdr):
         hdr = np.float32(hdr)
         tonemapReinhard = cv2.createTonemapReinhard(1.5, 0, 0, 0)
         ldrReinhard = tonemapReinhard.process(hdr)
-        return  ldrReinhard * 255
+        return ldrReinhard * 255
 
     def show_hdr_image(self, title, hdr, resize=2):
         img_tonemp = self.tonemap(hdr)
@@ -944,7 +921,7 @@ class Helpers:
         Returns:
             numpy array: Generated mask image."""
 
-        w, h = dimension # width and height
+        w, h = dimension  # width and height
         a, b = corner
         is_rgb = len(array.shape)
 
@@ -957,8 +934,8 @@ class Helpers:
 
         s = (nx, ny)
         image_mask = np.zeros(s)
-        y, x = np.mgrid[-a:nx-a,-b:ny-b]
-        mask = (x<a)&(x-a<=w)&(y>b)&(y-b<=h)
+        y, x = np.mgrid[-a:nx - a, -b:ny - b]
+        mask = (x < a) & (x - a <= w) & (y > b) & (y - b <= h)
         image_mask[~mask] = 1
 
         return (image_mask)
@@ -976,17 +953,17 @@ class Helpers:
             h = input_image.shape[0]
             w = input_image.shape[1]
 
-            for y in range(0,h):
-                for x in range(0,w):
-                    if mask[y,x] == 0:
-                        blue[y,x] = 65535
+            for y in range(0, h):
+                for x in range(0, w):
+                    if mask[y, x] == 0:
+                        blue[y, x] = 65535
             b_img = blue
         else:
             b_img = blue.astype(float) * mask
 
         r_img = red.astype(float) * mask
         g_img = green.astype(float) * mask
-        #b_img = blue.astype(float) * mask
+        # b_img = blue.astype(float) * mask
 
         dimension = (input_image.shape[0], input_image.shape[1], 3)
         output_img = np.zeros(dimension, dtype=float)
@@ -1009,16 +986,16 @@ class Helpers:
             h = input_image.shape[0]
             w = input_image.shape[1]
 
-            for y in range(0,h):
-                for x in range(0,w):
-                    if mask[y,x] == 0:
-                        green[y,x] = 65535
+            for y in range(0, h):
+                for x in range(0, w):
+                    if mask[y, x] == 0:
+                        green[y, x] = 65535
             g_img = green
         else:
             g_img = green.astype(float) * mask
 
         r_img = red.astype(float) * mask
-        #g_img = green.astype(float) * mask
+        # g_img = green.astype(float) * mask
         b_img = blue.astype(float) * mask
 
         dimension = (input_image.shape[0], input_image.shape[1], 3)
@@ -1030,9 +1007,9 @@ class Helpers:
 
         return output_img
 
-    def mask_array(self, data, cam_id='1', type='', show_mask=False ):
+    def mask_array(self, data, cam_id='1', type='', show_mask=False):
 
-        masked_img=None
+        masked_img = None
 
         w = data.shape[0]
         h = data.shape[1]
@@ -1040,7 +1017,7 @@ class Helpers:
 
         if cam_id == 1:
             if type == 'data':
-                centre = [505,746] # [y,x] !
+                centre = [505, 746]  # [y,x] !
                 radius = 680
 
             if type == 'jpg':
@@ -1051,14 +1028,14 @@ class Helpers:
 
         if cam_id == 2:
             if type == 'data':
-                centre = [620,885]  # [y,x] !
+                centre = [620, 885]  # [y,x] !
                 radius = 680
-                corner = [0,520]
-                dimension = [0,100]
+                corner = [0, 520]
+                dimension = [0, 100]
 
             if type == 'jpg':
                 centre = [1080, 1300]  # [y,x] !
-                radius = 1065  #1065
+                radius = 1065  # 1065
                 corner = [0, 822]
                 dimension = [0, 168]
 
@@ -1067,25 +1044,26 @@ class Helpers:
 
         return masked_img
 
-    def LuminanceSquareCrop(self, LDR_low_img, exp_low_time, sun_x, sun_y, crop_dim = 300, show_rect = False):
+    def LuminanceSquareCrop(self, LDR_low_img, exp_low_time, sun_x, sun_y, crop_dim=300, show_rect=False):
         try:
             centroid_x = sun_x
             centroid_y = sun_y
 
             # Construct rectangle
-            around_sun = LDR_low_img[(int(centroid_x - crop_dim/2)):(int(centroid_x + crop_dim/2)),(int(centroid_y - crop_dim/2)):(int(centroid_y + crop_dim/2))]
+            around_sun = LDR_low_img[(int(centroid_x - crop_dim / 2)):(int(centroid_x + crop_dim / 2)),
+                         (int(centroid_y - crop_dim / 2)):(int(centroid_y + crop_dim / 2))]
 
             if show_rect:
-                x_1 = int(centroid_x - crop_dim/2)
-                y_1 = int(centroid_y - crop_dim/2)
-                x_2 = int(centroid_x + crop_dim/2)
-                y_2 = int(centroid_y + crop_dim/2)
-                cv2.rectangle(LDR_low_img, ( x_1,y_1), (x_2, y_2 ), (255, 255, 255), 3)
+                x_1 = int(centroid_x - crop_dim / 2)
+                y_1 = int(centroid_y - crop_dim / 2)
+                x_2 = int(centroid_x + crop_dim / 2)
+                y_2 = int(centroid_y + crop_dim / 2)
+                cv2.rectangle(LDR_low_img, (x_1, y_1), (x_2, y_2), (255, 255, 255), 3)
 
-            lum = 0.2126*around_sun[:,:,0] + 0.7152*around_sun[:,:,1] + 0.0722*around_sun[:,:,2]
+            lum = 0.2126 * around_sun[:, :, 0] + 0.7152 * around_sun[:, :, 1] + 0.0722 * around_sun[:, :, 2]
             lum = np.mean(lum)
 
-            LDRLuminance = lum/exp_low_time
+            LDRLuminance = lum / exp_low_time
 
         except Exception as e:
             print("Error in LuminanceSquareCrop: " + str(e))
@@ -1094,7 +1072,7 @@ class Helpers:
 
     def demonstrate(self, dir):
 
-        #dir = r'E:\SkY_CAM_IMGS\camera_2\cam_2_vers3\29181012_raw_cam2\temp\20181012_145034'
+        # dir = r'E:\SkY_CAM_IMGS\camera_2\cam_2_vers3\29181012_raw_cam2\temp\20181012_145034'
         if not os.path.isdir(dir):
             print('Could not finde file!')
             sys.exit(0)
@@ -1119,7 +1097,7 @@ class Helpers:
             lum_jpg_m = np.mean(arr_jpg_m)
             print('mean relat lum jpg masked:    {}'.format(lum_jpg_m))
 
-            self.show_ldr_image('Low exposure with cropped square', LDR_low,5)
+            self.show_ldr_image('Low exposure with cropped square', LDR_low, 5)
             self.show_hdr_image('HDR from raw image', arr_hdr_m, 4)
             self.show_hdr_image('HDR from jpg image', arr_jpg_m, 5)
             cv2.waitKey(0)
@@ -1144,11 +1122,11 @@ class Helpers:
                 else:
                     add_dir_to_missing = False
                     for file in files_to_check:
-                        if not os.path.isfile(join(dir,'output', file)):
+                        if not os.path.isfile(join(dir, 'output', file)):
                             add_dir_to_missing = True
                         else:
-                            if os.path.getsize(join(dir,'output', file)) == 0:
-                                os.remove(join(dir,'output', file))
+                            if os.path.getsize(join(dir, 'output', file)) == 0:
+                                os.remove(join(dir, 'output', file))
                                 add_dir_to_missing = True
 
                     if add_dir_to_missing:
@@ -1164,7 +1142,7 @@ class Helpers:
             return (found_errors == 0), missing_data_dirs
 
         except Exception as e:
-           print('check_data_integrity: {}'.format(e))
+            print('check_data_integrity: {}'.format(e))
 
     def re_process_missing_data(self, missing_data_dirs):
         try:
@@ -1186,15 +1164,13 @@ class Helpers:
         except Exception as e:
             print('re_process_missing_data: {}'.format(e))
 
-
 def main():
     try:
         global path_img
         h = Helpers()
         # demonstrate()
 
-
-        print('Processing: {}'.format(path_img))
+        print('Path to source: {}'.format(path_img))
         print('Checking data integrity:')
         data_ok, missing_data_dirs = h.check_data_integrity(path_img)
         print('Data integrity check done.')
@@ -1207,8 +1183,6 @@ def main():
                 return
             else:
                 print('Successfully fixed missing data, proceeding with:')
-                
-
 
         print('calculate luminance...')
         name, sw_vers, cam_id = h.strip_name_swvers_camid(path_img)
@@ -1234,24 +1208,24 @@ def main():
             listOfAll_LDRs.append(LDR_low)
 
             # Calculate relative luminance from raw HDR
-            cam_id, type, arr_hdr = h.getNumpyArray(join(dir,'output','hdr_data.dat'))
+            cam_id, type, arr_hdr = h.getNumpyArray(join(dir, 'output', 'hdr_data.dat'))
             lum_hdr = np.mean(arr_hdr)
-            listOf_lum_hdr.append(str(round(lum_hdr,7)))
+            listOf_lum_hdr.append(str(round(lum_hdr, 7)))
 
             # Calculate relative luminance from masked raw HDR
             arr_hdr_m = h.mask_array(arr_hdr, cam_id, type, False)
             lum_hdr_m = np.mean(arr_hdr_m)
-            listOf_lum_hdr_m.append(str(round(lum_hdr_m,7)))
+            listOf_lum_hdr_m.append(str(round(lum_hdr_m, 7)))
 
             # Calculate relative luminance from jpg HDR
-            cam_id, type, arr_jpg = h.getNumpyArray(join(dir,'output','hdr_jpg.dat'))
+            cam_id, type, arr_jpg = h.getNumpyArray(join(dir, 'output', 'hdr_jpg.dat'))
             arr_jpg_m = h.mask_array(arr_jpg, cam_id, type, False)
             lum_jpg_m = np.mean(arr_jpg_m)
-            listOf_lum_jpg_m.append(str(round(lum_jpg_m,7)))
+            listOf_lum_jpg_m.append(str(round(lum_jpg_m, 7)))
 
-            cnt +=1
+            cnt += 1
             print('{}'.format(cnt))
-            #if cnt == 5:  # LOESCHEN
+            # if cnt == 5:  # LOESCHEN
             #    break
 
         print('Done loading images, starting to calculate cropped square iluminance.')
@@ -1264,27 +1238,28 @@ def main():
         count = 0
 
         for ldr_low in listOfAll_LDRs:
-            count +=1
+            count += 1
             sun_y, sun_x = h.calculate_sun_centre(ldr_low, count)
             list_sun_X.append(sun_x)
             list_sun_Y.append(sun_y)
 
-        print('Len(list_sun) x/y sun centre: {} x-coords and {} y-coords'.format(len(list_sun_X), len(list_sun_Y)))  # -> ok: Found 381 x-coords and 381 y-coords
+        print('Len(list_sun) x/y sun centre: {} x-coords and {} y-coords'.format(len(list_sun_X), len(
+            list_sun_Y)))  # -> ok: Found 381 x-coords and 381 y-coords
 
         # Interpolate missing sun positions
-        #print('Interpolating missing sun\'s position')
-        #complete_sunX, complete_sunY = interpolate_missing_sun_pos(list_sun_X, list_sun_Y) # Hier ist ein Fehler:
-        #print('Done interpolating missing sun\'s position')                                # complete_sunX / Y sind leer !
+        # print('Interpolating missing sun\'s position')
+        # complete_sunX, complete_sunY = interpolate_missing_sun_pos(list_sun_X, list_sun_Y) # Hier ist ein Fehler:
+        # print('Done interpolating missing sun\'s position')                                # complete_sunX / Y sind leer !
 
         # Debugging -> loeschen
-        #print('complete_sunX:{}'.format(len(complete_sunX))) # diese sind leer !
-        #print('complete_sunY:{}'.format(len(complete_sunY))) # diese sind leer !
+        # print('complete_sunX:{}'.format(len(complete_sunX))) # diese sind leer !
+        # print('complete_sunY:{}'.format(len(complete_sunY))) # diese sind leer !
 
         # Header of *.csv file.
         file_name = timestamp + '_luminance.csv'
-        text_file = open(join(path_img,file_name), "w")
+        text_file = open(join(path_img, file_name), "w")
         text_file.write("####################################################################### \n")
-        text_file.write("# Datet Time: {} Camera ID: {} Softwareversion: {}.  \n".format(timestamp,cam_id,sw_vers))
+        text_file.write("# Datet Time: {} Camera ID: {} Softwareversion: {}.  \n".format(timestamp, cam_id, sw_vers))
         text_file.write("####################################################################### \n")
         text_file.write("# sun_x, sun_y: position in pixels of sun.  \n")
         text_file.write("# lum_hdr:      luminance from HDR image  \n")
@@ -1294,18 +1269,17 @@ def main():
         text_file.write("####################################################################### \n")
         text_file.write("no,date,time,sun_x,sun_y,lum_hdr,lum_hdr_m,lum_jpg_m,lum_sqrcrpt \n")
 
-
         print('Calculating square cropped luminance')
         for i, ldr_low in enumerate(listOfAll_LDRs):
-            #sun_x = complete_sunX[i]                    # Hier ist der Fehler:      sun_x = complete_sunX[i]
-            #sun_y = complete_sunY[i]                    # IndexError: index 0 is out of bounds for axis 0 with size 0
-            sun_x = list_sun_X[i]                       # ohne interpolation
-            sun_y = list_sun_Y[i]                       # ohne interpolation
+            # sun_x = complete_sunX[i]                    # Hier ist der Fehler:      sun_x = complete_sunX[i]
+            # sun_y = complete_sunY[i]                    # IndexError: index 0 is out of bounds for axis 0 with size 0
+            sun_x = list_sun_X[i]  # ohne interpolation
+            sun_y = list_sun_Y[i]  # ohne interpolation
             ss = listOfAll_SS[i]
-            #lum_sqrcrpt = LuminanceSquareCrop(ldr_low, ss , sun_x, sun_y, 300, False)
-            #listOf_lum_sqrcrpt.append(str(round(lum_sqrcrpt,7)))
+            # lum_sqrcrpt = LuminanceSquareCrop(ldr_low, ss , sun_x, sun_y, 300, False)
+            # listOf_lum_sqrcrpt.append(str(round(lum_sqrcrpt,7)))
 
-            values= dict(
+            values = dict(
                 no=str(i),
                 dt=listOfAll_date[i],
                 tm=listOffAll_time[i],
@@ -1326,7 +1300,7 @@ def main():
         text_file.close()
 
     except Exception as e:
-       print('MAIN: {}'.format(e))
+        print('MAIN: {}'.format(e))
 
 
 if __name__ == '__main__':
