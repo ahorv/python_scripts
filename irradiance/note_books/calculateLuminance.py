@@ -23,7 +23,7 @@ from datetime import datetime
 # 06.11.2018 : added data integrity check
 ######################################################################
 
-path_img = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM\camera_2\cam_2_vers3\20181013_raw_cam2\temp'
+path_img = r'\\IHLNAS05\SkyCam_FTP\SKY_CAM\camera_1\cam_1_vers3\20181013_raw_cam1\temp'
 
 global len_interpolated
 len_interpolated = 0
@@ -164,12 +164,13 @@ def interpolate_missing_sun_pos(list_sun_CX, list_sun_CY):
 
 def getDirectories(path_to_dirs):
     try:
+        avoid_this_Dirs = ['imgs', 'hdr']
         allDirs = []
         img_cnt = 1
 
         for dirs in sorted(glob(join(path_to_dirs, "*", ""))):
             if os.path.isdir(dirs):
-                if dirs.rstrip('\\').rpartition('\\')[-1]:
+                if dirs.rstrip('\\').rpartition('\\')[-1] not in avoid_this_Dirs:
                     allDirs.append(dirs.rstrip('\\'))
                     img_cnt +=1
         return allDirs
@@ -595,27 +596,40 @@ def demonstrate():
 
 def check_data_integrity(path_img):
     try:
-        timestamp = getDateSring(path_img)
         all_dirs = getDirectories(path_img)
         files_to_check = ['hdr_data.dat', 'hdr_data.jpg', 'hdr_jpg.dat', 'hdr_jpg.jpg']
         result = []
+        missing_data_dirs = []
 
         for dir in all_dirs:
             path_output = join(dir, 'output')
             if not os.path.exists(path_output):
                 msg = 'missing output dir in : {}'.format(dir)
                 result.append(msg)
-                break
+                missing_data_dirs.append(dir)
             else:
+                add_dir_to_missing = False
                 for file in files_to_check:
                     if not os.path.isfile(join(dir,'output', file)):
-                        msg = 'missing file in dir: {}'.format(dir)
-                        result.append(msg)
-                        break
+                        add_dir_to_missing = True
+                    else:
+                        if os.path.getsize(join(dir,'output', file)) == 0:
+                            os.remove(join(dir,'output', file))
+                            add_dir_to_missing = True
 
-        print('Found {} missing data:'.format(len(result)))
+                if add_dir_to_missing:
+                    msg = 'missing file in dir: {}'.format(dir)
+                    result.append(msg)
+                    missing_data_dirs.append(dir)
+
+
+        found_errors = len(result)
+        print('Found {} missing data:'.format(found_errors))
         for res in result:
             print('{}'.format(res))
+
+        return (found_errors == 0), missing_data_dirs
+
 
     except Exception as e:
        print('check_data_integrity: {}'.format(e))
@@ -624,12 +638,16 @@ def check_data_integrity(path_img):
 def main():
     try:
         global path_img
+        # demonstrate()
         print('Processing: {}'.format(path_img))
         print('Checking data integrity:')
-        check_data_integrity(path_img)
+        data_ok, missing_data_dirs = check_data_integrity(path_img)
         print('Data integrity check done.')
-        print('Started luminance calculation:')
-        #demonstrate()
+        if not data_ok:
+            print('Processing stopped, you have to fix missing data first.')
+            return
+
+        print('calculate luminance...')
         name, sw_vers, cam_id = strip_name_swvers_camid(path_img)
         timestamp = getDateSring(path_img)
         all_dirs = getDirectories(path_img)

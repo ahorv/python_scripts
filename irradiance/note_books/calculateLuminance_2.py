@@ -1115,18 +1115,21 @@ class Helpers:
 
             for dir in all_dirs:
                 path_output = join(dir, 'output')
+                locked_output = join(dir, '_output')
                 if not os.path.exists(path_output):
                     msg = 'missing output dir in : {}'.format(dir)
                     result.append(msg)
                     missing_data_dirs.append(dir)
                 else:
                     add_dir_to_missing = False
+                    if os.path.exists(locked_output):
+                        os.rename(locked_output, path_output)
                     for file in files_to_check:
-                        if not os.path.isfile(join(dir, 'output', file)):
+                        if not os.path.isfile(join(path_output, file)):
                             add_dir_to_missing = True
                         else:
-                            if os.path.getsize(join(dir, 'output', file)) == 0:
-                                os.remove(join(dir, 'output', file))
+                            if os.path.getsize(join(path_output, file)) == 0:
+                                os.remove(join(path_output, file))
                                 add_dir_to_missing = True
 
                     if add_dir_to_missing:
