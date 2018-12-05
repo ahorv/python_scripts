@@ -10,6 +10,7 @@ from os.path import join
 from glob import glob
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
+from datetime import datetime
 
 print('Version opencv: ' + cv2.__version__)
 
@@ -66,6 +67,34 @@ def strip_name_swvers_camid(path):
     if sw_vers.isdigit(): sw_vers = int(sw_vers)
 
     return dir_name, sw_vers, camera_ID
+
+def strip_date_and_time(newdatetimestr):
+    try:
+        formated_date = '0000-00-00'
+        formated_time = datetime.now().strftime('%H:%M:%S')
+
+        date = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[0]
+        time = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[-1]
+
+        year  = date[:4]
+        month = date[4:6]
+        day   = date[6:8]
+        hour  = time[:2]
+        min   = time[2:4]
+        sec   = time[4:6]
+
+        check = [year,month,day,hour,min,sec]
+
+        for item in check:
+            if not item or not item.isdigit():
+                return formated_date, formated_time
+
+        formated_date = '{}-{}-{}'.format(year,month,day)
+        formated_time = '{}:{}:{}'.format(hour,min,sec)
+
+        return formated_date, formated_time
+    except Exception as e:
+        return formated_date, formated_time
 
 def getImageName():
     source_path = Path_to_source.rstrip('\\temp')
@@ -167,9 +196,13 @@ def analyse(list_of_dirs):
         output_path = join(Path_to_source.rstrip('\\temp'),'dirdiff')
         file_name = getImageName()
         erodSize = 20
+        ratio_list=[]
+        tot_number = len(list_of_dirs)
+        cnt = 0
 
         for dir in  list_of_dirs:
             name, sw, id = strip_name_swvers_camid(dir)
+            date, time = strip_date_and_time(dir)
             img = cv2.imread(join(dir,file_name),0)
             disk_c = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10, 10))
             disk_e = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erodSize, erodSize))
@@ -185,12 +218,11 @@ def analyse(list_of_dirs):
             Ind = cv2.findNonZero(imgErod)
             #lumDir = np.mean(img[Ind])
             lumDir = np.mean(img[imgErod>0])
-            print('lumDir: {}'.format(lumDir))
-
             imgDiff = ~imgErod & img >0
             imgDiff = np.array(imgDiff, dtype=np.uint8)
             lumDiff = np.mean(img[imgDiff > 0])
-            print('lumDiff: {}'.format(lumDiff))
+
+            print('{}: {} : lumDir: {}, lumDiff: {}'.format((tot_number-cnt),time, round(lumDir,2),round(lumDiff),2))
 
             img_bgr = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) #imgErod*255
 
@@ -216,9 +248,13 @@ def analyse(list_of_dirs):
             #print('Number of found contours: {}'.format(len(contours)))
             #showFinalSubplots(img_bgr, roi_zoom, name, lumDir, lumDiff)
 
-            showFinalPlot(img_bgr,name,lumDir,lumDiff)
+            #showFinalPlot(img_bgr,name,lumDir,lumDiff)
 
             #showSurfacePlot(roi,name)
+            cnt +=1
+
+            ratio = round(lumDir/lumDiff)
+            ratio_list.append(ratio)
 
     except Exception as e:
         print('MAIN: Error in main: ' + str(e))
