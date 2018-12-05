@@ -21,7 +21,7 @@ global Path_imgs
 global Avoid_This_Directories
 global Path_to_ffmpeg
 global Path_to_sourceDir
-Path_to_sourceDir = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM_7\camera_1'
+Path_to_sourceDir = r'A:\camera_1\cam_1_vers1\20180308_raw_cam1'
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Path_imgs = ''
 
@@ -250,8 +250,8 @@ def getDirectories(pathToDirectories):
 def main():
     try:
 
-        hdr_video = False
-        regular_video = False
+        hdr_video = True
+        regular_video = True
         unzip = True
 
         if unzip:
