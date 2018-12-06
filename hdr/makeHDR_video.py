@@ -14,7 +14,7 @@ global Path_imgs
 global Avoid_This_Directories
 global Path_to_ffmpeg
 global Path_to_sourceDir
-Path_to_sourceDir = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM\camera_2\cam_2_vers3\20181013_raw_cam2'
+Path_to_sourceDir = r'\\192.168.1.8\SkyCam_FTP\camera_1\cam_1_vers1\20180131_raw_cam1'
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Path_imgs = ''
 
@@ -133,6 +133,7 @@ def check_for_missing_data(path_img):
     try:
         all_dirs = getDirectories(path_img)
         dir_to_del = []
+        error_msgs = []
 
         for dir in all_dirs:
             data_ok = True
@@ -152,11 +153,16 @@ def check_for_missing_data(path_img):
 
             if not data_ok:
                 dir_to_del.append(dir.rstrip('\\'))
-                print('{} {} : invalid data found, must be removed.'.format(date, time))
-                sys.exit
+                msg = 'Invalid data in {} {} found, must be removed.'.format(date, time)
+                error_msgs.append(msg)
+
 
         if len(dir_to_del) == 0:
             print('Data integrity ok.')
+        else:
+            for msg in error_msgs:
+                print(msg)
+            sys.exit()
 
         '''
         for dir in dir_to_del:
@@ -167,6 +173,7 @@ def check_for_missing_data(path_img):
 
 def create_Video():
     try:
+        print('Creating video.')
         path_to_imgs = ''
         if os.path.exists(join(Path_to_sourceDir, 'imgs')):
             path_to_imgs  = join(Path_to_sourceDir, 'imgs')
@@ -222,6 +229,8 @@ def copyAndMaskAll_HDR_imgs(list_alldirs):
         Path_imgs = 'hdr'
         Path_to_copy_hdrs = join(Path_to_sourceDir,'hdr')
 
+        print('Collecting images.')
+
         if not os.path.exists(Path_to_copy_hdrs):
             os.makedirs(Path_to_copy_hdrs)
 
@@ -261,6 +270,8 @@ def copyAndMaskAll_imgs(list_alldirs):
         Path_to_copy_imgs = join(Path_to_sourceDir, "imgs")
         dir_name, sw_vers, camera_ID = strip_name_swvers_camid(Path_to_sourceDir)
         img_to_get = ''
+
+        print('Collecting images.')
 
         if sw_vers == 1 or sw_vers == 2:
             img_to_get = 'raw_img5.jpg'
@@ -323,13 +334,18 @@ def getDirectories(pathToDirectories):
 def main():
     try:
 
-        unzip = True
+        unzip = False
+        check = True
         hdr_video = False
         regular_video = True
+
+        print('Start make video.')
 
         if unzip:
             unzipall(Path_to_sourceDir)
             print('Unzip finished.')
+
+        if check:
             check_for_missing_data(join(Path_to_sourceDir, 'temp'))
 
         allDirs = getDirectories(join(Path_to_sourceDir, 'temp'))
