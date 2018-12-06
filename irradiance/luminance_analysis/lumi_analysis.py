@@ -175,9 +175,13 @@ def showAsSubplots(i1,i2,i3,i4, name='' ,keybrake=None):
 
 def showFinalSubplots(img_bgr,roi,name,lumDir,lumDiff, keybrake=None):
 
+    ratio = round(lumDir/lumDiff,2)
+    dir = round(lumDir, 2)
+    dif = round(lumDiff, 2)
+
     fig = plt.figure(2)
     plt.gcf().canvas.set_window_title("DateTime: {}".format(name))
-    fig.suptitle("direct: {}, diffuse: {}".format(round(lumDir, 2), round(lumDiff, 2)), fontsize=12)
+    fig.suptitle("direct: {}, diffuse: {}, ratio: {}".format(dir,dif,ratio), fontsize=12)
     ax1 = plt.subplot(121)  # 1=rows, 2=cols, 1=pic number
     ax1.set_title("Eroded with convex hul")
     img = np.array(img_bgr, dtype=np.uint8)
@@ -220,6 +224,8 @@ def showSurfacePlot(roi,name, keybrake=None):
     fig.suptitle("Surface plot of ROI", fontsize=12)
     xx, yy = np.mgrid[0:roi.shape[0], 0:roi.shape[1]]
 
+    ax.view_init(elev=50, azim=-30)
+
     if keybrake:
         ax.plot_surface(xx, yy, (roi), rstride=1, cstride=1, cmap=cm.RdYlBu, linewidth=10, shade=True)  # RdYlBu
         fig.tight_layout()
@@ -253,11 +259,10 @@ def plot_ratio(csv_name, keybrake=None):
         ratio_s.plot()
         plt.show()
 
-def analyse(list_of_dirs):
+def analyse(list_of_dirs, showplot=None):
     try:
         output_path = join(Path_to_source.rstrip('\\temp'),'dirdiff')
         file_name = getImageName()
-        erodSize = 20
         ratio_list=[]
         lumDir_list = []
         lumDiff_list = []
@@ -266,8 +271,9 @@ def analyse(list_of_dirs):
         csv_name = Path_to_source.rstrip('\\temp').rpartition('\\')[-1]
         csv_name = csv_name.replace('raw_','')
         csv_name = csv_name + "_dirdiff.csv"
-        cnt = 0
 
+        cnt = 0
+        erodSize = 30
 
         for dir in  list_of_dirs:
             name, sw, id = strip_name_swvers_camid(dir)
@@ -282,7 +288,8 @@ def analyse(list_of_dirs):
             imgClose = cv2.morphologyEx(imgSat, cv2.MORPH_CLOSE, disk_c)
             imgErod = cv2.dilate(imgClose,disk_e)
 
-            showAsSubplots(img,imgSat,imgClose,imgErod,name, keybrake=False)
+            #if showplot:
+                #showAsSubplots(img,imgSat,imgClose,imgErod,name, keybrake=True)
 
             Ind = cv2.findNonZero(imgErod)
             #lumDir = np.mean(img[Ind])
@@ -290,8 +297,6 @@ def analyse(list_of_dirs):
             imgDiff = ~imgErod & img >0
             imgDiff = np.array(imgDiff, dtype=np.uint8)
             lumDiff = np.mean(img[imgDiff > 0])
-
-            print('{}: {} : lumDir: {}, lumDiff: {}'.format((tot_number-cnt),time, round(lumDir,2),round(lumDiff),2))
 
             img_bgr = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) #imgErod*255
 
@@ -315,17 +320,20 @@ def analyse(list_of_dirs):
             roi_zoom = img_bgr[y_1-delta:y_2+delta, x_1-delta:x_2+delta]
 
             #print('Number of found contours: {}'.format(len(contours)))
-            showFinalSubplots(img_bgr, roi_zoom, name, lumDir, lumDiff,keybrake=False)
+            if showplot:
+                showFinalSubplots(img_bgr, roi_zoom, name, lumDir, lumDiff,keybrake=True)
+                #showFinalPlot(img_bgr,name,lumDir,lumDiff,keybrake=True)
+                #showSurfacePlot(roi,name, keybrake=True)
 
-            showFinalPlot(img_bgr,name,lumDir,lumDiff,keybrake=False)
-            showSurfacePlot(roi,name, keybrake=True)
             cnt +=1
 
             lumDir_list.append(lumDir)
             lumDiff_list.append(lumDiff)
 
-            ratio = round(lumDir/lumDiff)
+            ratio = lumDir/lumDiff
             ratio_list.append(ratio)
+            print('{}: {} : lumDir: {}, lumDiff: {}, ratio: {}'\
+                  .format((tot_number - cnt), time, round(lumDir, 2), round(lumDiff,2),round(ratio,4)))
 
         print('Done calculating direct/diffuse ratio.')
         print('len ratio: {}'.format(len(ratio_list)))
@@ -343,8 +351,8 @@ def analyse(list_of_dirs):
 def main():
     try:
         list_of_dirs = getDirectories(Path_to_source)
-        csv_name = analyse(list_of_dirs)
-        csv_name = r'_20180308_cam1_dirdiff.csv'
+        #csv_name = analyse(list_of_dirs,showplot= False)
+        csv_name = r'20180308_cam1_dirdiff.csv'
         plot_ratio(csv_name, keybrake=True)
 
 
