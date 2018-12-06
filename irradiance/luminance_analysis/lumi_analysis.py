@@ -31,7 +31,7 @@ print('Version opencv: ' + cv2.__version__)
 global Path_to_source
 
 # Full path including temp directory
-Path_to_source = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM_4\camera_2\cam_2_vers3\20181012_raw_cam2\temp'
+Path_to_source = r'\\192.168.1.8\SkyCam_FTP\camera_1\cam_1_vers2\20180406_raw_cam1\temp'
 
 def getDirectories(pathToDirectories):
     try:
@@ -388,8 +388,6 @@ def analyse(list_of_dirs, showplot=None):
         df = pd.DataFrame.from_dict({'date' : date_list, 'time':time_list,\
             'ratio':ratio_list,'direct':lumDir_list,'diffuse':lumDiff_list})
 
-        csv_name = 'test.csv'
-
         df.to_csv(csv_name,index=False)
 
         return csv_name
@@ -418,12 +416,13 @@ def smoothCurve(csv_name, keybrake=None):
 
 def main():
     try:
-        #check_for_missing_data(Path_to_source)
-        #list_of_dirs = getDirectories(Path_to_source)
-        #csv_name = analyse(list_of_dirs,showplot= False)
-        csv_name = r'20181012_cam2_dirdiff_e5.csv'
+        check_for_missing_data(Path_to_source)
+        list_of_dirs = getDirectories(Path_to_source)
+        csv_name = analyse(list_of_dirs,showplot= False)
 
-        #plot_ratio(csv_name, keybrake=False)
+        #csv_name = r'20181012_cam2_dirdiff_e5.csv'
+
+        plot_ratio(csv_name, keybrake=False)
         smoothCurve(csv_name, keybrake=True)
 
 
