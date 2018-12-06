@@ -30,7 +30,8 @@ print('Version opencv: ' + cv2.__version__)
 ######################################################################
 global Path_to_source
 
-Path_to_source = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM_3\camera_1\cam_1_vers1\20180324_raw_cam1\temp'
+# Full path including temp directory
+Path_to_source = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM_4\camera_2\cam_2_vers3\20181012_raw_cam2\temp'
 
 def getDirectories(pathToDirectories):
     try:
@@ -78,8 +79,9 @@ def check_for_missing_data(path_img):
                 dir_to_del.append(dir.rstrip('\\'))
                 print('{} {} : invalid data found, must be removed.'.format(date, time))
                 sys.exit
-            else:
-                print('Data integrity ok.')
+
+        if len(dir_to_del) == 0:
+            print('Data integrity ok.')
 
         '''
         for dir in dir_to_del:
@@ -280,7 +282,7 @@ def plot_ratio(csv_name, keybrake=None):
 
     df = pd.read_csv(csv_name)
     ratio_s = df['ratio']
-    print(ratio_s.head())
+    #print(ratio_s.head())
 
     fig = plt.figure(4)
     plt.gcf().canvas.set_window_title("Ratio direct to diffuse luminance")
@@ -296,6 +298,8 @@ def plot_ratio(csv_name, keybrake=None):
         ratio_s.plot()
         plt.show()
 
+    print('Show final plot done.')
+
 def analyse(list_of_dirs, showplot=None):
     try:
         output_path = join(Path_to_source.rstrip('\\temp'),'dirdiff')
@@ -303,6 +307,8 @@ def analyse(list_of_dirs, showplot=None):
         ratio_list=[]
         lumDir_list = []
         lumDiff_list = []
+        date_list = []
+        time_list = []
         tot_number = len(list_of_dirs)
 
         csv_name = Path_to_source.rstrip('\\temp').rpartition('\\')[-1]
@@ -310,11 +316,13 @@ def analyse(list_of_dirs, showplot=None):
         csv_name = csv_name + "_dirdiff.csv"
 
         cnt = 0
-        erodSize = 30
+        erodSize = 5
 
         for dir in  list_of_dirs:
             name, sw, id = strip_name_swvers_camid(dir)
             date, time = strip_date_and_time(dir)
+            date_list.append(date)
+            time_list.append(time)
             img = cv2.imread(join(dir,file_name),0)
             disk_c = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10, 10))
             disk_e = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erodSize, erodSize))
@@ -377,7 +385,11 @@ def analyse(list_of_dirs, showplot=None):
         print('len direct: {}'.format(len(lumDir_list)))
         print('len diffuse: {}'.format(len(lumDiff_list)))
 
-        df = pd.DataFrame.from_dict({'ratio':ratio_list,'direct':lumDir_list,'diffuse':lumDiff_list})
+        df = pd.DataFrame.from_dict({'date' : date_list, 'time':time_list,\
+            'ratio':ratio_list,'direct':lumDir_list,'diffuse':lumDiff_list})
+
+        csv_name = 'test.csv'
+
         df.to_csv(csv_name,index=False)
 
         return csv_name
@@ -385,13 +397,37 @@ def analyse(list_of_dirs, showplot=None):
     except Exception as e:
         print('Error in analyse: ' + str(e))
 
+def smoothCurve(csv_name, keybrake=None):
+    df = pd.read_csv(csv_name)
+    ratio_s = df['ratio']
+
+    smoothed_s = df['ratio'].rolling(window=150).mean()
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(15, 5))
+    axes[0].plot(ratio_s)
+    axes[0].set_title('Original')
+    axes[1].plot(smoothed_s)
+    axes[1].set_title('Smoothed')
+    plt.draw()
+
+    if keybrake:
+        while True:
+            if plt.waitforbuttonpress():
+                break
+        plt.close(fig)
+
 def main():
     try:
         #check_for_missing_data(Path_to_source)
-        list_of_dirs = getDirectories(Path_to_source)
-        csv_name = analyse(list_of_dirs,showplot= False)
-        #csv_name = r'20180308_cam1_dirdiff.csv'
-        plot_ratio(csv_name, keybrake=True)
+        #list_of_dirs = getDirectories(Path_to_source)
+        #csv_name = analyse(list_of_dirs,showplot= False)
+        csv_name = r'20181012_cam2_dirdiff_e5.csv'
+
+        #plot_ratio(csv_name, keybrake=False)
+        smoothCurve(csv_name, keybrake=True)
+
+
+        print('Luminance analysis done.')
 
 
     except Exception as e:
