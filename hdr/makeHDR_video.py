@@ -250,9 +250,10 @@ def getDirectories(pathToDirectories):
 def main():
     try:
 
-        hdr_video = True
+        unzip = False
+        hdr_video = False
         regular_video = True
-        unzip = True
+
 
         if unzip:
             unzipall(Path_to_sourceDir)

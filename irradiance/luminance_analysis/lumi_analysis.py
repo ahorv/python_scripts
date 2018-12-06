@@ -11,6 +11,7 @@ from glob import glob
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
 from datetime import datetime
+import pandas as pd
 
 print('Version opencv: ' + cv2.__version__)
 
@@ -96,6 +97,33 @@ def strip_date_and_time(newdatetimestr):
     except Exception as e:
         return formated_date, formated_time
 
+def strip_date(path):
+    try:
+        H_S = datetime.now().strftime('%M-%S')
+        formated_date = '0000-{}'.format(H_S)
+
+        temp = path.rstrip('\\temp')
+        temp = (temp.rpartition('\\'))[-1]
+        temp = temp.replace('_',' ')
+        dateAndTime = temp
+
+        year = dateAndTime[:4]
+        month = dateAndTime[4:6]
+        day = dateAndTime[6:8]
+
+        check = [year,month,day]
+
+        for item in check:
+            if not item or not item.isdigit():
+                logger.error('strip_date: {} could not read date and time  used {} !'.format(path, formated_date))
+                return formated_date
+
+        formated_date = '{}-{}-{}'.format(year, month, day)
+
+        return formated_date
+    except IOError as e:
+        return formated_date
+
 def getImageName():
     source_path = Path_to_source.rstrip('\\temp')
     dir_name, sw_vers, camera_ID = strip_name_swvers_camid(source_path)
@@ -108,10 +136,8 @@ def getImageName():
 
     return img_name
 
-def showAsSubplots(i1,i2,i3,i4, name=''):
-
+def showAsSubplots(i1,i2,i3,i4, name='' ,keybrake=None):
     try:
-
         fig = plt.figure(1)
         plt.gcf().canvas.set_window_title("DateTime: {}".format(name))
         fig.suptitle("Determine direct and diffuse parts.", fontsize=16)
@@ -135,16 +161,19 @@ def showAsSubplots(i1,i2,i3,i4, name=''):
         img = np.array(i4, dtype=np.uint8)
         plt.imshow(img,'gray')
 
-        plt.draw()
-        while True:
-            if plt.waitforbuttonpress():
-                break
-        plt.close(fig)
+        if keybrake:
+            while True:
+                plt.draw()
+                if plt.waitforbuttonpress():
+                    break
+            plt.close(fig)
+        else:
+            plt.draw()
 
     except Exception as e:
         print('showAsSubplots: ' + str(e))
 
-def showFinalSubplots(img_bgr,roi,name,lumDir,lumDiff):
+def showFinalSubplots(img_bgr,roi,name,lumDir,lumDiff, keybrake=None):
 
     fig = plt.figure(2)
     plt.gcf().canvas.set_window_title("DateTime: {}".format(name))
@@ -159,37 +188,70 @@ def showFinalSubplots(img_bgr,roi,name,lumDir,lumDiff):
     img = np.array(roi, dtype=np.uint8)
     plt.imshow(img)
 
-    plt.draw()
-    while True:
-        if plt.waitforbuttonpress():
-            break
-    plt.close(fig)
+    if keybrake:
+        plt.draw()
+        while True:
+            if plt.waitforbuttonpress():
+                break
+        plt.close(fig)
+    else:
+        plt.draw()
 
-def showFinalPlot(img_bgr,name,lumDir,lumDiff):
+def showFinalPlot(img_bgr,name,lumDir,lumDiff, keybrake=None):
     fig = plt.figure(3)
     plt.gcf().canvas.set_window_title("DateTime: {}".format(name))
     fig.suptitle("direct: {}, diffuse: {}".format(round(lumDir, 2), round(lumDiff, 2)), fontsize=12)
-    plt.imshow(img_bgr)
-    plt.draw()
-    while True:
-        if plt.waitforbuttonpress():
-            break
-    plt.close(fig)
 
-def showSurfacePlot(roi,name):
+    if keybrake:
+        plt.imshow(img_bgr)
+        plt.draw()
+        while True:
+            if plt.waitforbuttonpress():
+                break
+        plt.close(fig)
+
+    else:
+        plt.imshow(img_bgr)
+        plt.draw()
+
+def showSurfacePlot(roi,name, keybrake=None):
     fig, ax = plt.subplots(nrows=1, ncols=1, subplot_kw={'projection': '3d'})
     plt.gcf().canvas.set_window_title("DateTime: {}".format(name))
     fig.suptitle("Surface plot of ROI", fontsize=12)
-
     xx, yy = np.mgrid[0:roi.shape[0], 0:roi.shape[1]]
-    ax.plot_surface(xx, yy, (roi), rstride=1, cstride=1, cmap=cm.RdYlBu, linewidth=10, shade=True)  # RdYlBu
 
-    fig.tight_layout()
-    plt.draw()
-    while True:
-        if plt.waitforbuttonpress():
-            break
-    plt.close(fig)
+    if keybrake:
+        ax.plot_surface(xx, yy, (roi), rstride=1, cstride=1, cmap=cm.RdYlBu, linewidth=10, shade=True)  # RdYlBu
+        fig.tight_layout()
+        plt.draw()
+        while True:
+            if plt.waitforbuttonpress():
+                break
+        plt.close(fig)
+    else:
+        ax.plot_surface(xx, yy, (roi), rstride=1, cstride=1, cmap=cm.RdYlBu, linewidth=10, shade=True)  # RdYlBu
+        fig.tight_layout()
+        plt.draw()
+
+def plot_ratio(csv_name, keybrake=None):
+
+    df = pd.read_csv(csv_name)
+    ratio_s = df['ratio']
+    print(ratio_s.head())
+
+    fig = plt.figure(4)
+    plt.gcf().canvas.set_window_title("Ratio direct to diffuse luminance")
+    fig.suptitle("Ratio direct to diffuse luminance", fontsize=12)
+
+    if keybrake:
+        ratio_s.plot()
+        while True:
+            if plt.waitforbuttonpress():
+                break
+        plt.close(fig)
+    else:
+        ratio_s.plot()
+        plt.show()
 
 def analyse(list_of_dirs):
     try:
@@ -197,8 +259,15 @@ def analyse(list_of_dirs):
         file_name = getImageName()
         erodSize = 20
         ratio_list=[]
+        lumDir_list = []
+        lumDiff_list = []
         tot_number = len(list_of_dirs)
+
+        csv_name = Path_to_source.rstrip('\\temp').rpartition('\\')[-1]
+        csv_name = csv_name.replace('raw_','')
+        csv_name = csv_name + "_dirdiff.csv"
         cnt = 0
+
 
         for dir in  list_of_dirs:
             name, sw, id = strip_name_swvers_camid(dir)
@@ -213,7 +282,7 @@ def analyse(list_of_dirs):
             imgClose = cv2.morphologyEx(imgSat, cv2.MORPH_CLOSE, disk_c)
             imgErod = cv2.dilate(imgClose,disk_e)
 
-            #showAsSubplots(img,imgSat,imgClose,imgErod,name)
+            showAsSubplots(img,imgSat,imgClose,imgErod,name, keybrake=False)
 
             Ind = cv2.findNonZero(imgErod)
             #lumDir = np.mean(img[Ind])
@@ -246,24 +315,37 @@ def analyse(list_of_dirs):
             roi_zoom = img_bgr[y_1-delta:y_2+delta, x_1-delta:x_2+delta]
 
             #print('Number of found contours: {}'.format(len(contours)))
-            #showFinalSubplots(img_bgr, roi_zoom, name, lumDir, lumDiff)
+            showFinalSubplots(img_bgr, roi_zoom, name, lumDir, lumDiff,keybrake=False)
 
-            #showFinalPlot(img_bgr,name,lumDir,lumDiff)
-
-            #showSurfacePlot(roi,name)
+            showFinalPlot(img_bgr,name,lumDir,lumDiff,keybrake=False)
+            showSurfacePlot(roi,name, keybrake=True)
             cnt +=1
+
+            lumDir_list.append(lumDir)
+            lumDiff_list.append(lumDiff)
 
             ratio = round(lumDir/lumDiff)
             ratio_list.append(ratio)
 
+        print('Done calculating direct/diffuse ratio.')
+        print('len ratio: {}'.format(len(ratio_list)))
+        print('len direct: {}'.format(len(lumDir_list)))
+        print('len diffuse: {}'.format(len(lumDiff_list)))
+
+        df = pd.DataFrame.from_dict({'ratio':ratio_list,'direct':lumDir_list,'diffuse':lumDiff_list})
+        df.to_csv(csv_name,index=False)
+
+        return csv_name
+
     except Exception as e:
-        print('MAIN: Error in main: ' + str(e))
+        print('Error in analyse: ' + str(e))
 
 def main():
     try:
-
         list_of_dirs = getDirectories(Path_to_source)
-        analyse(list_of_dirs)
+        csv_name = analyse(list_of_dirs)
+        csv_name = r'_20180308_cam1_dirdiff.csv'
+        plot_ratio(csv_name, keybrake=True)
 
 
     except Exception as e:
