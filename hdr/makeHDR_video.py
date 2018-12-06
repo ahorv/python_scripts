@@ -14,7 +14,7 @@ global Path_imgs
 global Avoid_This_Directories
 global Path_to_ffmpeg
 global Path_to_sourceDir
-Path_to_sourceDir = r'A:\camera_1\cam_1_vers1\20180123_raw_cam1'
+Path_to_sourceDir = r'\\192.168.1.8\SkyCam_FTP\camera_1\cam_1_vers1\20180129_raw_cam1'
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Path_imgs = ''
 
@@ -306,7 +306,7 @@ def copyAndMaskAll_imgs(list_alldirs):
             cv2.imwrite(new_img_path, masked_img)
             cnt += 1
 
-        print(' {} images copyied to hdr.'.format(cnt))
+        print(' {} images copyied to img.'.format(cnt))
 
     except Exception as e:
         print('Error in copyAndMaskAll_HDR_imgs: {}'.format(e))
@@ -334,7 +334,7 @@ def getDirectories(pathToDirectories):
 def main():
     try:
 
-        unzip = True
+        unzip = False
         check = True
         hdr_video = False
         regular_video = True
