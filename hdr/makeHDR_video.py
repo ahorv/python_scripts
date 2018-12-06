@@ -9,11 +9,12 @@ import subprocess
 import zipfile
 from glob import glob, glob1
 from os.path import isfile, join
+from datetime import datetime
 global Path_imgs
 global Avoid_This_Directories
 global Path_to_ffmpeg
 global Path_to_sourceDir
-Path_to_sourceDir = r'A:\camera_1\cam_1_vers1\20171122_raw_cam1'
+Path_to_sourceDir = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM\camera_2\cam_2_vers3\20181013_raw_cam2'
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Path_imgs = ''
 
@@ -161,8 +162,6 @@ def check_for_missing_data(path_img):
         for dir in dir_to_del:
             os.remove(dir)
         '''
-
-
     except Exception as e:
         print('Error in check_for_missing_data: ' + str(e))
 
