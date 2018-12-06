@@ -11,6 +11,7 @@ from glob import glob, glob1
 import matplotlib.cm as cm
 from datetime import datetime
 import pandas as pd
+import sys
 
 print('Version opencv: ' + cv2.__version__)
 
@@ -76,6 +77,7 @@ def check_for_missing_data(path_img):
             if not data_ok:
                 dir_to_del.append(dir.rstrip('\\'))
                 print('{} {} : invalid data found, must be removed.'.format(date, time))
+                sys.exit
             else:
                 print('Data integrity ok.')
 
@@ -83,6 +85,7 @@ def check_for_missing_data(path_img):
         for dir in dir_to_del:
             os.remove(dir)
         '''
+
 
     except Exception as e:
         print('Error in check_for_missing_data: ' + str(e))
@@ -384,8 +387,7 @@ def analyse(list_of_dirs, showplot=None):
 
 def main():
     try:
-        check_for_missing_data(Path_to_source)
-        return
+        #check_for_missing_data(Path_to_source)
         list_of_dirs = getDirectories(Path_to_source)
         csv_name = analyse(list_of_dirs,showplot= False)
         #csv_name = r'20180308_cam1_dirdiff.csv'
