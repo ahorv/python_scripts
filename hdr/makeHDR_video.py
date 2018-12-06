@@ -5,23 +5,15 @@ from __future__ import print_function
 import os
 import cv2
 import sys
-import time
-import shutil
-import exifread
-from shutil import copy2
-from glob import glob
 import subprocess
 import zipfile
-from matplotlib import pyplot as plt
-from os import listdir
+from glob import glob, glob1
 from os.path import isfile, join
-import numpy as np
-from fractions import Fraction
 global Path_imgs
 global Avoid_This_Directories
 global Path_to_ffmpeg
 global Path_to_sourceDir
-Path_to_sourceDir = r'A:\SKY_CAM\camera_1\cam_1_vers3\20181013_raw_cam1'
+Path_to_sourceDir = r'A:\camera_1\cam_1_vers1\20171122_raw_cam1'
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Path_imgs = ''
 
@@ -91,6 +83,88 @@ def unzipall(path_to_extract):
 
     except Exception as e:
         print('unzipall: ' + str(e))
+
+def strip_name_swvers_camid(path):
+    path = path.lower()
+    path = path.rstrip('\\')
+    dir_name = (path.split('\\'))[-1]
+    temp = (path.split('\\cam_'))[-1]
+    temp = (temp.split('\\'))[0]
+    temp = (temp.split('_'))
+    camera_ID = temp[0]
+    sw_vers = temp[1]
+    sw_vers = sw_vers.replace('vers', '')
+
+    if camera_ID.isdigit(): camera_ID = int(camera_ID)
+    if sw_vers.isdigit(): sw_vers = int(sw_vers)
+
+    return dir_name, sw_vers, camera_ID
+
+def strip_date_and_time(newdatetimestr):
+    try:
+        formated_date = '0000-00-00'
+        formated_time = datetime.now().strftime('%H:%M:%S')
+
+        date = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[0]
+        time = (newdatetimestr.rstrip('\\').rpartition('\\')[-1]).rpartition('_')[-1]
+
+        year  = date[:4]
+        month = date[4:6]
+        day   = date[6:8]
+        hour  = time[:2]
+        min   = time[2:4]
+        sec   = time[4:6]
+
+        check = [year,month,day,hour,min,sec]
+
+        for item in check:
+            if not item or not item.isdigit():
+                return formated_date, formated_time
+
+        formated_date = '{}-{}-{}'.format(year,month,day)
+        formated_time = '{}:{}:{}'.format(hour,min,sec)
+
+        return formated_date, formated_time
+    except Exception as e:
+        return formated_date, formated_time
+
+def check_for_missing_data(path_img):
+    try:
+        all_dirs = getDirectories(path_img)
+        dir_to_del = []
+
+        for dir in all_dirs:
+            data_ok = True
+            dir_name, sw_vers, camera_ID = strip_name_swvers_camid(dir)
+            date, time = strip_date_and_time(dir_name)
+
+            datCnt = len(glob1(dir, "*.data"))
+            jpgCnt = len(glob1(dir, "*.jpg"))
+            logCnt = len(glob1(dir, "*.log"))
+
+            if sw_vers == 1:
+                if datCnt < 9 or jpgCnt < 9 or not (logCnt == 1):
+                    data_ok = False
+            else:
+                if datCnt < 3 or jpgCnt < 3 or not (logCnt == 1):
+                    data_ok = False
+
+            if not data_ok:
+                dir_to_del.append(dir.rstrip('\\'))
+                print('{} {} : invalid data found, must be removed.'.format(date, time))
+                sys.exit
+
+        if len(dir_to_del) == 0:
+            print('Data integrity ok.')
+
+        '''
+        for dir in dir_to_del:
+            os.remove(dir)
+        '''
+
+
+    except Exception as e:
+        print('Error in check_for_missing_data: ' + str(e))
 
 def create_Video():
     try:
@@ -250,14 +324,14 @@ def getDirectories(pathToDirectories):
 def main():
     try:
 
-        unzip = False
+        unzip = True
         hdr_video = False
         regular_video = True
-
 
         if unzip:
             unzipall(Path_to_sourceDir)
             print('Unzip finished.')
+            check_for_missing_data(join(Path_to_sourceDir, 'temp'))
 
         allDirs = getDirectories(join(Path_to_sourceDir, 'temp'))
 
