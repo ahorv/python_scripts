@@ -21,7 +21,7 @@ global Path_imgs
 global Avoid_This_Directories
 global Path_to_ffmpeg
 global Path_to_sourceDir
-Path_to_sourceDir = r'A:\camera_1\cam_1_vers1\20180308_raw_cam1'
+Path_to_sourceDir = r'A:\SKY_CAM\camera_1\cam_1_vers3\20181013_raw_cam1'
 Path_to_ffmpeg = r'C:\ffmpeg\bin\ffmpeg.exe'
 Path_imgs = ''
 

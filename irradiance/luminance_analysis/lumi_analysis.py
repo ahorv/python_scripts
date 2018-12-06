@@ -7,8 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 from os.path import join
-from glob import glob
-from mpl_toolkits.mplot3d import Axes3D
+from glob import glob, glob1
 import matplotlib.cm as cm
 from datetime import datetime
 import pandas as pd
@@ -30,7 +29,7 @@ print('Version opencv: ' + cv2.__version__)
 ######################################################################
 global Path_to_source
 
-Path_to_source = r'A:\camera_1\cam_1_vers1\20180308_raw_cam1\temp'
+Path_to_source = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM_3\camera_1\cam_1_vers1\20180324_raw_cam1\temp'
 
 def getDirectories(pathToDirectories):
     try:
@@ -52,6 +51,41 @@ def getDirectories(pathToDirectories):
 
     except Exception as e:
         print('getDirectories: Error: ' + str(e))
+
+def check_for_missing_data(path_img):
+    try:
+        all_dirs = getDirectories(path_img)
+        dir_to_del = []
+
+        for dir in all_dirs:
+            data_ok = True
+            dir_name, sw_vers, camera_ID = strip_name_swvers_camid(dir)
+            date, time = strip_date_and_time(dir_name)
+
+            datCnt = len(glob1(dir, "*.data"))
+            jpgCnt = len(glob1(dir, "*.jpg"))
+            logCnt = len(glob1(dir, "*.log"))
+
+            if sw_vers == 1:
+                if datCnt < 9 or jpgCnt < 9 or not (logCnt == 1):
+                    data_ok = False
+            else:
+                if datCnt < 3 or jpgCnt < 3 or not (logCnt == 1):
+                    data_ok = False
+
+            if not data_ok:
+                dir_to_del.append(dir.rstrip('\\'))
+                print('{} {} : invalid data found, must be removed.'.format(date, time))
+            else:
+                print('Data integrity ok.')
+
+        '''
+        for dir in dir_to_del:
+            os.remove(dir)
+        '''
+
+    except Exception as e:
+        print('Error in check_for_missing_data: ' + str(e))
 
 def strip_name_swvers_camid(path):
     path = path.lower()
@@ -350,9 +384,11 @@ def analyse(list_of_dirs, showplot=None):
 
 def main():
     try:
+        check_for_missing_data(Path_to_source)
+        return
         list_of_dirs = getDirectories(Path_to_source)
-        #csv_name = analyse(list_of_dirs,showplot= False)
-        csv_name = r'20180308_cam1_dirdiff.csv'
+        csv_name = analyse(list_of_dirs,showplot= False)
+        #csv_name = r'20180308_cam1_dirdiff.csv'
         plot_ratio(csv_name, keybrake=True)
 
 

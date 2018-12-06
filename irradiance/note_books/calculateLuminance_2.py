@@ -1106,46 +1106,6 @@ class Helpers:
             print('Done demonstrate.')
             sys.exit(0)
 
-    def check_data_integrity(self, path_img):
-        try:
-            all_dirs = self.getDirectories(path_img)
-            files_to_check = ['hdr_data.dat', 'hdr_data.jpg', 'hdr_jpg.dat', 'hdr_jpg.jpg']
-            result = []
-            missing_data_dirs = []
-
-            for dir in all_dirs:
-                path_output = join(dir, 'output')
-                locked_output = join(dir, '_output')
-                if not os.path.exists(path_output):
-                    msg = 'missing output dir in : {}'.format(dir)
-                    result.append(msg)
-                    missing_data_dirs.append(dir)
-                else:
-                    add_dir_to_missing = False
-                    if os.path.exists(locked_output):
-                        os.rename(locked_output, path_output)
-                    for file in files_to_check:
-                        if not os.path.isfile(join(path_output, file)):
-                            add_dir_to_missing = True
-                        else:
-                            if os.path.getsize(join(path_output, file)) == 0:
-                                os.remove(join(path_output, file))
-                                add_dir_to_missing = True
-
-                    if add_dir_to_missing:
-                        msg = 'missing file in dir: {}'.format(dir)
-                        result.append(msg)
-                        missing_data_dirs.append(dir)
-
-            found_errors = len(result)
-            print('Found {} missing data:'.format(found_errors))
-            for res in result:
-                print('{}'.format(res))
-
-            return (found_errors == 0), missing_data_dirs
-
-        except Exception as e:
-            print('check_data_integrity: {}'.format(e))
 
     def re_process_missing_data(self, missing_data_dirs):
         try:
@@ -1175,12 +1135,12 @@ def main():
 
         print('Path to source: {}'.format(path_img))
         print('Checking data integrity:')
-        data_ok, missing_data_dirs = h.check_data_integrity(path_img)
+        data_ok, missing_data_dirs = h.check_for_missing_data(path_img)
         print('Data integrity check done.')
         if not data_ok:
             print('Processing stopped, trying to fix missing data first.')
             h.re_process_missing_data(missing_data_dirs)
-            data_ok, _ = h.check_data_integrity(path_img)
+            data_ok, _ = h.check_for_missing_data(path_img)
             if not data_ok:
                 print('Could not fix missing data, stopping processing.')
                 return
