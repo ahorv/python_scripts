@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import cv2
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import os
 from os.path import join
@@ -31,7 +32,7 @@ print('Version opencv: ' + cv2.__version__)
 global Path_to_source
 
 # Full path including temp directory
-Path_to_source = r'\\192.168.1.8\SkyCam_FTP\camera_1\cam_1_vers2\20180406_raw_cam1\temp'
+Path_to_source = r'Z:\SKY_CAM_4\camera_2\cam_2_vers3\20181012_raw_cam2\temp'
 
 def getDirectories(pathToDirectories):
     try:
@@ -154,7 +155,6 @@ def strip_date(path):
 
         for item in check:
             if not item or not item.isdigit():
-                logger.error('strip_date: {} could not read date and time  used {} !'.format(path, formated_date))
                 return formated_date
 
         formated_date = '{}-{}-{}'.format(year, month, day)
@@ -171,7 +171,7 @@ def getImageName():
         img_name = 'raw_img5.jpg'
 
     if sw_vers == 3:
-        img_name = 'raw_img0.jpg'
+        img_name = 'raw_img-4.jpg'
 
     return img_name
 
@@ -263,7 +263,7 @@ def showSurfacePlot(roi,name, keybrake=None):
     fig.suptitle("Surface plot of ROI", fontsize=12)
     xx, yy = np.mgrid[0:roi.shape[0], 0:roi.shape[1]]
 
-    ax.view_init(elev=50, azim=-30)
+    #ax.view_init(elev=50, azim=-30)
 
     if keybrake:
         ax.plot_surface(xx, yy, (roi), rstride=1, cstride=1, cmap=cm.RdYlBu, linewidth=10, shade=True)  # RdYlBu
@@ -300,6 +300,28 @@ def plot_ratio(csv_name, keybrake=None):
 
     print('Show final plot done.')
 
+def plot_direct(csv_name, keybrake=None):
+
+    df = pd.read_csv(csv_name)
+    ratio_s = df['diffuse']
+    #print(ratio_s.head())
+
+    fig = plt.figure(4)
+    plt.gcf().canvas.set_window_title("Direct")
+    fig.suptitle("Ratio direct to diffuse luminance", fontsize=12)
+
+    if keybrake:
+        ratio_s.plot()
+        while True:
+            if plt.waitforbuttonpress():
+                break
+        plt.close(fig)
+    else:
+        ratio_s.plot()
+        plt.show()
+
+    print('Show final plot done.')
+
 def analyse(list_of_dirs, showplot=None):
     try:
         output_path = join(Path_to_source.rstrip('\\temp'),'dirdiff')
@@ -316,7 +338,7 @@ def analyse(list_of_dirs, showplot=None):
         csv_name = csv_name + "_dirdiff.csv"
 
         cnt = 0
-        erodSize = 5
+        erodSize = 20
 
         for dir in  list_of_dirs:
             name, sw, id = strip_name_swvers_camid(dir)
@@ -333,8 +355,8 @@ def analyse(list_of_dirs, showplot=None):
             imgClose = cv2.morphologyEx(imgSat, cv2.MORPH_CLOSE, disk_c)
             imgErod = cv2.dilate(imgClose,disk_e)
 
-            #if showplot:
-                #showAsSubplots(img,imgSat,imgClose,imgErod,name, keybrake=True)
+            if showplot:
+                showAsSubplots(img,imgSat,imgClose,imgErod,name, keybrake=True)
 
             Ind = cv2.findNonZero(imgErod)
             #lumDir = np.mean(img[Ind])
@@ -395,11 +417,11 @@ def analyse(list_of_dirs, showplot=None):
     except Exception as e:
         print('Error in analyse: ' + str(e))
 
-def smoothCurve(csv_name, keybrake=None):
+def smoothCurve(csv_name, keybrake=None,ws = 80):
     df = pd.read_csv(csv_name)
-    ratio_s = df['ratio']
+    ratio_s = df['diffuse']
 
-    smoothed_s = df['ratio'].rolling(window=150).mean()
+    smoothed_s = df['diffuse'].rolling(window=ws).mean()
 
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(15, 5))
     axes[0].plot(ratio_s)
@@ -416,15 +438,26 @@ def smoothCurve(csv_name, keybrake=None):
 
 def main():
     try:
-        check_for_missing_data(Path_to_source)
+        #check_for_missing_data(Path_to_source)
         list_of_dirs = getDirectories(Path_to_source)
-        csv_name = analyse(list_of_dirs,showplot= False)
+        #csv_name = analyse(list_of_dirs, showplot=False)
+        #plot_ratio(csv_name, keybrake=False)
 
-        #csv_name = r'20181012_cam2_dirdiff_e5.csv'
 
-        plot_ratio(csv_name, keybrake=False)
-        smoothCurve(csv_name, keybrake=True)
+        csv_name = r'20180308_cam1_dirdiff.csv'
+        plot_direct(csv_name)
 
+        smoothCurve(csv_name, keybrake=True, ws=180)
+
+        return
+
+
+        csv_name = r'20180324_cam1_dirdiff_e5.csv'
+        #csv_name = r'20180324_cam1_dirdiff_e5.csv'
+        #csv_name = r'20180406_cam1_dirdiff_e5.csv'
+
+        #smoothCurve(csv_name, keybrake=True, ws=80)
+        plot_direct(csv_name)
 
         print('Luminance analysis done.')
 
