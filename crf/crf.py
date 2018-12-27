@@ -32,7 +32,8 @@ if sys.platform == "linux":
 # 24.12.2017 : First implemented
 ######################################################################
 
-SS_LIST = np.linspace(0., 33000., 659)
+#SS_LIST = np.linspace(0., 33000., 659)
+SS_LIST = np.linspace(10., 66000.,1320)
 Path = join('/home', 'pi', 'python_scripts', 'crf')
 
 
@@ -214,7 +215,6 @@ def takepictures():
     except Exception as e:
         camera.close()
         print('Error in takepicture: ' + str(e))
-
 
 
 def main():
