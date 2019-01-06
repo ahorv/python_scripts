@@ -29,7 +29,7 @@ if sys.platform == "linux":
 ######################################################################
 # This class takes 3 consecutive images with increasing shutter times.
 # Pictures are in raw bayer format. In addition a jpg as reference is
-# taken in addition.
+# taken.
 # Aim is to merge a sequence of images to a HDR image.
 # Runtime for a sequence of 3 images is about 21 sec
 # Shutter times: img0: 85, img5: 595, img9: 992 micro secs
