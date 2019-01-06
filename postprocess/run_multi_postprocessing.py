@@ -10,12 +10,12 @@ import time
 ######################################################################
 ## Hoa: 19.11.2018 Version: run_multi_processing.py
 ######################################################################
-# This is a master file for postprocessing.py.
+# This is a master file for postprocessing4.py.
 # The script starts multiple threads according to the number of
 # CPU cores. Multiple instances of postprocessing.py are run parallel.
 # ----------------------------------------------------------------------
-# Remarks: You must set the python's interpreters path to your individual
-#          configuration !
+# Remarks: You must set the python's 'interpreter_path' (see second line
+#          of code) according to your own IDE configuration !
 #
 # New /Changes:
 # ----------------------------------------------------------------------
@@ -31,7 +31,7 @@ interpreter_path = r'C:\Users\ati\Anaconda3\envs\skycam\python.exe'
 
 def run_process():
     try:
-        os.system('{} postprocess.py'.format(interpreter_path))
+        os.system('{} postprocess4.py'.format(interpreter_path))
     except Exception as e:
         print('Error in run_process: {}'.format(e))
 

@@ -35,9 +35,10 @@ if sys.platform == "linux":
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 19.11.2018 Version: postprocess.py
+## Hoa: 19.11.2018 Version 4: postprocess.py
 ######################################################################
 # Can be run as multiple simultaneous threads.
+# Can cope with all three types of camera software version.
 # Database table 'dir_table' with two new columns 'block', 'done'.
 # If a directory is processed, 'block' is set True
 # If processing of directory is finished, 'done' is set true.
@@ -50,7 +51,7 @@ print('Version opencv: ' + cv2.__version__)
 # - File structure is as follows:
 #   \\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1\
 #   where:
-#   camera_1 resp camera_2: distinguishes between the two camereras in use
+#   camera_1 resp camera_2: distinguishes between the two cameras in use
 #   cam_1_vers1: stands for camera 1 with software version 1. 3 different
 #   camera software version where in use.
 #   20180117_raw_cam1: designates year, month, day
@@ -62,8 +63,9 @@ print('Version opencv: ' + cv2.__version__)
 # New /Changes:
 # ----------------------------------------------------------------------
 #
-# 18.10.2018 : first implemented
-# 10.11.2018 : added host detection, updated logger, improved path retrieval
+# 19.11.2018 : first implemented
+# 20.11.2018 : final version
+#
 #
 ######################################################################
 

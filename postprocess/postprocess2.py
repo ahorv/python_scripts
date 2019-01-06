@@ -22,7 +22,7 @@ from fractions import Fraction
 print('Version opencv: ' + cv2.__version__)
 
 ###############################################################################
-## Hoa: 07.10.2018 Version 1 : postprocess2.py
+## Hoa: 07.10.2018 Version 2 : postprocess2.py
 ###############################################################################
 # This version runs on images created with picam.py
 # Collects *.jpg and .data images and creates HDR pictures. In addition:

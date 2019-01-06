@@ -2,15 +2,13 @@
 
 from __future__ import print_function
 
-import multiprocessing
 import mysql.connector
 from mysql.connector import Error
 import gc
 import re
 import os
-import io
-from glob import glob1
 import cv2
+import socket
 import sys
 import math
 import pandas as pd
@@ -18,6 +16,7 @@ import exifread
 from glob import glob
 import zipfile
 import shutil
+import io
 from pathlib import Path
 from os.path import join
 import numpy as np
@@ -26,7 +25,6 @@ import matplotlib.pyplot as plt
 import logging
 import logging.handlers
 from datetime import datetime
-import signal
 
 if sys.platform == "linux":
     import pwd
@@ -36,67 +34,32 @@ if sys.platform == "linux":
 print('Version opencv: ' + cv2.__version__)
 
 ######################################################################
-## Hoa: 10.11.2018 Version 2 : postprocess_spez_2.py
+## Hoa: 10.11.2018 Version 3 : postprocess3.py
 ######################################################################
+# Reads all images from FTP - server. Create HDR images. Camera data
+# and images are stored in MySQL database.
 #
-# Special version of postprocess.py:
-# Like postprocess.py but with the difference that the HDR - images
-# are not stored in a MySQL database but in their directories.
-# All unziped files are collected in the new directory 'temp'.
-# Resulting HDR images are saved to new 'output' directory located in
-# each unzipped directory.
-#
-# Used for preprocessing images for irradiance calculations.
+# Remarks:
+# - File structure is as follows:
+#   \\HOANAS\HOA_SKYCam\camera_1\cam_1_vers1\20200505_raw_cam1\
+#   where:
+#   camera_1 resp camera_2: distinguishes between the two camereras in use
+#   cam_1_vers1: stands for camera 1 with software version 1. 3 different
+#   camera software version where in use.
+#   20180117_raw_cam1: designates year, month, day
+# - use phpmyadmin to see database contents
+# - in CFG set only one path to process single directory eg. :
+#        'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1\cam_1_vers3',
+#        'camera_2_Directory': r'',
 #
 # New /Changes:
 # ----------------------------------------------------------------------
 #
 # 18.10.2018 : first implemented
-# 02.12.2018 : This version will try to reprocess missing data.
+# 10.11.2018 : added host detection, updated logger, improved path retrieval
 #
 ######################################################################
 
-class DelayedKeyboardInterrupt(object):
-    def __enter__(self):
-        self.signal_received = False
-        self.old_handler = signal.signal(signal.SIGINT, self.handler)
-        self.process = Process_Data.process
-
-    def handler(self, sig, frame):
-        self.signal_received = (sig, frame)
-        print('KeyboardInterrupt received, closing gracefully.')
-        self.process.terminate()
-
-        while(not self.process.is_alive()):
-            print('Process terminated.')
-
-        dir = Process_Data.current_dir
-
-        if os.path.exists(join(dir, '_output')):
-            os.rename(join(dir, '_output'),join(dir,'output'))
-
-    def __exit__(self, type, value, traceback):
-        print('DelayedKeyboardInterrupt Exiting programm')
-        signal.signal(signal.SIGINT, self.old_handler)
-        if self.signal_received:
-            self.old_handler(*self.signal_received)
-
-class Process_Data(object):
-    process = '?'
-    current_dir = '?'
-
-    def __init__(self, state_map={}):
-        self.process = state_map.get('process', 0)
-        self.current_dir = state_map.get('current_dir', 0)
-
-        Process_Data.process = self.process
-        Process_Data.current_dir = self.current_dir
-
-        def to_dict(self):
-            return {
-                'process': Process_Data.process,
-                'current_dir': Process_Data.current_dir,
-            }
 
 class Image_Data(object):
     """Container class for image data.
@@ -231,6 +194,7 @@ class Camera_Data(object):
 class Config(object):
     """Container class for configuration.
     """
+    HOST_NAME = '?'
     NAS_IP = '?'
     sourceDirectory = '?'
     camera_1_Directory = '?'
@@ -242,6 +206,7 @@ class Config(object):
 
     def __init__(self, state_map={}):
 
+        self.HOST_NAME = state_map.get('HOST_NAME', '?')
         self.NAS_IP = state_map.get('NAS_IP','?')
         self.sourceDirectory = state_map.get('sourceDirectory', '?')
         self.camera_1_Directory = state_map.get('camera_1_Directory', '?')
@@ -251,6 +216,7 @@ class Config(object):
         self.allFilesProcessed_path = state_map.get('allFilesProcessed_path', '?')
         self.rainy_days_path = state_map.get('rainy_days_path', '?')
 
+        Config.HOST_NAME = self.HOST_NAME
         Config.NAS_IP = self.NAS_IP
         Config.sourceDirectory = self.sourceDirectory
         Config.camera_1_Directory = self.camera_1_Directory
@@ -260,46 +226,18 @@ class Config(object):
         Config.allFilesProcessed_path = self.allFilesProcessed_path
         Config.rainy_days_path = self.rainy_days_path
 
+class AppFilter(logging.Filter):
+    '''
+    Needed by class Logger.
+    Sets additional field for logger message.
+    '''
+    def filter(self, record):
+        record.host_name = Config.HOST_NAME
+        return True
+
 class Logger:
     def __init__(self):
         self.logger = None
-
-    def getFileLogger(self):
-        try:
-            PATH = Config.databaseDirectory
-
-            FILEPATH = os.path.join(PATH, 'allFilesProcessed.log')
-            LOGFILEPATH = join(r'\\',FILEPATH)
-            Config.allFilesProcessed_path = LOGFILEPATH
-
-            logFormatter = logging.Formatter('%(message)s')
-            fileHandler = logging.FileHandler(LOGFILEPATH)
-            name = 'filesProcessedLogger'
-
-            # configure file handler
-            fileHandler.setFormatter(logFormatter)
-
-            # configure stream handler
-            consoleHandler = logging.StreamHandler()
-            consoleHandler.setFormatter(logFormatter)
-
-            # get the logger instance
-            self.logger = logging.getLogger(name)
-
-            # set the logging level
-            self.logger.setLevel(logging.INFO)
-
-            if not len(self.logger.handlers):
-                self.logger.addHandler(fileHandler)
-                self.logger.addHandler(consoleHandler)
-
-            helper = Helpers()
-            if sys.platform == "linux":
-                helper.setOwnerAndPermission(LOGFILEPATH)
-            return self.logger
-
-        except Exception as e:
-            print('Error Filelogger:' + str(e))
 
     def getLogger(self, newLogPath=None):
 
@@ -310,7 +248,7 @@ class Logger:
                 FILEPATH = os.path.join(PATH, 'postprocessor.log')
                 LOGFILEPATH = join(r'\\',FILEPATH)
 
-                logFormatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+                logFormatter = logging.Formatter('%(host_name)s %(asctime)s %(levelname)s %(message)s')
                 fileHandler = logging.FileHandler(LOGFILEPATH)
                 name = 'rootlogger'
             else:
@@ -328,6 +266,9 @@ class Logger:
 
             # get the logger instance
             self.logger = logging.getLogger(name)
+
+            # add new message field (host_name)
+            self.logger.addFilter(AppFilter())
 
             # set the logging level
             self.logger.setLevel(logging.INFO)
@@ -679,11 +620,6 @@ class HDR:
             img_dir = []
             type = ''
 
-            output_path = join(path, '_output')
-
-            if not os.path.exists(output_path):
-                os.rename(join(path, 'output'), output_path)  # lock this directory for processing
-
             if img_type is 'jpg':
                 type = '*.jpg'
             else:
@@ -709,9 +645,8 @@ class HDR:
 
             if img_type is 'jpg':
                 hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
-
-                with open(join(output_path, 'hdr_jpg.dat'), 'wb') as f:
-                    hdr.tofile(f)
+                byte_str = hdr.tobytes()
+                Image_Data.ldr = byte_str
 
                 # cb = COLORBALANCE() # not clear if luminace information will be preserved
 
@@ -721,15 +656,43 @@ class HDR:
                 hdr_reinhard_s = cv2.resize(hdr_reinhard,(int(h/3),int(w/3)))
                 rhard_8bit = cv2.normalize(hdr_reinhard_s, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
 
-                cv2.imwrite(join(output_path, 'hdr_jpg.jpg'), rhard_8bit)
+                rhard_rgb = cv2.cvtColor(rhard_8bit, cv2.COLOR_BGR2RGB)
+
+                fig, ax = plt.subplots(figsize=plt.figaspect(rhard_rgb))
+                fig.subplots_adjust(0, 0, 1, 1)
+                ax.set_axis_off()
+                ax.imshow(rhard_rgb)
+                byte_str = io.BytesIO()
+                fig.savefig(byte_str, format='jpg')
+                byte_str.seek(0)
+                blob = byte_str.read()
+                Image_Data.ldr_s = blob
+                plt.cla()       # Hoa neu
+                plt.close(fig)  # Hoa neu
                 # clean up
-                del rhard_8bit; del hdr_reinhard; del hdr_reinhard_s
+                del byte_str; del blob; del rhard_rgb; del rhard_8bit; del hdr_reinhard; del hdr_reinhard_s
 
             if img_type is 'data':
-                hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
+                # Create and plot response curve
+                plt.figure(figsize=(10, 10))
+                plt.plot(gr, range(256), 'rx')
+                plt.plot(gg, range(256), 'gx')
+                plt.plot(gb, range(256), 'bx')
+                plt.ylabel('pixel value Z')
+                plt.xlabel('log exposure X')
+                fig = plt.gcf()
+                respc = io.BytesIO()
+                fig.savefig(respc, format='jpg')
+                respc.seek(0)
+                resp_blob = respc.read()
+                Image_Data.resp = resp_blob
+                plt.cla()      # Hoa neu
+                plt.close(fig) # Hoa neu
 
-                with open(join(output_path, 'hdr_data.dat'), 'wb') as f:
-                    hdr.tofile(f)
+                # make the HDR
+                hdr = self.construct_hdr([img_list_b, img_list_g, img_list_r], [gb, gg, gr], listOfSS)
+                byte_str = hdr.tobytes()
+                Image_Data.hdr = byte_str
 
                 # create thumbnails image
                 hdr_reinhard = self.tonemapReinhard(hdr)
@@ -737,21 +700,42 @@ class HDR:
                 hdr_reinhard_s = cv2.resize(hdr_reinhard, (int(h / 3), int(w / 3)))
                 rhard_8bit = cv2.normalize(hdr_reinhard_s, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
 
-                cv2.imwrite(join(output_path, 'hdr_data.jpg'),rhard_8bit)
-                #clean up
-                del hdr; del hdr_reinhard; del hdr_reinhard_s; del rhard_8bit
+                fig, ax = plt.subplots(figsize=plt.figaspect(rhard_8bit))
+                fig.subplots_adjust(0, 0, 1, 1)
+                ax.set_axis_off()
+                ax.imshow(rhard_8bit)
+                byte_str = io.BytesIO()
+                fig.savefig(byte_str, format='jpg')
+                byte_str.seek(0)
+                blob = byte_str.read()
+                Image_Data.hdr_s = blob
+                plt.cla()        # Hoa neu
+                plt.close(fig)   # Hoa neu
+
+                # Create radiance map
+                plt.figure(figsize=(12, 8))
+                plt.imshow(np.log2(cv2.cvtColor(hdr, cv2.COLOR_BGR2GRAY)), cmap='jet')
+                plt.colorbar()
+                fig = plt.gcf()
+                rmap = io.BytesIO()
+                fig.savefig(rmap, format='jpg')
+                rmap.seek(0)
+                rmap_blob = rmap.read()
+                Image_Data.rmap = rmap_blob
+                plt.cla()       # Hoa neu
+                plt.close(fig)  # Hoa neu
+                # clean up
+                del rmap; del rmap_blob; del hdr; del hdr_reinhard; del hdr_reinhard_s; del rhard_8bit; del byte_str
+                del respc; del resp_blob
 
             # clean up
             del img_dir; del img_list_b; del img_list_g; del img_list_r; del listOfSS
             del gb; del gr; del gg
 
-            os.rename(output_path,join(path, 'output'))
-
             success = True
             return success
 
         except Exception as e:
-            os.rename(output_path, join(path, 'output'))
             logger.error('make_hdr ' + str(e))
             return success
 
@@ -1864,13 +1848,15 @@ class Helpers:
     def getDirectories(self,pathToDirectories):
         try:
             allDirs = []
-            img_cnt = 1
 
-            for dirs in sorted(glob(os.path.join(pathToDirectories, "*", ""))):
-                if os.path.isdir(dirs):
-                    if dirs.rstrip('\\').rpartition('\\')[-1]:
-                        allDirs.append(dirs.rstrip('\\'))
-                        img_cnt +=1
+            dir_name = pathToDirectories.rpartition('\\')[-1]
+            if 'raw' in dir_name:
+                allDirs = pathToDirectories
+            else:
+                for dirs in sorted(glob(os.path.join(pathToDirectories, "*", ""))):
+                    if os.path.isdir(dirs):
+                        if dirs.rstrip('\\').rpartition('\\')[-1]:
+                            allDirs.append(dirs.rstrip('\\'))
             return allDirs
 
         except Exception as e:
@@ -1940,50 +1926,22 @@ class Helpers:
 
             allzipDirs = self.getZipDirs(path_to_extract)
 
-            for dirs in allzipDirs:
-                path = dirs.lower().replace('.zip', '')
+            for dir in allzipDirs:
+                path = dir.lower().replace('.zip', '')
                 dirName = (path.rstrip('\\').rpartition('\\')[-1])
                 new_temp_path = join(temp_path, dirName)
 
                 if path:
                     if not os.path.exists(new_temp_path):
-                        zipfilepath = os.path.join(dirs)
+                        zipfilepath = os.path.join(dir)
                         zf = zipfile.ZipFile(zipfilepath, "r")
                         zf.extractall(os.path.join(new_temp_path))
                         zf.close()
-
-                self.validate_unzipped_data(new_temp_path) # will delete unzipped dir if invalid data
 
             return temp_path
 
         except Exception as e:
             logger.error('unzipall: ' + str(e))
-
-    def delAllZIP(self,path_to_extract):
-        try:
-            allzipDirs = self.getZipDirs(path_to_extract)
-            numb_to_unzip = len(allzipDirs)
-            cnt = 0
-
-            for zipdir in allzipDirs:
-                # delete unzipped directory
-                print('deleting: '+str(zipdir))
-                os.remove(zipdir)
-
-            print('deleted all ZIP files.')
-
-        except Exception as e:
-            print('delAllZIP: Error: ' + str(e))
-
-    def delUnzipedDir(self, pathtoDir):
-        try:
-            s = Logger()
-            logger = s.getLogger()
-            shutil.rmtree(pathtoDir)
-            logger.info('deleted {} folder.'.format(pathtoDir))
-
-        except Exception as e:
-            logger.error('delUnzipedDir: {}'.format(e))
 
     def search_list(self, myList, search_str):
         matching = None
@@ -1996,11 +1954,15 @@ class Helpers:
         all_cam2_vers = self.getDirectories(Config.camera_2_Directory)
         all_cam_vers = []
 
-        for i, val in enumerate(all_cam1_vers):
-            all_cam_vers.append(val)
-            all_cam_vers.append(all_cam2_vers[i])
+        if all_cam1_vers and all_cam2_vers:
+            for i, val in enumerate(all_cam1_vers):
+                all_cam_vers.append(val)
+                all_cam_vers.append(all_cam2_vers[i])
 
-        return  all_cam_vers
+        else:
+            all_cam_vers = all_cam1_vers + all_cam2_vers
+
+        return all_cam_vers
 
     def getAll_previouslyProcessed(self):
         filename = Config.allFilesProcessed_path
@@ -2008,7 +1970,7 @@ class Helpers:
 
         return lines
 
-    def start_preprocessing(self, path_to_one_dir=None):
+    def load_images2DB(self, path_to_one_dir=None):
         '''
         Depending weather one directory or empty paramter given, one day of
         captured images is processed or all days within the root directory.
@@ -2021,20 +1983,24 @@ class Helpers:
 
             # write only one day to database
             if path_to_one_dir:
-                name, sw_vers, cam_id = self.strip_name_swvers_camid(path_to_one_dir)
-                Camera_Data.cam_id = cam_id
-                Camera_Data.sw_vers = sw_vers
-                success = self.processOneDay(path_to_one_dir)
+                date = self.getDateSring(path_to_one_dir)
+                if self.is_rainy_day(date):  # check if it was a rainy day
+                    logger.info('Skipped {} was a rainy day.'.format(date))
+                    return
+                else:
+                    success = self.processOneDay(path_to_one_dir)
 
-            # write everything to database
+            # write everything to database (within given directory)
             else:
                 allCamDirectorys = self.getAllCamDirectories()
                 for path in allCamDirectorys:
-                    allDirs = self.getDirectories(path)
 
-                    for raw_cam_dir in allDirs:
-                        #date = self.getDateSring(raw_cam_dir)
-                        success = self.processOneDay(raw_cam_dir)
+                    all_dirs = self.getDirectories(path)
+
+                    if isinstance(all_dirs, (list, )):
+                        success = self.processDays(all_dirs)
+                    else:
+                        success = self.processOneDay(all_dirs)
 
             gc.collect()
 
@@ -2088,23 +2054,11 @@ class Helpers:
             Image_Data.awb_red = awb_red_to_db
             Image_Data.awb_blue = awb_blue_to_db
 
+            thumb_ok = hdr.make_thumb(path)
+            hdr_dat_ok = hdr.make_hdr(path, listOfSS,'data')
+            hdr_jpg_ok = hdr.make_hdr(path, listOfSS,'jpg')
 
-            if os.path.exists(join(path, '_output')): # right now processed from other process -> skip
-                return success
-
-            if not os.path.exists(join(path, 'output')):  # not processed yet
-                os.makedirs(join(path, 'output'))
-                hdr_dat_ok = hdr.make_hdr(path, listOfSS,'data')
-                hdr_jpg_ok = hdr.make_hdr(path, listOfSS,'jpg')
-            else:                                         # partially processed
-                if not os.path.isfile(join(path, 'output', 'hdr_data.dat')):
-                    hdr_dat_ok = hdr.make_hdr(path, listOfSS, 'data')
-                    hdr_jpg_ok = True
-                if not os.path.isfile(join(path, 'output', 'hdr_jpg.dat')):
-                    hdr_jpg_ok = hdr.make_hdr(path, listOfSS, 'jpg')
-                    hdr_dat_ok = True
-
-            if(hdr_dat_ok and hdr_jpg_ok):
+            if(hdr_dat_ok and hdr_jpg_ok and thumb_ok):
                 success = True
 
             return success
@@ -2146,60 +2100,21 @@ class Helpers:
 
         return succes
 
-    def validate_unzipped_data(self, new_unzipped_dir):
-        try:
-            data_ok = True
-            dir_name, sw_vers, camera_ID = self.strip_name_swvers_camid(new_unzipped_dir)
+    def processDays(self, all_dirs):
+        s = Logger()
+        logger = s.getLogger()
+        success = False
 
-            datCnt = len(glob1(new_unzipped_dir, "*.data"))
-            jpgCnt = len(glob1(new_unzipped_dir, "*.jpg"))
-            logCnt = len(glob1(new_unzipped_dir, "*.log"))
+        for raw_cam_dir in all_dirs:
+            date = self.getDateSring(raw_cam_dir)
 
-            if sw_vers == 1:
-                if datCnt < 9 or jpgCnt < 9 or not(logCnt == 1):
-                    data_ok = False
+            if self.is_rainy_day(date):  # check if it was a rainy day
+                logger.info('Skipped {} was a rainy day.'.format(date))
+                continue
             else:
-                if datCnt < 3 or jpgCnt < 3 or not(logCnt == 1):
-                    data_ok = False
+                success = self.processOneDay(raw_cam_dir)
 
-            if not data_ok:
-                os.remove(new_unzipped_dir)
-                print('invalid data found and removed: {}'.format(new_unzipped_dir))
-
-        except Exception as e:
-            print('Error in validate_unzipped_data: ' + str(e))
-
-    def check_data_integrity(self, all_dirs):
-        try:
-            files_to_check = ['hdr_data.dat', 'hdr_data.jpg', 'hdr_jpg.dat', 'hdr_jpg.jpg']
-            result = []
-            missing_data_dirs = []
-
-            for dir in all_dirs:
-                path_output = join(dir, 'output')
-                locked_output = join(dir, '_output')
-
-                if not os.path.exists(path_output):
-                    missing_data_dirs.append(dir)
-                else:
-                    add_dir_to_missing = False
-                    if os.path.exists(locked_output):
-                        os.rename(locked_output, path_output)
-                    for file in files_to_check:
-                        if not os.path.isfile(join(path_output, file)):
-                            add_dir_to_missing = True
-                        else:
-                            if os.path.getsize(join(path_output, file)) == 0:
-                                os.remove(join(path_output, file))
-                                add_dir_to_missing = True
-
-                    if add_dir_to_missing:
-                        missing_data_dirs.append(dir)
-
-            return missing_data_dirs
-
-        except Exception as e:
-            print('check_data_integrity: {}'.format(e))
+        return success
 
     def processOneDay(self, path):
         try:
@@ -2208,26 +2123,37 @@ class Helpers:
             success = False
 
             path_to_temp = self.unzipall(path)
-            all_unziped_dirs = self.getDirectories(path_to_temp)
-
             self.collectCamData(path)
-            dirs_to_process = self.check_data_integrity(all_unziped_dirs)
+            all_dirs = self.getDirectories(path_to_temp)
 
-            for dir in dirs_to_process:
-                now = datetime.now()
-                Process_Data.current_dir = dir
-                print('{} Processing: {}'.format(now.strftime("%H:%M:%S"), dir))
-                success = self.collectImageData(dir)
+            for dir in all_dirs:
+                if self.check_if_already_processed(dir.rstrip('\\')):
+                    continue
+                else:
+                    now = datetime.now()
+                    print('{} Processing: {}'.format(now.strftime("%H:%M:%S"),dir))
+                    success = self.collectImageData(dir)
+                    if success:
+                        success = self.writeImageData2DB()
+                    if success:
+                        success = self.addProcessedDir2DB(dir)
 
             if success:
-                #shutil.rmtree(path_to_temp)
-                print('Done.')
-            print('\n')
+                shutil.rmtree(path_to_temp)
+                print('all files in temp deleted.')
+
             return success
 
         except Exception as e:
           logger.error('processOneDay: ' + str(e))
           return success
+
+    def check_if_already_processed(self, cur_dir):
+        db = DB_handler()
+        dir_name, sw_vers, cam_ID = self.strip_name_swvers_camid(cur_dir)
+        exists = db.object_exists([str(dir_name), str(sw_vers), str(cam_ID)])
+
+        return exists
 
     def load_rainy_days(self):
         try:
@@ -2236,10 +2162,6 @@ class Helpers:
             success = False
 
             my_file = Path(Config.rainy_days_path)
-
-            if(not my_file._closed):
-                return True
-
             if my_file.is_file():
                 df = pd.read_csv(Config.rainy_days_path)
                 success = True
@@ -2263,66 +2185,36 @@ class Helpers:
             logger.error('is_rainy_day: ' + str(e))
             return rainy
 
-    def gracefully_terminate(self):
-        try:
-            print('KeyboardInterrupt received, closing gracefully.')
-            # For Cntrl+C in debug mode go to menu -> Run -> Debug -> Edit Configuration
-            # choose in Defaults : 'python' and set tick for  'Emulate terminal in output console'
-
-            current_pid = multiprocessing.current_process().pid
-            #os.popen('TASKKILL /PID ' + str(current_pid) + ' /F')
-
-            dir = Process_Data.current_dir
-            print('current dir: {}'.format(dir))
-
-            if os.path.exists(join(dir, '_output')):
-                os.rename(join(dir, '_output'), join(dir, 'output'))
-
-        except Exception as e:
-            dir = Process_Data.current_dir
-            if os.path.exists(join(dir, '_output')):
-                os.rename(join(dir, '_output'), join(dir, 'output'))
-            print('error gracefully_terminate: {}'.format(e))
-
-
 def main():
     try:
-        ##################
-        #  SPEZ VERSION  #
-        ##################
-
+        host_name = socket.gethostname()
         CFG = {
+            'HOST_NAME'         : host_name,
             'NAS_IP'            : r'192.168.1.10',            # @ Home: '192.168.1.10'
-            'sourceDirectory'   : r'\\192.168.1.8\SkyCam_FTP\SKY_CAM',
-            'databaseDirectory' : r'\\192.168.1.8\SkyCam_FTP\SKY_CAM',
-            'camera_1_Directory': r'',
-            'camera_2_Directory': r'',
-            'rainy_days_path'   : r'precipitation\rainy_days.csv',
+            'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
+            'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
+            'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
+            'camera_2_Directory': r'\\HOANAS\HOA_SKYCam\camera_2',
+            'rainy_days_path'   : r'..\assessment\rainy_days.csv',
         }
 
         config = Config(CFG)
 
-        #p = Proc()
         h = Helpers()
         s = Logger()
         logger = s.getLogger()
 
-        # dont provide temp in path
-        path = r'\\192.168.1.8\SkyCam_FTP\SKY_CAM\camera_2\cam_2_vers3\20181013_raw_cam2'
+        start = h.load_rainy_days()
 
-        logger.info('STARTED file processing.')
-        #p.start(h.start_preprocessing(path))
-        proc = multiprocessing.Process(target=h.start_preprocessing(path))
-        print('Started process pid: {}'.format(proc.pid))
-        proc.start()
-        print('Started process pid: {}'.format(proc.pid))
+        if start:
+            db = DB_handler()
+            db.createDB()
 
-
-        logger.info('STOPPED file processing.')
-
-    except KeyboardInterrupt as e:
-        print('Cntr+C')
-        h.gracefully_terminate()
+            logger.info('STARTED file processing.')
+            h.load_images2DB()        # if only one day to be processed, provide path
+            logger.info('STOPPED file processing.')
+        else:
+            print('Missing rainy_days.csv file.')
 
     except Exception as e:
         logger.error('MAIN: {}'.format(e))
