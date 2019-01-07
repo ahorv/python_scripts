@@ -1,2 +1,2 @@
 # python_scripts
-All my pythonscripts.
+Miscellaneous scripts for camera control, sensor data acquisition and image post-processing.
