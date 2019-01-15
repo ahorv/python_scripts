@@ -2314,18 +2314,18 @@ class Helpers:
 def main():
     try:
         host_name = socket.gethostname()
+
+        config = Config(CFG)
+
         CFG = {
             'HOST_NAME'         : host_name,
             'NAS_IP'            : r'192.168.1.10',            # @ Home: '192.168.1.10'
             'sourceDirectory'   : r'\\HOANAS\HOA_SKYCam',
             'databaseDirectory' : r'\\HOANAS\HOA_SKYCam',
-            'camera_1_Directory': r'', # r'\\HOANAS\HOA_SKYCam\camera_1'
-            'camera_2_Directory': r'',
-            'rainy_days_path'   : r'..\precipitation\rainy_days.csv',
+            'camera_1_Directory': r'\\HOANAS\HOA_SKYCam\camera_1',
+            'camera_2_Directory': r'\\HOANAS\HOA_SKYCam\camera_2',
+            'rainy_days_path'   : r'..\data\precipitation\rainy_days.csv',
         }
-
-        config = Config(CFG)
-
         h = Helpers()
         s = Logger()
         logger = s.getLogger()
@@ -2337,7 +2337,8 @@ def main():
             db.createDB()
 
             logger.info('STARTED file processing.')
-            h.load_images2DB(r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers1\20171124_raw_cam1')        # if only one day to be processed, provide path
+            h.load_images2DB() # loads everthing to database
+            #h.load_images2DB(r'I:\SkY_CAM_IMGS\camera_1\cam_1_vers1\20171124_raw_cam1')        # if only one day to be processed, provide path
             logger.info('STOPPED file processing.')
         else:
             print('Missing rainy_days.csv file.')
