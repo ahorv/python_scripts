@@ -710,8 +710,8 @@ def main():
 
         # Interpolate missing sun positions
         #print('Interpolating missing sun\'s position')
-        #complete_sunX, complete_sunY = interpolate_missing_sun_pos(list_sun_X, list_sun_Y) # Hier ist ein Fehler:
-        #print('Done interpolating missing sun\'s position')                                # complete_sunX / Y sind leer !
+        #complete_sunX, complete_sunY = interpolate_missing_sun_pos(list_sun_X, list_sun_Y)
+        #print('Done interpolating missing sun\'s position')
 
         # Debugging -> loeschen
         #print('complete_sunX:{}'.format(len(complete_sunX))) # diese sind leer !

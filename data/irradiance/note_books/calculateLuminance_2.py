@@ -1234,8 +1234,8 @@ def main():
 
         print('Calculating square cropped luminance')
         for i, ldr_low in enumerate(listOfAll_LDRs):
-            # sun_x = complete_sunX[i]                    # Hier ist der Fehler:      sun_x = complete_sunX[i]
-            # sun_y = complete_sunY[i]                    # IndexError: index 0 is out of bounds for axis 0 with size 0
+            # sun_x = complete_sunX[i]
+            # sun_y = complete_sunY[i]                   
             sun_x = list_sun_X[i]  # ohne interpolation
             sun_y = list_sun_Y[i]  # ohne interpolation
             ss = listOfAll_SS[i]
